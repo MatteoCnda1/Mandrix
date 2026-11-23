@@ -1,5 +1,5 @@
 import type { StoryGroup } from '@mandrix/shared';
-import { ArrowClockwise, ArrowRight, LockSimple, Plus, UsersThree } from '@phosphor-icons/react';
+import { ArrowClockwise, ArrowRight, LockSimple, MagnifyingGlass, Plus, UsersThree } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
@@ -29,7 +29,7 @@ function StoryTile({ group, label, ring, onClick, badge }: { group: StoryGroup; 
           {preview ? (
             <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
           ) : (
-            <span className="absolute inset-0 grid place-items-center text-[15px] font-extrabold text-phink">{group.user.initials}</span>
+            <span className="absolute inset-0 grid place-items-center text-[0.9375rem] font-extrabold text-phink">{group.user.initials}</span>
           )}
           <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
           <span className="pointer-events-none absolute inset-0 rounded-[23px] shadow-[inset_0_0_0_2px_var(--card)]" />
@@ -127,12 +127,20 @@ export function Feed() {
           />
         </span>
       </div>
+      <button
+        type="button"
+        onClick={() => nav('/recherche')}
+        className="tap flex h-12 animate-in items-center gap-2.5 rounded-[24px] border-0 bg-glass px-4 text-left text-[0.9375rem] text-mute shadow-pill backdrop-blur"
+      >
+        <MagnifyingGlass size={20} />
+        Rechercher des posts, #hashtags, amis…
+      </button>
       <Stories />
       {!isDesktop && (
         <button
           type="button"
           onClick={() => nav('/pellicule')}
-          className="tap flex min-h-[60px] animate-in items-center gap-3 rounded-[30px] border-0 bg-brand py-2 pr-[18px] pl-2 text-left text-[15px] font-bold text-white shadow-blue transition-transform active:scale-[.98]"
+          className="tap flex min-h-[60px] animate-in items-center gap-3 rounded-[30px] border-0 bg-brand py-2 pr-[18px] pl-2 text-left text-[0.9375rem] font-bold text-white shadow-blue transition-transform active:scale-[.98]"
         >
           <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-card text-acc">
             <LockSimple size={20} weight="fill" />

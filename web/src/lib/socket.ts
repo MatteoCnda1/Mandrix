@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, GameRoom, Message, ServerToClientEvents } from '@mandrix/shared';
+import type { ClientToServerEvents, ConversationDetail, GameRoom, Message, ServerToClientEvents } from '@mandrix/shared';
 import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { qc } from './data';
@@ -16,6 +16,31 @@ export const useGame = create<{ room: GameRoom | null; connected: boolean; synce
 
 export function getSocket() {
   return socket;
+}
+
+/** « En train d'écrire » : conversation → membres qui écrivent. Expire seul après 6 s sans nouvelle. */
+export const useTyping = create<Record<string, string[]>>(() => ({}));
+const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function setTyping(conversationId: string, userId: string, typing: boolean) {
+  const key = `${conversationId}:${userId}`;
+  clearTimeout(typingTimers.get(key));
+  typingTimers.delete(key);
+  useTyping.setState((s) => {
+    const list = (s[conversationId] ?? []).filter((id) => id !== userId);
+    return { [conversationId]: typing ? [...list, userId] : list };
+  });
+  if (typing) typingTimers.set(key, setTimeout(() => setTyping(conversationId, userId, false), 6000));
+}
+
+let lastTypingSent = 0;
+/** Prévient les autres membres que j'écris (au plus toutes les 3 s), ou que j'ai arrêté. */
+export function sendTyping(conversationId: string, typing: boolean) {
+  if (!socket?.connected) return;
+  const now = Date.now();
+  if (typing && now - lastTypingSent < 3000) return;
+  lastTypingSent = typing ? now : 0;
+  socket.emit('dm:typing', conversationId, typing);
 }
 
 export function connectSocket() {
@@ -41,6 +66,7 @@ export function connectSocket() {
       for (const k of [['friends'], ['feed'], ['stories'], ['profile']]) qc.invalidateQueries({ queryKey: k });
     }
     if (n.type === 'unpack') qc.invalidateQueries({ queryKey: ['unpack'] });
+    if (n.type === 'daily_meme') qc.invalidateQueries({ queryKey: ['daily'] });
     if (n.type === 'moment') {
       qc.invalidateQueries({ queryKey: ['pellicule'] });
       toast('C’est le moment Mandrix : 10 minutes pour ta photo 📸');
@@ -49,7 +75,17 @@ export function connectSocket() {
   socket.on('media:ready', () => {
     for (const k of [['feed'], ['reels'], ['stories'], ['user-posts'], ['post'], ['memes'], ['messages']]) qc.invalidateQueries({ queryKey: k });
   });
+  socket.on('dm:typing', (e) => setTyping(e.conversationId, e.userId, e.typing));
+  socket.on('dm:read', (e) => {
+    qc.setQueryData<ConversationDetail>(['conversation', e.conversationId], (old) =>
+      old ? { ...old, reads: [...old.reads.filter((r) => r.userId !== e.userId), { userId: e.userId, at: e.at }] } : old,
+    );
+  });
+  socket.on('dm:reaction', (e) => {
+    qc.setQueryData<Message[]>(['messages', e.conversationId], (old) => old?.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)));
+  });
   socket.on('dm:new', (m: Message) => {
+    setTyping(m.conversationId, m.senderId, false);
     qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));
     qc.invalidateQueries({ queryKey: ['conversations'] });
     // Évènement de groupe (ajout, départ, nouveau nom) : on recharge la fiche du groupe.

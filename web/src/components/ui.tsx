@@ -1,6 +1,6 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
 import { CircleNotch, X } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
 import logoSymbol from '../assets/logo/mandrix-symbol.svg';
@@ -53,7 +53,7 @@ export function Seg<T extends string | number>({ options, value, onChange, class
           onClick={() => onChange(o.value)}
           className={cx(
             'tap flex-1 border-0 font-bold transition-colors duration-300',
-            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-10 rounded-[20px] px-3 text-[13px]',
+            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-10 rounded-[20px] px-3 text-[0.8125rem]',
             o.value === value ? 'bg-ink text-inv' : 'bg-transparent text-ink',
           )}
         >
@@ -66,7 +66,7 @@ export function Seg<T extends string | number>({ options, value, onChange, class
 
 export function Switch({ on }: { on: boolean }) {
   return (
-    <span className={cx('relative h-[30px] w-[52px] flex-none rounded-[15px] transition-colors duration-300', on ? 'bg-brand' : 'bg-line')}>
+    <span className={cx('relative inline-block h-[30px] w-[52px] flex-none rounded-[15px] align-middle transition-colors duration-300', on ? 'bg-brand' : 'bg-line')}>
       <span
         className="absolute top-[3px] left-[3px] h-6 w-6 rounded-full bg-white transition-transform duration-[350ms] ease-spring"
         style={{ transform: on ? 'translateX(22px)' : 'none' }}
@@ -80,6 +80,33 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
   const [dragY, setDragY] = useState(0);
   const [closing, setClosing] = useState(false);
   const drag = useRef<{ y: number; t: number } | null>(null);
+  const panel = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
+
+  // Lecteur d'écran et clavier : le focus entre dans la feuille, y reste, et revient d'où il venait.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    panel.current?.focus({ preventScroll: true });
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panel.current) return;
+      const items = panel.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', trap);
+    return () => {
+      window.removeEventListener('keydown', trap);
+      prev?.focus?.({ preventScroll: true });
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -119,6 +146,7 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
       style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <div
         onClick={dismiss}
@@ -126,8 +154,10 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
         style={{ opacity: closing ? 0 : Math.max(0.3, 1 - dragY / 500) }}
       />
       <div
+        ref={panel}
+        tabIndex={-1}
         className={cx(
-          'no-scrollbar relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
+          'no-scrollbar relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] outline-none w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
           wide ? 'max-w-[640px]' : 'max-w-[560px]',
         )}
         style={{
@@ -147,7 +177,9 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
         >
           <div className="h-[5px] w-11 flex-none self-center rounded-[3px] bg-line" />
           <div className="flex items-center gap-2.5">
-            <div className="mr-auto text-xl font-extrabold tracking-[-.02em]">{title}</div>
+            <h2 id={titleId} className="m-0 mr-auto text-xl font-extrabold tracking-[-.02em]">
+              {title}
+            </h2>
             <IconBtn label="Fermer" onClick={dismiss}>
               <X size={20} />
             </IconBtn>
@@ -204,15 +236,15 @@ export function ConfirmHost() {
     req.resolve(ok);
     setReq(null);
   };
-  const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[17px] transition-colors active:bg-soft';
+  const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[1.0625rem] transition-colors active:bg-soft';
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
       <div onClick={() => answer(false)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
       <div className="relative flex w-full max-w-[420px] animate-sheet flex-col gap-2">
         <div className="overflow-hidden rounded-[24px] bg-card text-center">
           <div className="flex flex-col gap-1 px-5 pt-4 pb-3.5">
-            <div className="text-[13px] font-bold text-mute">{req.title}</div>
-            {req.message && <div className="text-[13px] leading-snug text-mute">{req.message}</div>}
+            <div className="text-[0.8125rem] font-bold text-mute">{req.title}</div>
+            {req.message && <div className="text-[0.8125rem] leading-snug text-mute">{req.message}</div>}
           </div>
           <button type="button" autoFocus onClick={() => answer(true)} className={cx(row, 'border-t border-line font-semibold', req.destructive ? 'text-heart' : 'text-acc')}>
             {req.confirmLabel}
@@ -269,8 +301,10 @@ export function Toast() {
   );
 }
 
-export function MediaView({ media, className, style, controls, autoPlay, muted = true, loop = true, onClick, fit = 'cover', videoRef }: {
+export function MediaView({ media, className, style, controls, autoPlay, muted = true, loop = true, onClick, fit = 'cover', videoRef, sizes = '(max-width: 700px) 100vw, 640px' }: {
   media: MediaRef;
+  /** Largeur d'affichage, pour choisir la bonne variante de la photo (`srcset`). */
+  sizes?: string;
   className?: string;
   style?: CSSProperties;
   controls?: boolean;
@@ -301,13 +335,25 @@ export function MediaView({ media, className, style, controls, autoPlay, muted =
       />
     );
   }
-  return <img src={media.url} alt="" loading="lazy" decoding="async" className={cx('h-full w-full', fitCls, className)} style={style} onClick={onClick} />;
+  return (
+    <img
+      src={media.url}
+      srcSet={media.srcSet ?? undefined}
+      sizes={media.srcSet ? sizes : undefined}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className={cx('h-full w-full', fitCls, className)}
+      style={style}
+      onClick={onClick}
+    />
+  );
 }
 
 /** Vidéo en cours de transcodage sur le serveur. */
 export function VideoProcessing({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
-    <div className={cx('phdark flex h-full w-full flex-col items-center justify-center gap-2 text-center text-[13px] font-bold text-white/85', className)} style={style}>
+    <div className={cx('phdark flex h-full w-full flex-col items-center justify-center gap-2 text-center text-[0.8125rem] font-bold text-white/85', className)} style={style}>
       <CircleNotch size={28} className="animate-spin" />
       <span>Vidéo en cours de préparation…</span>
     </div>
@@ -360,7 +406,7 @@ export function EmptyCard({ icon, title, text, children }: { icon: ReactNode; ti
     <div className="card flex animate-in flex-col items-center gap-3 px-6 py-8 text-center">
       <div className="grid h-16 w-16 place-items-center rounded-full bg-tint text-ink">{icon}</div>
       <div className="text-xl font-extrabold tracking-[-.02em]">{title}</div>
-      <p className="m-0 max-w-[360px] text-[15px] leading-normal text-pretty text-mute">{text}</p>
+      <p className="m-0 max-w-[360px] text-[0.9375rem] leading-normal text-pretty text-mute">{text}</p>
       {children}
     </div>
   );
@@ -374,7 +420,7 @@ export function PrimaryBtn({ children, onClick, disabled, className, type = 'but
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        'tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 px-5 text-[15px] font-bold transition-[transform,background,color] duration-200 active:scale-[.97]',
+        'tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 px-5 text-[0.9375rem] font-bold transition-[transform,background,color] duration-200 active:scale-[.97]',
         disabled ? 'cursor-not-allowed bg-line text-mute shadow-none' : tones[tone],
         className,
       )}
@@ -393,7 +439,7 @@ export function Podium({ entries, heights = ['124px', '96px', '70px'], height = 
   const styles = [
     { bg: 'bg-brand text-white', size: 'text-3xl' },
     { bg: 'bg-ink text-inv', size: 'text-2xl' },
-    { bg: 'bg-tint text-ink', size: 'text-[22px]' },
+    { bg: 'bg-tint text-ink', size: 'text-[1.375rem]' },
   ];
   const order = [1, 0, 2].filter((i) => i < entries.length);
   return (
@@ -404,7 +450,7 @@ export function Podium({ entries, heights = ['124px', '96px', '70px'], height = 
         return (
           <div key={e.key} className="flex h-full min-w-0 flex-col items-center justify-end gap-1.5">
             {e.top}
-            <div className="max-w-full overflow-hidden text-center text-[13px] leading-tight font-bold text-ellipsis">{e.label}</div>
+            <div className="max-w-full overflow-hidden text-center text-[0.8125rem] leading-tight font-bold text-ellipsis">{e.label}</div>
             {e.sub}
             <div
               className={cx('grid w-full flex-none origin-bottom animate-grow place-items-center rounded-[20px_20px_8px_8px] font-extrabold', styles[rank].bg, styles[rank].size)}

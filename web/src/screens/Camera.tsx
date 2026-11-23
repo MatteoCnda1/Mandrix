@@ -150,7 +150,7 @@ export function Camera() {
         {(cam.state === 'denied' || cam.state === 'unavailable') && (
           <div className="relative flex max-w-[300px] flex-col items-center gap-3 px-6 text-center text-white">
             <WarningCircle size={34} />
-            <div className="text-[15px] leading-snug">
+            <div className="text-[0.9375rem] leading-snug">
               {cam.state === 'denied' ? 'Autorise l’accès à la caméra pour remplir ta pellicule.' : 'Aucune caméra disponible sur cet appareil.'}
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -166,19 +166,19 @@ export function Camera() {
           </div>
         )}
         {pel?.moment && momentLeft > 0 ? (
-          <div className="absolute top-3.5 left-3.5 flex h-10 animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[13px] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">
+          <div className="absolute top-3.5 left-3.5 flex h-10 animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[0.8125rem] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">
             <Lightning size={16} weight="fill" />
             <span>
               Moment Mandrix · {Math.floor(momentLeft / 60)}:{String(momentLeft % 60).padStart(2, '0')}
             </span>
           </div>
         ) : (
-          <div className="absolute top-3.5 left-3.5 flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-[13px] font-bold text-white tabular-nums backdrop-blur">
+          <div className="absolute top-3.5 left-3.5 flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur">
             <LockSimple size={16} weight="fill" />
             <span>{cd.line}</span>
           </div>
         )}
-        <div className="absolute top-3.5 right-3.5 flex h-10 items-center gap-1.5 rounded-[20px] bg-white/15 px-3.5 text-[13px] font-bold text-white backdrop-blur">
+        <div className="absolute top-3.5 right-3.5 flex h-10 items-center gap-1.5 rounded-[20px] bg-white/15 px-3.5 text-[0.8125rem] font-bold text-white backdrop-blur">
           <Fire size={16} weight="fill" className="text-ember" />
           <span>{pel?.streak.weeks ?? 0} sem.</span>
         </div>
@@ -210,10 +210,10 @@ export function Camera() {
       <div className="card flex flex-col gap-3 p-[18px]">
         <div className="flex flex-wrap items-end gap-3.5">
           <div className="mr-auto">
-            <div className="text-[22px] font-extrabold tracking-[-.02em]">
+            <div className="text-[1.375rem] font-extrabold tracking-[-.02em]">
               {total} {total > 1 ? 'photos scellées' : 'photo scellée'}
             </div>
-            <div className="text-[13px] text-mute">{pel?.weekLabel ?? ''}</div>
+            <div className="text-[0.8125rem] text-mute">{pel?.weekLabel ?? ''}</div>
           </div>
           <div className="flex h-[58px] items-end gap-2">
             {DAYS.map((l, i) => {
@@ -236,7 +236,7 @@ export function Camera() {
             <span className="flex-1">
               {pending} photo{pending > 1 ? 's' : ''} en attente d’envoi
             </span>
-            <button type="button" onClick={retryPending} className="tap h-10 rounded-[20px] border-0 bg-ink px-3.5 text-[13px] font-bold text-inv active:scale-95">
+            <button type="button" onClick={retryPending} className="tap h-10 rounded-[20px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
               Réessayer
             </button>
           </div>
@@ -248,7 +248,7 @@ export function Camera() {
       <button
         type="button"
         onClick={() => nav('/deballage')}
-        className="tap flex h-14 items-center justify-center gap-2.5 rounded-[28px] border-0 bg-ink text-[15px] font-bold text-inv transition-transform active:scale-[.97]"
+        className="tap flex h-14 items-center justify-center gap-2.5 rounded-[28px] border-0 bg-ink text-[0.9375rem] font-bold text-inv transition-transform active:scale-[.97]"
       >
         <span>Aller au déballage</span>
         <ArrowRight size={20} />

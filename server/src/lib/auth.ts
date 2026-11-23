@@ -22,10 +22,10 @@ export const verifyPassword = (h: string, pw: string) => verify(h, pw).catch(() 
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 export const randomToken = () => randomBytes(32).toString('base64url');
 
-export async function createSession(reply: FastifyReply, userId: string) {
+export async function createSession(reply: FastifyReply, userId: string, userAgent?: string) {
   const token = randomToken();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400_000);
-  await db.insert(schema.sessions).values({ id: sha256(token), userId, expiresAt });
+  await db.insert(schema.sessions).values({ id: sha256(token), userId, expiresAt, userAgent: userAgent?.slice(0, 300) ?? null, lastSeenAt: new Date() });
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
     httpOnly: true,
@@ -49,7 +49,8 @@ export async function userFromToken(token: string | undefined): Promise<AuthUser
     .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
     .where(and(eq(schema.sessions.id, sha256(token)), gt(schema.sessions.expiresAt, new Date())))
     .limit(1);
-  return rows[0]?.user ?? null;
+  const user = rows[0]?.user ?? null;
+  return user && !user.suspendedAt ? user : null;
 }
 
 export function parseCookieHeader(header: string | undefined, name: string): string | undefined {
@@ -61,8 +62,21 @@ export function parseCookieHeader(header: string | undefined, name: string): str
   return undefined;
 }
 
+// Dernière activité de chaque session, enregistrée au plus toutes les 10 minutes.
+const seen = new Map<string, number>();
+
 export async function authHook(req: FastifyRequest) {
-  req.user = await userFromToken(req.cookies[SESSION_COOKIE]);
+  const token = req.cookies[SESSION_COOKIE];
+  req.user = await userFromToken(token);
+  if (req.user && token) {
+    const id = sha256(token);
+    const now = Date.now();
+    if (now - (seen.get(id) ?? 0) > 10 * 60_000) {
+      seen.set(id, now);
+      if (seen.size > 5000) seen.clear();
+      await db.update(schema.sessions).set({ lastSeenAt: new Date(now) }).where(eq(schema.sessions.id, id));
+    }
+  }
 }
 
 export function requireUser(req: FastifyRequest): AuthUser {

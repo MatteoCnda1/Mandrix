@@ -115,7 +115,7 @@ export function Landing() {
               />
             )}
             {mode === 'signup' && config?.inviteRequired && !invite && (
-              <div className="px-3 text-[13px] leading-snug text-mute">Mandrix se rejoint sur invitation : demande son code de parrainage à un ami déjà inscrit.</div>
+              <div className="px-3 text-[0.8125rem] leading-snug text-mute">Mandrix se rejoint sur invitation : demande son code de parrainage à un ami déjà inscrit.</div>
             )}
             {error && <div className="px-3 text-sm font-semibold text-heart" role="alert">{error}</div>}
             {info && <div className="px-3 text-sm font-semibold text-acc">{info}</div>}
@@ -135,12 +135,12 @@ export function Landing() {
             <button
               type="button"
               onClick={() => switchTo(mode === 'signup' ? 'login' : 'signup')}
-              className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[15px] font-semibold text-ink underline underline-offset-4"
+              className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-ink underline underline-offset-4"
             >
               {mode === 'signup' ? 'J’ai déjà un compte' : 'Créer un compte'}
             </button>
             {mode === 'login' && config?.mailEnabled && (
-              <button type="button" onClick={() => switchTo('forgot')} className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[15px] font-semibold text-mute underline underline-offset-4">
+              <button type="button" onClick={() => switchTo('forgot')} className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-mute underline underline-offset-4">
                 Mot de passe oublié ?
               </button>
             )}

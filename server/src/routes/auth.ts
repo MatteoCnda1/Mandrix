@@ -84,7 +84,7 @@ export default async function authRoutes(app: FastifyInstance) {
         push: { title: 'Nouveau filleul 🎉', body: `${user.displayName} a rejoint Mandrix avec ton code`, url: `/u/${user.username}`, tag: 'invite' },
       });
     }
-    await createSession(reply, user.id);
+    await createSession(reply, user.id, req.headers['user-agent']);
     return toMe(user);
   });
 
@@ -96,7 +96,8 @@ export default async function authRoutes(app: FastifyInstance) {
       .where(or(eq(schema.users.email, body.login), eq(schema.users.username, body.login)))
       .limit(1);
     if (!user || !(await verifyPassword(user.passwordHash, body.password))) fail(401, 'Identifiants incorrects');
-    await createSession(reply, user!.id);
+    if (user!.suspendedAt) fail(403, 'Ce compte est suspendu. Contacte un administrateur.');
+    await createSession(reply, user!.id, req.headers['user-agent']);
     return toMe(user!);
   });
 
@@ -141,7 +142,7 @@ export default async function authRoutes(app: FastifyInstance) {
     await db.update(schema.passwordResets).set({ used: true }).where(eq(schema.passwordResets.id, row!.id));
     await db.update(schema.users).set({ passwordHash: await hashPassword(body.password) }).where(eq(schema.users.id, row!.userId));
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, row!.userId));
-    await createSession(reply, row!.userId);
+    await createSession(reply, row!.userId, req.headers['user-agent']);
     const [user] = await db.select().from(schema.users).where(eq(schema.users.id, row!.userId));
     return toMe(user);
   });

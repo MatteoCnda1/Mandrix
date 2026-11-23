@@ -52,7 +52,7 @@ export function InviteSheet() {
   return (
     <Sheet title="Inviter des amis" onClose={closeSheet}>
       <div className="flex items-center gap-2 rounded-[26px] bg-soft p-2 pl-4">
-        <span className="font-mono text-[15px] font-semibold">{room.code}</span>
+        <span className="font-mono text-[0.9375rem] font-semibold">{room.code}</span>
         <button
           type="button"
           aria-label="Copier le code"
@@ -77,7 +77,7 @@ export function InviteSheet() {
               className={cx('tap flex items-center gap-3 rounded-3xl border-0 p-2 text-left text-ink transition-colors', on ? 'bg-tint' : 'bg-transparent hover:bg-soft')}
             >
               <Avatar user={f} size={44} />
-              <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{f.displayName}</span>
+              <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-bold">{f.displayName}</span>
               <CheckCircle size={26} weight={on ? 'fill' : 'regular'} className={on ? 'text-brand' : 'text-line'} />
             </button>
           );

@@ -1,6 +1,9 @@
 import type { AppNotification } from '@mandrix/shared';
 import {
+  At,
+  ChartBar,
   ChatCircle,
+  Trophy,
   Fire,
   GameController,
   Heart,
@@ -84,6 +87,61 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
       };
     case 'shot_like':
       return { icon: <Heart size={18} weight="fill" className="text-heart" />, text: <>{who} a aimé ta photo de la Pellicule</>, to: '/deballage' };
+    case 'reaction': {
+      const others = Number(d.others ?? 0);
+      return {
+        icon: <span className="text-[1.0625rem] leading-none">{String(d.emoji ?? '😍')}</span>,
+        text: (
+          <>
+            {who}
+            {others > 0 ? ` et ${others} autre${others > 1 ? 's' : ''}` : ''} {others > 0 ? 'ont' : 'a'} réagi à {what}
+          </>
+        ),
+        to: `/p/${d.postId}`,
+      };
+    }
+    case 'mention':
+      return {
+        icon: <At size={18} weight="bold" className="text-acc" />,
+        text: (
+          <>
+            {who} t’a mentionné·e {d.where === 'comment' ? 'dans un commentaire' : 'dans un post'} : « {String(d.text ?? '')} »
+          </>
+        ),
+        to: `/p/${d.postId}`,
+      };
+    case 'poll_ended':
+      return {
+        icon: <ChartBar size={18} weight="fill" className="text-acc" />,
+        text: (
+          <>
+            Ton sondage « {String(d.question ?? '')} » est terminé. {String(d.result ?? '')}
+          </>
+        ),
+        to: `/p/${d.postId}`,
+      };
+    case 'alert':
+      return {
+        icon: <Lightning size={18} weight="fill" className="text-heart" />,
+        text: (
+          <>
+            <b>{String(d.title ?? 'Alerte serveur')}</b> {String(d.body ?? '')}
+          </>
+        ),
+      };
+    case 'daily_meme':
+      return {
+        icon: d.stage === 'won' ? <Trophy size={18} weight="fill" className="text-ember" /> : <Sticker size={18} weight="fill" className="text-acc" />,
+        text:
+          d.stage === 'won' ? (
+            <>Ta légende a gagné le mème du jour avec {String(d.votes)} vote{Number(d.votes) > 1 ? 's' : ''} 🏆</>
+          ) : d.stage === 'vote' ? (
+            <>Les votes du mème du jour sont ouverts · {String(d.count ?? '')} légendes</>
+          ) : (
+            <>Le mème du jour est arrivé : écris ta légende</>
+          ),
+        action: { label: d.stage === 'vote' ? 'Voter' : 'Voir', run: () => nav('/jeu?onglet=jour') },
+      };
     default:
       return { icon: <Heart size={18} />, text: <>Nouvelle activité</> };
   }
@@ -99,7 +157,7 @@ export function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
     onNavigate?.();
     nav(to);
   };
-  const btn = 'tap h-11 flex-none rounded-[22px] border-0 bg-ink px-3.5 text-[13px] font-bold text-inv';
+  const btn = 'tap h-11 flex-none rounded-[22px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv';
   const rowCls = 'flex items-center gap-2.5 rounded-[20px] p-2.5 transition-colors duration-200 hover:bg-soft';
 
   return (

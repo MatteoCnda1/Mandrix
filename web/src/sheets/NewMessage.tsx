@@ -56,7 +56,7 @@ export function NewMessageSheet() {
         </div>
       ) : (
         <>
-          <p className="m-0 px-1 text-[13px] text-mute">Choisis un ami pour discuter à deux, ou plusieurs pour créer un groupe.</p>
+          <p className="m-0 px-1 text-[0.8125rem] text-mute">Choisis un ami pour discuter à deux, ou plusieurs pour créer un groupe.</p>
           {friends.length > 6 && (
             <label className="relative flex items-center">
               <MagnifyingGlass size={20} className="pointer-events-none absolute left-4 text-mute" />
@@ -76,8 +76,8 @@ export function NewMessageSheet() {
                 >
                   <Avatar user={f} size={44} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-bold">{f.displayName}</span>
-                    <span className="block truncate text-[13px] text-mute">@{f.username}</span>
+                    <span className="block truncate text-[0.9375rem] font-bold">{f.displayName}</span>
+                    <span className="block truncate text-[0.8125rem] text-mute">@{f.username}</span>
                   </span>
                   <CheckCircle size={26} weight={on ? 'fill' : 'regular'} className={on ? 'text-brand' : 'text-line'} />
                 </button>

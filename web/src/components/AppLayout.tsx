@@ -14,11 +14,11 @@ import { cx, Logo, Toast } from './ui';
 type IconC = ComponentType<{ size?: number; weight?: 'regular' | 'fill' | 'bold' }>;
 
 const NAV: { to: string; icon: IconC; label: string; long: string; match: string[] }[] = [
-  { to: '/', icon: House, label: 'Fil', long: 'Pour toi', match: ['/', '/p/'] },
+  { to: '/', icon: House, label: 'Fil', long: 'Pour toi', match: ['/', '/p/', '/recherche'] },
   { to: '/reels', icon: Play, label: 'Reels', long: 'Reels', match: ['/reels'] },
   { to: '/pellicule', icon: Camera, label: 'Pellicule', long: 'La Pellicule', match: ['/pellicule', '/deballage'] },
   { to: '/jeu', icon: GameController, label: 'Jeu', long: 'Make It Friends', match: ['/jeu'] },
-  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation'] },
+  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation', '/reglages'] },
 ];
 
 /** Titre de l'écran et destination du bouton « retour » (navigation hiérarchique, HIG). */
@@ -35,6 +35,8 @@ const ROUTES: { prefix: string; title: string; back?: string | -1; backLabel?: s
   { prefix: '/notifications', title: 'Notifications', back: -1, backLabel: 'Retour' },
   { prefix: '/moderation', title: 'Modération', back: '/profil', backLabel: 'Profil' },
   { prefix: '/p/', title: 'Post', back: -1, backLabel: 'Retour' },
+  { prefix: '/recherche', title: 'Recherche', back: -1, backLabel: 'Retour' },
+  { prefix: '/reglages', title: 'Réglages', back: '/profil', backLabel: 'Profil' },
 ];
 
 const routeInfo = (path: string) => (path === '/' ? { prefix: '/', title: 'Pour toi' } : (ROUTES.find((r) => path.startsWith(r.prefix)) ?? { prefix: path, title: '' }));
@@ -47,7 +49,7 @@ function SideNav({ desktop }: { desktop: boolean }) {
     <nav className="sticky top-6 flex flex-none flex-col gap-2.5 self-start" aria-label="Navigation principale">
       <div className="mb-2 flex h-14 items-center gap-3 px-1.5">
         <Logo size={42} />
-        {desktop && <div className="pr-2 font-script text-[40px] leading-none">Mandrix</div>}
+        {desktop && <div className="pr-2 font-script text-[2.5rem] leading-none">Mandrix</div>}
       </div>
       {NAV.map((n) => {
         const active = isActive(pathname, n.match);
@@ -58,7 +60,7 @@ function SideNav({ desktop }: { desktop: boolean }) {
             to={n.to}
             aria-label={n.long}
             className={cx(
-              'tap flex h-[54px] items-center gap-3 rounded-[27px] px-4 text-[15px] font-bold no-underline shadow-pill transition-[background,color,transform] duration-300 hover:translate-x-[3px] active:scale-[.96]',
+              'tap flex h-[54px] items-center gap-3 rounded-[27px] px-4 text-[0.9375rem] font-bold no-underline shadow-pill transition-[background,color,transform] duration-300 hover:translate-x-[3px] active:scale-[.96]',
               active ? 'bg-ink text-inv hover:text-inv' : 'bg-glass text-ink hover:text-ink',
             )}
           >
@@ -98,7 +100,7 @@ function BottomNav() {
               style={{ opacity: active ? 1 : 0 }}
             />
             <Icon size={24} weight={active ? 'fill' : 'regular'} />
-            <span className="relative text-[11px] leading-none font-bold">{n.label}</span>
+            <span className="relative text-[0.6875rem] leading-none font-bold">{n.label}</span>
           </NavLink>
         );
       })}
@@ -142,12 +144,12 @@ function Header({ isPhone }: { isPhone: boolean }) {
             type="button"
             onClick={goBack}
             aria-label={`Retour : ${info.backLabel}`}
-            className="tap flex h-11 flex-none items-center gap-0.5 rounded-[22px] border-0 bg-card/70 pr-3.5 pl-2 text-[15px] font-bold text-acc shadow-pill backdrop-blur active:scale-95"
+            className="tap flex h-11 flex-none items-center gap-0.5 rounded-[22px] border-0 bg-card/70 pr-3.5 pl-2 text-[0.9375rem] font-bold text-acc shadow-pill backdrop-blur active:scale-95"
           >
             <CaretLeft size={20} weight="bold" />
             {!isPhone && <span>{info.backLabel}</span>}
           </button>
-          <h1 className="m-0 truncate text-[22px] font-extrabold tracking-[-.03em] sm:text-[28px]">{info.title}</h1>
+          <h1 className="m-0 truncate text-[1.375rem] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">{info.title}</h1>
         </div>
       ) : isPhone && pathname === '/' ? (
         <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="tap flex items-center gap-1 border-0 bg-transparent p-0 text-ink" aria-label="Mandrix, revenir en haut">
@@ -155,7 +157,7 @@ function Header({ isPhone }: { isPhone: boolean }) {
           <div className="ml-1 font-script text-4xl leading-none">Mandrix</div>
         </button>
       ) : (
-        <h1 className="m-0 min-w-0 truncate text-[26px] font-extrabold tracking-[-.03em] sm:text-[28px]">{info.title}</h1>
+        <h1 className="m-0 min-w-0 truncate text-[1.625rem] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">{info.title}</h1>
       )}
       <div className="ml-auto flex gap-2">
         {!(isPhone && info.back) && (
@@ -193,8 +195,8 @@ function Header({ isPhone }: { isPhone: boolean }) {
           <div className="fixed inset-0" onClick={() => setOpen(false)} />
           <div className="absolute top-[62px] right-0 flex max-h-[70vh] w-[min(390px,100%)] origin-top-right animate-drop flex-col gap-0.5 overflow-auto rounded-[28px] bg-card p-2.5 shadow-menu">
             <div className="flex items-center px-2.5 py-2">
-              <div className="text-[17px] font-extrabold">Notifications</div>
-              <button type="button" className="tap ml-auto border-0 bg-transparent text-[13px] font-bold text-acc" onClick={() => nav('/notifications')}>
+              <div className="text-[1.0625rem] font-extrabold">Notifications</div>
+              <button type="button" className="tap ml-auto border-0 bg-transparent text-[0.8125rem] font-bold text-acc" onClick={() => nav('/notifications')}>
                 Tout voir
               </button>
             </div>
@@ -216,7 +218,7 @@ function Aside() {
   return (
     <aside className="sticky top-6 flex w-[300px] flex-none flex-col gap-3.5 self-start pt-[70px]">
       <div className="flex flex-col gap-3.5 rounded-[32px] bg-brand p-[18px] text-white shadow-blue">
-        <div className="flex items-center gap-2 text-[17px] font-extrabold">
+        <div className="flex items-center gap-2 text-[1.0625rem] font-extrabold">
           <LockSimple size={20} weight="fill" />
           <span>La Pellicule</span>
         </div>
@@ -228,7 +230,7 @@ function Aside() {
             [cd.s, 's'],
           ].map(([v, l]) => (
             <div key={l} className={tile}>
-              <div className="text-[22px] font-extrabold">{v}</div>
+              <div className="text-[1.375rem] font-extrabold">{v}</div>
               <div className="text-xs text-mute">{l}</div>
             </div>
           ))}
@@ -243,7 +245,7 @@ function Aside() {
         </div>
       </div>
       <div className="flex flex-col gap-3 rounded-[32px] bg-hero p-[18px] text-white shadow-hero">
-        <div className="text-[26px] leading-none font-extrabold tracking-[-.05em]">Make It Friends</div>
+        <div className="text-[1.625rem] leading-none font-extrabold tracking-[-.05em]">Make It Friends</div>
         <div className="text-sm text-fog">{(pool?.publicCount ?? 0).toLocaleString('fr-FR')} photos et vidéos dans le pool public.</div>
         <button type="button" onClick={() => nav('/jeu')} className="tap h-[46px] rounded-[23px] border-0 bg-white text-sm font-bold text-night active:scale-95">
           Jouer

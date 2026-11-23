@@ -24,6 +24,7 @@ export function toMe(u: typeof users.$inferSelect): Me {
     bio: u.bio,
     isAdmin: u.isAdmin,
     createdAt: u.createdAt.toISOString(),
+    notificationPrefs: u.notificationPrefs ?? {},
   };
 }
 

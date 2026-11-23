@@ -1,6 +1,8 @@
 import type { Comment } from '@mandrix/shared';
-import { Heart, PaperPlaneRight } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { Flag, Heart, PaperPlaneRight } from '@phosphor-icons/react';
+import { useRef, useState } from 'react';
+import { openReport } from '../components/Report';
+import { MentionSuggestions, RichText } from '../components/RichText';
 import { Avatar, Sheet, confirmAction, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { patchPost, qc, useComments, useMe } from '../lib/data';
@@ -12,6 +14,7 @@ export function CommentsSheet({ postId }: { postId: string }) {
   const { data, isLoading } = useComments(postId);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const input = useRef<HTMLInputElement | null>(null);
   const close = () => useUI.setState({ commentsFor: null });
 
   const setList = (fn: (l: Comment[]) => Comment[]) => qc.setQueryData<Comment[]>(['comments', postId], (old) => fn(old ?? []));
@@ -72,16 +75,29 @@ export function CommentsSheet({ postId }: { postId: string }) {
                     Supprimer
                   </button>
                 )}
+                {me && c.author.id !== me.id && (
+                  <button
+                    type="button"
+                    aria-label={`Signaler le commentaire de ${c.author.displayName}`}
+                    className="tap grid h-7 w-7 place-items-center border-0 bg-transparent p-0 text-mute hover:text-heart"
+                    onClick={() => openReport({ targetType: 'comment', targetId: c.id, authorName: c.author.displayName.split(' ')[0] })}
+                  >
+                    <Flag size={14} />
+                  </button>
+                )}
               </div>
-              <div className="text-base leading-[1.4] break-words">{c.text}</div>
+              <div className="text-base leading-[1.4] break-words">
+                <RichText text={c.text} />
+              </div>
             </div>
             <button type="button" aria-label="Aimer le commentaire" onClick={() => like(c)} className="tap flex h-11 min-w-11 flex-none flex-col items-center justify-center border-0 bg-transparent">
               <Heart size={20} weight={c.liked ? 'fill' : 'regular'} className={cx(c.liked ? 'animate-pop text-heart' : 'text-mute')} />
-              {c.likes > 0 && <span className="text-[11px] font-bold text-mute">{c.likes}</span>}
+              {c.likes > 0 && <span className="text-[0.6875rem] font-bold text-mute">{c.likes}</span>}
             </button>
           </div>
         ))}
       </div>
+      <MentionSuggestions value={draft} onChange={setDraft} inputRef={input} className="flex-none" />
       <form
         className="flex flex-none gap-2"
         onSubmit={(e) => {
@@ -89,7 +105,7 @@ export function CommentsSheet({ postId }: { postId: string }) {
           send();
         }}
       >
-        <input className="field flex-1" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={200} placeholder="Ajoute un commentaire…" />
+        <input ref={input} className="field flex-1" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={200} placeholder="Ajoute un commentaire, @mentionne un ami…" />
         <button type="submit" aria-label="Envoyer" className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-ink text-inv active:scale-90">
           <PaperPlaneRight size={20} weight="fill" />
         </button>

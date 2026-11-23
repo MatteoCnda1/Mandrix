@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { isUuid } from '../lib/http.js';
+import { variantPath } from '../lib/media.js';
 
 export default async function mediaRoutes(app: FastifyInstance) {
   app.get('/media/:id', async (req, reply) => {
@@ -19,6 +20,12 @@ export default async function mediaRoutes(app: FastifyInstance) {
     if (!fs.existsSync(path.join(mediaDir, m.path))) return reply.code(404).send({ error: 'Fichier introuvable' });
     reply.header('Cache-Control', 'private, max-age=31536000, immutable');
     reply.header('X-Content-Type-Options', 'nosniff');
+    // Variante réduite d'une photo (?w=360|720|1280), si elle existe.
+    const w = Number((req.query as { w?: string }).w);
+    if (w && m.variants?.includes(w)) {
+      const rel = variantPath(m.path, w);
+      if (fs.existsSync(path.join(mediaDir, rel))) return reply.type('image/webp').sendFile(rel, mediaDir, { cacheControl: false });
+    }
     return reply.type(m.mime).sendFile(m.path, mediaDir, { cacheControl: false });
   });
 

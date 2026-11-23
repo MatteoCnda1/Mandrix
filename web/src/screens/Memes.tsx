@@ -1,5 +1,6 @@
 import { Heart, Trophy } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
+import { SeasonBoard } from '../components/Daily';
 import { Avatar, EmptyCard, MediaView, Podium, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
 import { toggleLike, useMemes } from '../lib/data';
 import { fmtCount } from '../lib/format';
@@ -13,8 +14,9 @@ export function Memes() {
 
   return (
     <div data-screen-label="Galerie des mèmes" className="flex animate-in flex-col gap-3.5">
+      <SeasonBoard />
       <div className="card flex flex-col gap-4 p-5">
-        <div className="text-[22px] font-extrabold tracking-[-.02em]">Podium des plus aimés</div>
+        <div className="text-[1.375rem] font-extrabold tracking-[-.02em]">Podium des plus aimés</div>
         {podium.length > 0 ? (
           <Podium
             height={260}
@@ -24,7 +26,7 @@ export function Memes() {
               top: <Avatar user={p.author} size={46} />,
               label: <span className="line-clamp-2 text-xs font-semibold whitespace-normal text-mute">{p.text}</span>,
               sub: (
-                <div className="flex items-center gap-1 text-[13px] font-extrabold">
+                <div className="flex items-center gap-1 text-[0.8125rem] font-extrabold">
                   <Heart size={14} weight="fill" className="text-heart" />
                   <span>{fmtCount(p.likes)}</span>
                 </div>
@@ -32,7 +34,7 @@ export function Memes() {
             }))}
           />
         ) : (
-          <p className="m-0 text-[15px] text-mute">Le podium se remplira avec les mèmes publiés depuis Make It Friends.</p>
+          <p className="m-0 text-[0.9375rem] text-mute">Le podium se remplira avec les mèmes publiés depuis Make It Friends.</p>
         )}
       </div>
       {items.length === 0 ? (
@@ -45,10 +47,10 @@ export function Memes() {
         <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
           {items.map((m) => (
             <article key={m.id} className="card flex flex-col gap-2.5 p-3">
-              <div className="grid min-h-11 place-items-center px-1.5 py-0.5 text-center text-[17px] leading-tight font-extrabold tracking-[-.02em] text-balance">{m.text}</div>
-              <div className="ph aspect-[4/3] overflow-hidden rounded-[20px]">{m.media && <MediaView media={m.media} autoPlay={m.media.kind === 'video'} />}</div>
+              <div className="grid min-h-11 place-items-center px-1.5 py-0.5 text-center text-[1.0625rem] leading-tight font-extrabold tracking-[-.02em] text-balance">{m.text}</div>
+              <div className="ph aspect-[4/3] overflow-hidden rounded-[20px]">{m.media && <MediaView media={m.media} autoPlay={m.media.kind === 'video'} sizes="(max-width: 600px) 100vw, 340px" />}</div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap truncate border-0 bg-transparent pl-1 text-[13px] text-mute">
+                <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap truncate border-0 bg-transparent pl-1 text-[0.8125rem] text-mute">
                   Légende de {m.author.displayName}
                 </button>
                 <button

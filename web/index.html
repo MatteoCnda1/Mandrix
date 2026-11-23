@@ -2,7 +2,7 @@
 <html lang="fr" data-theme="light">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#E8F2FC" />
     <meta name="description" content="Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,6 +20,7 @@
           var dark = d === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : d === '1';
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
           if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#071120');
+          document.documentElement.setAttribute('data-ambiance', localStorage.getItem('mandrix.ambiance') || 'aurore');
         } catch (e) {}
       })();
     </script>

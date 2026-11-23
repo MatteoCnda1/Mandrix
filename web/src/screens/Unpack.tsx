@@ -45,8 +45,8 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
         <div className="flex items-center gap-2.5 p-3.5 text-white">
           <Avatar user={shot.author} size={40} />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[15px] font-bold">{shot.author.displayName}</div>
-            <div className="text-[13px] text-fog">
+            <div className="truncate text-[0.9375rem] font-bold">{shot.author.displayName}</div>
+            <div className="text-[0.8125rem] text-fog">
               {shot.day} · {new Date(shot.takenAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               {shot.onTime && <span className="ml-1.5 font-bold text-ember">· ⚡ pile à l’heure</span>}
             </div>
@@ -72,18 +72,18 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
           <button
             type="button"
             onClick={() => toggleShotLike(shot)}
-            className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-4 text-[15px] font-bold text-white active:scale-95"
+            className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-4 text-[0.9375rem] font-bold text-white active:scale-95"
           >
             <Heart size={22} weight={shot.liked ? 'fill' : 'regular'} className={cx(shot.liked && 'animate-pop text-heartlite')} />
             {fmtCount(shot.likes)}
           </button>
-          <span className="ml-1 text-[13px] text-fog">
+          <span className="ml-1 text-[0.8125rem] text-fog">
             {i + 1}/{photos.length}
           </span>
           <button
             type="button"
             onClick={() => (shot.pool ? removeFromPool({ shotId: shot.id }) : openPool({ shotId: shot.id }))}
-            className={cx('tap ml-auto flex h-12 items-center gap-2 rounded-3xl border-0 px-4 text-[15px] font-bold active:scale-95', shot.pool ? 'bg-brand text-white' : 'bg-white text-night')}
+            className={cx('tap ml-auto flex h-12 items-center gap-2 rounded-3xl border-0 px-4 text-[0.9375rem] font-bold active:scale-95', shot.pool ? 'bg-brand text-white' : 'bg-white text-night')}
           >
             {shot.pool ? <CheckCircle size={20} weight="fill" /> : <Sticker size={20} />}
             {shot.pool ? 'Dans le pool' : 'Pool'}
@@ -140,38 +140,38 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
             <div className="absolute right-5 bottom-6 left-5 flex items-center gap-3 text-white">
               <Avatar user={shot.author} size={44} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[17px] font-extrabold">{shot.author.displayName}</div>
-                <div className="text-[13px] text-fog">
+                <div className="truncate text-[1.0625rem] font-extrabold">{shot.author.displayName}</div>
+                <div className="text-[0.8125rem] text-fog">
                   {shot.day} · {timeOf(shot.takenAt)}
                   {shot.onTime && <span className="ml-1.5 font-bold text-ember">⚡ pile à l’heure</span>}
                 </div>
               </div>
-              <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-bold backdrop-blur">
+              <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[0.8125rem] font-bold backdrop-blur">
                 <Heart size={14} weight="fill" className="text-heartlite" /> {fmtCount(shot.likes)}
               </span>
             </div>
           </>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-5 bg-gradient-to-b from-[#0E2A47] to-night px-6 text-center text-white">
-            <div className="text-[13px] font-bold tracking-wide text-ice uppercase">{label}</div>
-            <div className="text-[28px] leading-tight font-extrabold tracking-[-.03em]">Le top de la semaine</div>
+            <div className="text-[0.8125rem] font-bold tracking-wide text-ice uppercase">{label}</div>
+            <div className="text-[1.75rem] leading-tight font-extrabold tracking-[-.03em]">Le top de la semaine</div>
             <div className="grid w-full grid-cols-3 gap-2.5">
               {top.map((t, k) => (
                 <div key={t.id} className="relative aspect-[3/4] overflow-hidden rounded-[20px] bg-white/10">
-                  <img src={t.media.url} alt="" className="h-full w-full object-cover" />
+                  <img src={t.media.url} srcSet={t.media.srcSet ?? undefined} sizes="200px" alt="" className="h-full w-full object-cover" />
                   <span className={cx('absolute top-2 left-2 grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold', k === 0 ? 'bg-brand text-white' : 'bg-white text-night')}>
                     {k + 1}
                   </span>
-                  <span className="absolute inset-x-1.5 bottom-1.5 truncate rounded-full bg-black/55 px-2 py-1 text-[11px] font-bold">@{t.author.username}</span>
+                  <span className="absolute inset-x-1.5 bottom-1.5 truncate rounded-full bg-black/55 px-2 py-1 text-[0.6875rem] font-bold">@{t.author.username}</span>
                 </div>
               ))}
             </div>
             <div className="text-sm text-fog">{plural(photos.length, 'photo', 'photos')} cette semaine. Rendez-vous dimanche prochain !</div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setI(0)} className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-5 text-[15px] font-bold text-white">
+              <button type="button" onClick={() => setI(0)} className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-5 text-[0.9375rem] font-bold text-white">
                 <ArrowClockwise size={18} /> Revoir
               </button>
-              <button type="button" onClick={onClose} className="tap h-12 rounded-3xl border-0 bg-white px-6 text-[15px] font-bold text-night">
+              <button type="button" onClick={onClose} className="tap h-12 rounded-3xl border-0 bg-white px-6 text-[0.9375rem] font-bold text-night">
                 Fermer
               </button>
             </div>
@@ -182,7 +182,7 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
           <div className="h-full rounded-sm bg-white transition-[width] duration-300" style={{ width: `${((i + 1) / (last + 1)) * 100}%` }} />
         </div>
         <div className="absolute top-7 right-3.5 left-5 flex items-center gap-2 text-white">
-          <span className="text-[13px] font-bold tabular-nums [text-shadow:0_1px_8px_rgba(0,0,0,.5)]">
+          <span className="text-[0.8125rem] font-bold tabular-nums [text-shadow:0_1px_8px_rgba(0,0,0,.5)]">
             {Math.min(i + 1, last)}/{last}
           </span>
           {paused && shot && <span className="rounded-full bg-black/40 px-2.5 py-1 text-xs font-bold">En pause</span>}
@@ -260,7 +260,7 @@ export function Unpack() {
     <div data-screen-label="Déballage" className="flex animate-in flex-col gap-3.5">
       <div className="card flex flex-wrap items-center gap-3.5 p-[18px]">
         <div className="min-w-0 flex-[1_1_220px]">
-          <div className="text-[22px] font-extrabold tracking-[-.02em]">{label}</div>
+          <div className="text-[1.375rem] font-extrabold tracking-[-.02em]">{label}</div>
           <div className="text-sm text-mute">
             {plural(count, 'photo prise', 'photos prises')} par {plural(people, 'personne', 'personnes')} · {cd.line}
           </div>
@@ -270,7 +270,7 @@ export function Unpack() {
           onClick={toggle}
           disabled={locked}
           className={cx(
-            'tap flex h-[52px] items-center gap-2 rounded-[26px] border-0 px-[22px] text-[15px] font-bold transition-[background,color,transform] duration-[400ms] active:scale-[.96]',
+            'tap flex h-[52px] items-center gap-2 rounded-[26px] border-0 px-[22px] text-[0.9375rem] font-bold transition-[background,color,transform] duration-[400ms] active:scale-[.96]',
             locked ? 'cursor-not-allowed bg-line text-mute' : revealed ? 'bg-ink text-inv' : 'bg-brand text-white shadow-blue',
           )}
         >
@@ -306,7 +306,7 @@ export function Unpack() {
           <button
             type="button"
             onClick={() => setRetro(true)}
-            className="tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 bg-brand text-[15px] font-bold text-white shadow-blue transition-transform active:scale-[.97]"
+            className="tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 bg-brand text-[0.9375rem] font-bold text-white shadow-blue transition-transform active:scale-[.97]"
           >
             <Play size={20} weight="fill" />
             <span>Rétrospective de la semaine</span>
@@ -337,7 +337,7 @@ export function Unpack() {
             onClick={sendTop}
             disabled={topSending}
             className={cx(
-              'tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 text-[15px] font-bold transition-[background,color,transform] duration-[400ms] active:scale-[.97]',
+              'tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 text-[0.9375rem] font-bold transition-[background,color,transform] duration-[400ms] active:scale-[.97]',
               topAllPooled ? 'bg-brand text-white' : 'bg-ink text-inv',
             )}
           >
@@ -347,7 +347,7 @@ export function Unpack() {
         </div>
       )}
 
-      {r && r.photos.length === 0 && <div className="card p-6 text-center text-[15px] text-mute">Personne n’a pris de photo cette semaine.</div>}
+      {r && r.photos.length === 0 && <div className="card p-6 text-center text-[0.9375rem] text-mute">Personne n’a pris de photo cette semaine.</div>}
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
         {(r ? r.photos : Array.from({ length: backs }, (_, i) => ({ id: `b${i}` }) as unknown as Shot)).map((ph, i) => {
@@ -369,9 +369,9 @@ export function Unpack() {
                     className="ph tap absolute inset-0 flex flex-col justify-end overflow-hidden rounded-3xl p-2.5 shadow-[0_10px_26px_rgba(20,90,160,.12)] [backface-visibility:hidden]"
                     onClick={() => open && setViewer(i)}
                   >
-                    {open && <MediaView media={ph.media} className="absolute inset-0" />}
+                    {open && <MediaView media={ph.media} className="absolute inset-0" sizes="(max-width: 700px) 34vw, 220px" />}
                     {open && ph.onTime && (
-                      <span className="absolute top-2 left-2 flex h-7 items-center gap-1 rounded-full bg-gradient-to-r from-ember to-heart px-2.5 text-[11px] font-extrabold text-white shadow-[0_4px_12px_rgba(229,72,77,.35)]">
+                      <span className="absolute top-2 left-2 flex h-7 items-center gap-1 rounded-full bg-gradient-to-r from-ember to-heart px-2.5 text-[0.6875rem] font-extrabold text-white shadow-[0_4px_12px_rgba(229,72,77,.35)]">
                         <Lightning size={12} weight="fill" /> Pile à l’heure
                       </span>
                     )}

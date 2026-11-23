@@ -27,6 +27,18 @@ describe('posts et fil', () => {
     expect(file.raw.headers['content-type']).toBe('image/webp');
   });
 
+  it('génère des variantes réduites pour les grandes photos', async () => {
+    const m = await upload(lea, '/api/media', await jpeg('#3366CC', 1600, 1200));
+    expect(m.body.srcSet).toContain('?w=360 360w');
+    expect(m.body.srcSet).toContain('?w=1280 1280w');
+    const small = await call(lea, 'GET', `${m.body.url}?w=360`);
+    const full = await call(lea, 'GET', m.body.url);
+    expect(small.raw.headers['content-type']).toBe('image/webp');
+    expect(small.raw.rawPayload.length).toBeLessThan(full.raw.rawPayload.length);
+    // Largeur inconnue : l'original est servi.
+    expect((await call(lea, 'GET', `${m.body.url}?w=999`)).raw.rawPayload.length).toBe(full.raw.rawPayload.length);
+  });
+
   it('montre le post aux amis seulement', async () => {
     const feedNoah = await call(noah, 'GET', '/api/feed');
     expect(feedNoah.body.items.map((p: Post) => p.id)).toContain(photo.id);

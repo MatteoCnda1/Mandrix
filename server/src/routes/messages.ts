@@ -1,5 +1,15 @@
-import { attachmentLabel, GROUP_MAX_MEMBERS, type Conversation, type ConversationDetail, type MediaRef, type Message, type MessageMeta } from '@mandrix/shared';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import {
+  attachmentLabel,
+  GROUP_MAX_MEMBERS,
+  MESSAGE_REACTIONS,
+  type Conversation,
+  type ConversationDetail,
+  type MediaRef,
+  type Message,
+  type MessageMeta,
+  type MessageReaction,
+} from '@mandrix/shared';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
@@ -8,10 +18,11 @@ import { fail, parse, uuidParam } from '../lib/http.js';
 import { mediaRef } from '../lib/media.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { sendPush } from '../lib/push.js';
+import { isBlockedBetween } from '../lib/blocks.js';
 import { areFriends, friendIds, usersByIds } from '../lib/users.js';
 import { emitToUser } from '../realtime/io.js';
 
-const { conversations, conversationMembers, messages, conversationReads } = schema;
+const { conversations, conversationMembers, messages, conversationReads, messageReactions } = schema;
 
 type MessageRow = typeof messages.$inferSelect;
 
@@ -25,8 +36,24 @@ async function attachments(rows: MessageRow[]) {
   return map;
 }
 
+/** Réactions groupées par emoji, dans l'ordre d'arrivée. */
+async function reactionsOf(ids: string[]) {
+  const map = new Map<string, MessageReaction[]>();
+  if (ids.length === 0) return map;
+  const rows = await db.select().from(messageReactions).where(inArray(messageReactions.messageId, ids)).orderBy(asc(messageReactions.createdAt));
+  for (const r of rows) {
+    const list = map.get(r.messageId) ?? [];
+    let entry = list.find((x) => x.emoji === r.emoji);
+    if (!entry) list.push((entry = { emoji: r.emoji, userIds: [] }));
+    entry.userIds.push(r.userId);
+    map.set(r.messageId, list);
+  }
+  return map;
+}
+
 async function toMessages(rows: MessageRow[]): Promise<Message[]> {
   const media = await attachments(rows);
+  const reactions = await reactionsOf(rows.map((r) => r.id));
   return rows.map((m) => ({
     id: m.id,
     conversationId: m.conversationId,
@@ -34,6 +61,7 @@ async function toMessages(rows: MessageRow[]): Promise<Message[]> {
     text: m.text,
     meta: (m.meta as MessageMeta) ?? null,
     media: m.mediaId ? (media.get(m.mediaId) ?? null) : null,
+    reactions: reactions.get(m.id) ?? [],
     createdAt: m.createdAt.toISOString(),
   }));
 }
@@ -67,19 +95,39 @@ export async function getOrCreateConversation(a: string, b: string) {
   return conv;
 }
 
-async function markRead(conversationId: string, userId: string) {
+/** Marque la conversation comme lue et prévient les autres membres (accusé « Vu »). */
+async function markRead(conversationId: string, userId: string, announce = true) {
   const now = new Date();
   await db
     .insert(conversationReads)
     .values({ conversationId, userId, lastReadAt: now })
     .onConflictDoUpdate({ target: [conversationReads.conversationId, conversationReads.userId], set: { lastReadAt: now } });
+  if (!announce) return;
+  for (const uid of await memberIds(conversationId)) {
+    if (uid !== userId) emitToUser(uid, 'dm:read', { conversationId, userId, at: now.toISOString() });
+  }
+}
+
+// « En train d'écrire » : relayé aux autres membres, sans passer par la base à chaque frappe.
+const membersCache = new Map<string, { ids: string[]; at: number }>();
+
+export async function relayTyping(userId: string, conversationId: string, typing: boolean) {
+  if (typeof conversationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(conversationId)) return;
+  let cached = membersCache.get(conversationId);
+  if (!cached || Date.now() - cached.at > 30_000) {
+    cached = { ids: await memberIds(conversationId), at: Date.now() };
+    membersCache.set(conversationId, cached);
+    if (membersCache.size > 2000) membersCache.clear();
+  }
+  if (!cached.ids.includes(userId)) return;
+  for (const uid of cached.ids) if (uid !== userId) emitToUser(uid, 'dm:typing', { conversationId, userId, typing: !!typing });
 }
 
 /** Publie un message dans une conversation et prévient tous ses membres. */
 async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null, mediaId: string | null = null) {
   const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId }).returning();
   await db.update(conversations).set({ lastMessageAt: m.createdAt }).where(eq(conversations.id, conv.id));
-  await markRead(conv.id, from.id);
+  await markRead(conv.id, from.id, false);
   const [msg] = await toMessages([m]);
   const members = await memberIds(conv.id);
   for (const uid of members) emitToUser(uid, 'dm:new', msg);
@@ -89,7 +137,7 @@ async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUs
     const title = conv.isGroup ? (conv.title ?? 'Groupe') : from.displayName;
     const content = text || attachmentLabel(msg.media?.kind, msg.media?.duration);
     const body = conv.isGroup ? `${from.displayName} : ${content}` : content;
-    sendPush(others, { title, body: body.slice(0, 140), url: `/messages/${conv.id}`, tag: `dm:${conv.id}` }).catch(() => {});
+    sendPush(others, { title, body: body.slice(0, 140), url: `/messages/${conv.id}`, tag: `dm:${conv.id}` }, 'message').catch(() => {});
   }
   return msg;
 }
@@ -98,6 +146,22 @@ export async function sendDm(from: AuthUser, toUserId: string, text: string, met
   if (!(await areFriends(from.id, toUserId))) fail(403, 'Tu ne peux écrire qu’à tes amis');
   const conv = await getOrCreateConversation(from.id, toUserId);
   return postMessage(conv, from, text, meta);
+}
+
+/** Message d'une conversation dont je suis membre (hors messages système). */
+async function reactable(messageId: string, userId: string) {
+  const [m] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+  if (!m || (m.meta as MessageMeta)?.type === 'system') fail(404, 'Message introuvable');
+  await ownConversation(m!.conversationId, userId);
+  return m!;
+}
+
+async function broadcastReactions(m: MessageRow) {
+  const reactions = (await reactionsOf([m.id])).get(m.id) ?? [];
+  for (const uid of await memberIds(m.conversationId)) {
+    emitToUser(uid, 'dm:reaction', { conversationId: m.conversationId, messageId: m.id, reactions });
+  }
+  return reactions;
 }
 
 async function ownConversation(id: string, userId: string) {
@@ -117,7 +181,19 @@ async function detail(conv: typeof conversations.$inferSelect, meId: string): Pr
   const members = ids.map((id) => users.get(id)!).filter(Boolean);
   members.sort((a, b) => (a.id === meId ? -1 : b.id === meId ? 1 : a.displayName.localeCompare(b.displayName, 'fr')));
   const other = conv.isGroup ? null : (members.find((m) => m.id !== meId) ?? null);
-  return { id: conv.id, isGroup: conv.isGroup, title: conv.title, user: other, members, createdBy: conv.createdBy };
+  const reads = await db
+    .select({ userId: conversationReads.userId, at: conversationReads.lastReadAt })
+    .from(conversationReads)
+    .where(and(eq(conversationReads.conversationId, conv.id), ne(conversationReads.userId, meId)));
+  return {
+    id: conv.id,
+    isGroup: conv.isGroup,
+    title: conv.title,
+    user: other,
+    members,
+    createdBy: conv.createdBy,
+    reads: reads.map((r) => ({ userId: r.userId, at: r.at.toISOString() })),
+  };
 }
 
 /** Vérifie que tous les utilisateurs sont amis avec `me`. */
@@ -286,6 +362,10 @@ export default async function messageRoutes(app: FastifyInstance) {
         .refine((b) => b.text.length > 0 || !!b.mediaId, { message: 'Message vide' }),
       req.body,
     );
+    if (!c.isGroup) {
+      const other = (await memberIds(c.id)).find((id) => id !== me.id);
+      if (other && (await isBlockedBetween(me.id, other))) fail(403, 'Tu ne peux plus écrire à cette personne');
+    }
     if (body.mediaId) {
       const [m] = await db.select({ ownerId: schema.media.ownerId }).from(schema.media).where(eq(schema.media.id, body.mediaId)).limit(1);
       if (!m || m.ownerId !== me.id) fail(400, 'Pièce jointe introuvable');
@@ -299,6 +379,33 @@ export default async function messageRoutes(app: FastifyInstance) {
     await markRead(c.id, me.id);
     await emitBadges(me.id);
     return { ok: true };
+  });
+
+  /** Réaction emoji à un message (une par personne, modifiable). */
+  app.put('/api/messages/:id/reaction', async (req) => {
+    const me = requireUser(req);
+    const { emoji } = parse(z.object({ emoji: z.enum(MESSAGE_REACTIONS) }), req.body);
+    const m = await reactable(uuidParam(req.params), me.id);
+    await db
+      .insert(messageReactions)
+      .values({ messageId: m.id, userId: me.id, emoji })
+      .onConflictDoUpdate({ target: [messageReactions.messageId, messageReactions.userId], set: { emoji, createdAt: new Date() } });
+    const reactions = await broadcastReactions(m);
+    if (m.senderId !== me.id) {
+      sendPush(
+        m.senderId,
+        { title: me.displayName, body: `A réagi ${emoji} à ton message`, url: `/messages/${m.conversationId}`, tag: `dm:${m.conversationId}` },
+        'message',
+      ).catch(() => {});
+    }
+    return reactions;
+  });
+
+  app.delete('/api/messages/:id/reaction', async (req) => {
+    const me = requireUser(req);
+    const m = await reactable(uuidParam(req.params), me.id);
+    await db.delete(messageReactions).where(and(eq(messageReactions.messageId, m.id), eq(messageReactions.userId, me.id)));
+    return broadcastReactions(m);
   });
 
   /** Réponse à une story : ouvre (ou crée) la conversation avec l'auteur. */

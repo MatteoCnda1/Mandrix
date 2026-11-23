@@ -1,13 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { useUI } from '../lib/store';
-import { CommentsSheet } from '../sheets/Comments';
-import { Composer } from '../sheets/Composer';
-import { EditProfileSheet } from '../sheets/EditProfile';
-import { FriendsSheet } from '../sheets/Friends';
-import { InstallSheet } from '../sheets/Install';
-import { InviteSheet } from '../sheets/Invite';
-import { NewMessageSheet } from '../sheets/NewMessage';
-import { PoolSheet } from '../sheets/Pool';
-import { StoryViewer } from '../sheets/StoryViewer';
+
+// Feuilles chargées à la première ouverture.
+const CommentsSheet = lazy(() => import('../sheets/Comments').then((m) => ({ default: m.CommentsSheet })));
+const Composer = lazy(() => import('../sheets/Composer').then((m) => ({ default: m.Composer })));
+const EditProfileSheet = lazy(() => import('../sheets/EditProfile').then((m) => ({ default: m.EditProfileSheet })));
+const FriendsSheet = lazy(() => import('../sheets/Friends').then((m) => ({ default: m.FriendsSheet })));
+const InstallSheet = lazy(() => import('../sheets/Install').then((m) => ({ default: m.InstallSheet })));
+const InviteSheet = lazy(() => import('../sheets/Invite').then((m) => ({ default: m.InviteSheet })));
+const NewMessageSheet = lazy(() => import('../sheets/NewMessage').then((m) => ({ default: m.NewMessageSheet })));
+const PoolSheet = lazy(() => import('../sheets/Pool').then((m) => ({ default: m.PoolSheet })));
+const StoryViewer = lazy(() => import('../sheets/StoryViewer').then((m) => ({ default: m.StoryViewer })));
 
 export function Overlays() {
   const composer = useUI((s) => s.composer);
@@ -16,7 +19,7 @@ export function Overlays() {
   const story = useUI((s) => s.story);
   const sheet = useUI((s) => s.sheet);
   return (
-    <>
+    <Suspense fallback={null}>
       {composer && <Composer key={composer.mode} mode={composer.mode} initialKind={composer.kind} initialPool={composer.pool} />}
       {commentsFor && <CommentsSheet postId={commentsFor} />}
       {poolFor && <PoolSheet target={poolFor} />}
@@ -26,6 +29,6 @@ export function Overlays() {
       {sheet === 'invite' && <InviteSheet />}
       {sheet === 'newMessage' && <NewMessageSheet />}
       {sheet === 'install' && <InstallSheet />}
-    </>
+    </Suspense>
   );
 }

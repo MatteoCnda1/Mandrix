@@ -54,7 +54,7 @@ export async function drawPool(opts: {
       const circle = new Set([...opts.playerIds, ...(await friendIds(opts.hostId))]);
       filter = sql`pi.owner_id = any(${uuidArray([...circle])})`;
     }
-    return db.execute<{ id: string; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; username: string; ownerId: string; draws: number }>(sql`
+    return db.execute<{ id: string; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; mediaVariants: number[] | null; username: string; ownerId: string; draws: number }>(sql`
       select pi.id, pi.media_id as "mediaId", m.kind, m.width, m.height, ${sql.raw(MEDIA_SQL_COLUMNS)}, u.username, pi.owner_id as "ownerId", pi.draws
       from pool_items pi
       join media m on m.id = pi.media_id
@@ -75,7 +75,7 @@ export async function drawPool(opts: {
   }
   return rows.map((r) => ({
     itemId: r.id,
-    media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height, duration: r.mediaDuration, hasPoster: r.mediaPoster })!,
+    media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height, duration: r.mediaDuration, hasPoster: r.mediaPoster, variants: r.mediaVariants })!,
     by: `@${r.username}`,
   }));
 }

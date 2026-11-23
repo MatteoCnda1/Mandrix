@@ -1,7 +1,8 @@
-import type { MediaRef, PollKind, Post } from '@mandrix/shared';
-import { Image as ImageIcon, Sticker, X } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { POLL_DURATIONS, POLL_MAX_OPTIONS, type MediaRef, type PollKind, type Post } from '@mandrix/shared';
+import { Eye, Image as ImageIcon, Plus, Sticker, X } from '@phosphor-icons/react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { MentionSuggestions } from '../components/RichText';
 import { Seg, Sheet, Switch, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { qc, useConfig } from '../lib/data';
@@ -62,7 +63,11 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const [pool, setPool] = useState(!!initialPool);
   const [pollKind, setPollKind] = useState<PollKind>('text');
   const [q, setQ] = useState('');
-  const [opts, setOpts] = useState(['', '', '', '']);
+  const [opts, setOpts] = useState(['', '', '']);
+  const [duration, setDuration] = useState<number | null>(24);
+  const [isPublic, setIsPublic] = useState(false);
+  const textRef = useRef<HTMLInputElement | null>(null);
+  const qRef = useRef<HTMLInputElement | null>(null);
   const [imgOpts, setImgOpts] = useState<(File | null)[]>([null, null]);
   const [progress, setProgress] = useState<number | null>(null);
 
@@ -111,7 +116,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
             { label: opts[1].trim() || 'Option 2', mediaId: b.id },
           ];
         }
-        await api<Post>('/api/posts', { body: { kind: 'poll', pollKind, text: q.trim(), options } });
+        await api<Post>('/api/posts', { body: { kind: 'poll', pollKind, text: q.trim(), options, durationHours: duration, isPublic } });
         toast('Sondage publié');
       }
       if (mode === 'post') {
@@ -133,7 +138,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
       {mode === 'story' ? (
         <>
           <DropZone file={file} accept="image/*,video/*" label="Touche pour ajouter une photo ou une vidéo" onPick={pick} onClear={() => setFile(null)} aspect="4 / 5" />
-          <p className="m-0 px-1 text-[13px] text-mute">Visible par tes amis pendant 24 heures.</p>
+          <p className="m-0 px-1 text-[0.8125rem] text-mute">Visible par tes amis pendant 24 heures.</p>
         </>
       ) : (
         <>
@@ -159,7 +164,15 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                 onPick={pick}
                 onClear={() => setFile(null)}
               />
-              <input className="field" value={text} onChange={(e) => setText(e.target.value)} maxLength={140} placeholder="Ajoute une légende…" />
+              <input
+                ref={textRef}
+                className="field"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                maxLength={140}
+                placeholder="Ajoute une légende, @mentionne un ami, #hashtag…"
+              />
+              <MentionSuggestions value={text} onChange={setText} inputRef={textRef} className="-mt-1" />
               <button
                 type="button"
                 onClick={() => setPool(!pool)}
@@ -182,18 +195,42 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                   { value: 'slider' as const, label: 'Curseur' },
                 ]}
               />
-              <input className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" />
-              {pollKind === 'text' &&
-                opts.map((o, i) => (
-                  <input
-                    key={i}
-                    className="field"
-                    value={o}
-                    maxLength={30}
-                    placeholder={`Option ${i + 1}${i > 1 ? ' (facultatif)' : ''}`}
-                    onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
-                  />
-                ))}
+              <input ref={qRef} className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" />
+              <MentionSuggestions value={q} onChange={setQ} inputRef={qRef} className="-mt-1" />
+              {pollKind === 'text' && (
+                <>
+                  {opts.map((o, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        className="field min-w-0 flex-1"
+                        value={o}
+                        maxLength={30}
+                        placeholder={`Option ${i + 1}${i > 1 ? ' (facultatif)' : ''}`}
+                        onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
+                      />
+                      {i > 1 && (
+                        <button
+                          type="button"
+                          aria-label={`Retirer l’option ${i + 1}`}
+                          onClick={() => setOpts(opts.filter((_, j) => j !== i))}
+                          className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-soft text-mute"
+                        >
+                          <X size={18} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {opts.length < POLL_MAX_OPTIONS && (
+                    <button
+                      type="button"
+                      onClick={() => setOpts([...opts, ''])}
+                      className="tap flex h-12 items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-line bg-transparent text-sm font-bold text-mute"
+                    >
+                      <Plus size={18} weight="bold" /> Ajouter une option
+                    </button>
+                  )}
+                </>
+              )}
               {pollKind === 'image' && (
                 <div className="grid grid-cols-2 gap-2">
                   {[0, 1].map((i) => (
@@ -223,6 +260,21 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                   <span className="text-2xl">🔥</span>
                 </div>
               )}
+              <div className="flex flex-col gap-1.5">
+                <span className="px-1 text-[0.8125rem] font-semibold text-mute">Durée du sondage</span>
+                <Seg size="sm" value={duration ?? 0} onChange={(v) => setDuration(v || null)} options={POLL_DURATIONS.map((d) => ({ value: d.hours ?? 0, label: d.label }))} />
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isPublic}
+                onClick={() => setIsPublic(!isPublic)}
+                className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
+              >
+                <Eye size={22} />
+                <span className="flex-1">Montrer qui a voté quoi</span>
+                <Switch on={isPublic} />
+              </button>
             </>
           )}
         </>

@@ -1,5 +1,7 @@
+import type { NotificationPrefs } from '@mandrix/shared';
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -29,6 +31,10 @@ export const users = pgTable('users', {
   inviteCode: text('invite_code').unique(),
   /** Parrain : membre dont le code a servi à l'inscription. */
   invitedBy: uuid('invited_by'),
+  /** Préférences de notifications (types coupés, heures calmes). */
+  notificationPrefs: jsonb('notification_prefs').$type<NotificationPrefs>().notNull().default({}),
+  /** Compte suspendu par un admin : connexion refusée. */
+  suspendedAt: ts('suspended_at'),
   createdAt: created(),
 });
 
@@ -37,6 +43,8 @@ export const sessions = pgTable('sessions', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   createdAt: created(),
   expiresAt: ts('expires_at').notNull(),
+  userAgent: text('user_agent'),
+  lastSeenAt: ts('last_seen_at'),
 });
 
 export const passwordResets = pgTable('password_resets', {
@@ -67,6 +75,8 @@ export const media = pgTable(
     posterPath: text('poster_path'),
     /** Durée d'une vidéo, en secondes. */
     duration: real('duration'),
+    /** Largeurs des variantes WebP réduites d'une photo (ex. [320, 720]). */
+    variants: jsonb('variants').$type<number[]>(),
     createdAt: created(),
   },
   (t) => [index('media_owner_idx').on(t.ownerId), index('media_status_idx').on(t.status)],
@@ -93,6 +103,14 @@ export const posts = pgTable(
     text: text('text').notNull().default(''),
     mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
     location: text('location'),
+    /** Sondage : fin des votes (null : sans fin). */
+    pollEndsAt: ts('poll_ends_at'),
+    /** Sondage : les votes de chacun sont visibles. */
+    pollPublic: boolean('poll_public').notNull().default(false),
+    /** Sondage : l'auteur a été prévenu de la fin. */
+    pollNotifiedAt: ts('poll_notified_at'),
+    /** Masqué après plusieurs signalements ou par un admin. */
+    hiddenAt: ts('hidden_at'),
     createdAt: created(),
   },
   (t) => [index('posts_author_idx').on(t.authorId, t.createdAt), index('posts_kind_idx').on(t.kind, t.createdAt)],
@@ -132,6 +150,17 @@ export const likes = pgTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
 
+export const postReactions = pgTable(
+  'post_reactions',
+  {
+    postId: uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
 export const reposts = pgTable(
   'reposts',
   {
@@ -149,6 +178,7 @@ export const comments = pgTable(
     postId: uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     text: text('text').notNull(),
+    hiddenAt: ts('hidden_at'),
     createdAt: created(),
   },
   (t) => [index('comments_post_idx').on(t.postId, t.createdAt)],
@@ -169,6 +199,7 @@ export const stories = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+    hiddenAt: ts('hidden_at'),
     createdAt: created(),
     expiresAt: ts('expires_at').notNull(),
   },
@@ -304,6 +335,76 @@ export const messages = pgTable(
     createdAt: created(),
   },
   (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt)],
+);
+
+export const messageReactions = pgTable(
+  'message_reactions',
+  {
+    messageId: uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId] })],
+);
+
+/** Blocage : plus de visibilité réciproque ni de contact. */
+export const blocks = pgTable(
+  'blocks',
+  {
+    blockerId: uuid('blocker_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    blockedId: uuid('blocked_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.blockerId, t.blockedId] }), index('blocks_blocked_idx').on(t.blockedId)],
+);
+
+/** Signalements de posts, commentaires, stories, messages et comptes. */
+export const reports = pgTable(
+  'reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    reporterId: uuid('reporter_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    targetType: text('target_type').$type<'post' | 'comment' | 'story' | 'message' | 'user'>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    reason: text('reason').notNull(),
+    resolvedAt: ts('resolved_at'),
+    createdAt: created(),
+  },
+  (t) => [uniqueIndex('reports_unique').on(t.reporterId, t.targetType, t.targetId), index('reports_target_idx').on(t.targetType, t.targetId)],
+);
+
+/** Mème du jour : une image tirée du pool chaque matin. */
+export const dailyMemes = pgTable('daily_memes', {
+  day: date('day', { mode: 'string' }).primaryKey(),
+  mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+  closedAt: ts('closed_at'),
+  createdAt: created(),
+});
+
+export const dailyCaptions = pgTable(
+  'daily_captions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    day: date('day', { mode: 'string' }).notNull().references(() => dailyMemes.day, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    votes: integer('votes').notNull().default(0),
+    createdAt: created(),
+    updatedAt: ts('updated_at').defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('daily_captions_unique').on(t.day, t.userId)],
+);
+
+export const dailyVotes = pgTable(
+  'daily_votes',
+  {
+    day: date('day', { mode: 'string' }).notNull().references(() => dailyMemes.day, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    captionId: uuid('caption_id').notNull().references(() => dailyCaptions.id, { onDelete: 'cascade' }),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.userId] })],
 );
 
 export const notifications = pgTable(

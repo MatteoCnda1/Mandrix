@@ -1,0 +1,7 @@
+[Unit]
+Description=Supervision Mandrix (NAS, disque, site public)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/mandrix-watchdog

@@ -94,6 +94,60 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
   return { pull, refreshing };
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * Appui long (téléphone) ou clic droit (ordinateur). Le clic qui suit un appui long est annulé,
+ * pour que le tap « normal » (j'aime, ouvrir) ne se déclenche pas en plus.
+ */
+export function useLongPress(onLong: (p: Point) => void, ms = 420) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const start = useRef<Point | null>(null);
+  const fired = useRef(false);
+  const cb = useRef(onLong);
+  cb.current = onLong;
+  const clear = () => {
+    clearTimeout(timer.current);
+    start.current = null;
+  };
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      fired.current = false;
+      const p = { x: e.clientX, y: e.clientY };
+      start.current = p;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        fired.current = true;
+        navigator.vibrate?.(12);
+        cb.current(p);
+      }, ms);
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (start.current && Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 10) clear();
+    },
+    onPointerUp: clear,
+    onPointerCancel: clear,
+    onPointerLeave: clear,
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault();
+      clear();
+      fired.current = true;
+      cb.current({ x: e.clientX, y: e.clientY });
+    },
+    onClickCapture: (e: React.MouseEvent) => {
+      if (fired.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        fired.current = false;
+      }
+    },
+  };
+}
+
 export function useDebounced<T>(value: T, ms = 300) {
   const [v, setV] = useState(value);
   useEffect(() => {

@@ -1,0 +1,6 @@
+[Unit]
+Description=Restauration test de la dernière sauvegarde Mandrix
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/pct exec 107 -- /opt/mandrix/deploy/homelab/mandrix-restore-check.sh

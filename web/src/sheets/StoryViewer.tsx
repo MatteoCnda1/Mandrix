@@ -132,8 +132,8 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
         <button type="button" aria-label="Story suivante" onClick={next} className="absolute top-[90px] right-0 bottom-[90px] w-[65%] cursor-pointer border-0 bg-transparent" />
         <div className="absolute top-[30px] right-3.5 left-[18px] flex items-center gap-2.5 text-white">
           <Avatar user={group.user} size={40} />
-          <span className="text-[15px] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>
-          <span className="text-[13px] text-fog">{timeAgo(story.createdAt)}</span>
+          <span className="text-[0.9375rem] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>
+          <span className="text-[0.8125rem] text-fog">{timeAgo(story.createdAt)}</span>
           {mine && (
             <button type="button" aria-label="Supprimer la story" onClick={remove} className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
               <Trash size={20} />

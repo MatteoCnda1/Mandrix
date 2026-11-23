@@ -1,9 +1,11 @@
-import { conversationName, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
+import { conversationName, MESSAGE_REACTIONS, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
 import {
   CaretLeft,
   CaretRight,
   ChatCircleDots,
   CheckCircle,
+  Copy,
+  Flag,
   Microphone,
   PaperPlaneRight,
   Paperclip,
@@ -14,17 +16,20 @@ import {
   UsersThree,
   X,
 } from '@phosphor-icons/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
+import { ReactionPicker, type MenuAction } from '../components/Reactions';
+import { openReport } from '../components/Report';
 import { Avatar, EmptyCard, MediaView, PrimaryBtn, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
-import { useObjectUrl } from '../lib/hooks';
+import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
 import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
 import { qc, useConversation, useConversations, useFriends, useMe, useMessages } from '../lib/data';
 import { shortTime } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
+import { sendTyping, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
@@ -53,13 +58,14 @@ export function Messages() {
   const { data: me } = useMe();
   const { data, isLoading } = useConversations();
   const now = useNow(60_000);
+  const typing = useTyping();
   if (isLoading) return <ScreenLoader />;
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
       <button
         type="button"
         onClick={() => openSheet('newMessage')}
-        className="tap flex h-[52px] items-center gap-2.5 self-start rounded-[26px] border-0 bg-card px-5 text-[15px] font-bold text-ink shadow-pill active:scale-[.97]"
+        className="tap flex h-[52px] items-center gap-2.5 self-start rounded-[26px] border-0 bg-card px-5 text-[0.9375rem] font-bold text-ink shadow-pill active:scale-[.97]"
       >
         <PencilSimple size={20} /> Nouveau message
       </button>
@@ -86,8 +92,14 @@ export function Messages() {
               >
                 <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
                 <span className="min-w-0 flex-1">
-                  <span className={cx('block truncate text-[15px]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
-                  <span className={cx('block truncate text-sm', c.unread ? 'font-semibold text-ink' : 'text-mute', c.last?.system && 'italic')}>{preview}</span>
+                  <span className={cx('block truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
+                  {typing[c.id]?.length ? (
+                    <span className="block truncate text-sm font-semibold text-acc">
+                      {c.isGroup ? `${c.members.find((u) => u.id === typing[c.id][0])?.displayName.split(' ')[0] ?? 'Quelqu’un'} écrit…` : 'écrit…'}
+                    </span>
+                  ) : (
+                    <span className={cx('block truncate text-sm', c.unread ? 'font-semibold text-ink' : 'text-mute', c.last?.system && 'italic')}>{preview}</span>
+                  )}
                 </span>
                 <span className="flex flex-none flex-col items-end gap-1.5">
                   <span className="text-xs text-mute">{c.last ? shortTime(c.last.at, now) : ''}</span>
@@ -177,7 +189,7 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
           Renommer
         </button>
       </div>
-      <div className="px-1 pt-1 text-[13px] font-bold tracking-wide text-mute uppercase">
+      <div className="px-1 pt-1 text-[0.8125rem] font-bold tracking-wide text-mute uppercase">
         {conv.members.length} membre{conv.members.length > 1 ? 's' : ''}
       </div>
       <div className="flex flex-col gap-0.5">
@@ -193,8 +205,8 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
           >
             <Avatar user={m} size={42} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[15px] font-bold">{m.id === me?.id ? 'Toi' : m.displayName}</span>
-              <span className="block truncate text-[13px] text-mute">@{m.username}</span>
+              <span className="block truncate text-[0.9375rem] font-bold">{m.id === me?.id ? 'Toi' : m.displayName}</span>
+              <span className="block truncate text-[0.8125rem] text-mute">@{m.username}</span>
             </span>
             {conv.createdBy === m.id && <span className="rounded-full bg-soft px-2.5 py-1 text-xs font-bold text-mute">Créateur</span>}
           </button>
@@ -202,7 +214,7 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
       </div>
       {adding ? (
         <>
-          <div className="px-1 pt-1 text-[13px] font-bold tracking-wide text-mute uppercase">Ajouter des amis</div>
+          <div className="px-1 pt-1 text-[0.8125rem] font-bold tracking-wide text-mute uppercase">Ajouter des amis</div>
           {candidates.length === 0 && <div className="px-1 text-sm text-mute">Tous tes amis sont déjà dans le groupe.</div>}
           <div className="flex flex-col gap-0.5">
             {candidates.map((f) => {
@@ -215,7 +227,7 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
                   className={cx('tap flex items-center gap-3 rounded-3xl border-0 p-2 text-left text-ink transition-colors', on ? 'bg-tint' : 'bg-transparent hover:bg-soft')}
                 >
                   <Avatar user={f} size={42} />
-                  <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{f.displayName}</span>
+                  <span className="min-w-0 flex-1 truncate text-[0.9375rem] font-bold">{f.displayName}</span>
                   <CheckCircle size={26} weight={on ? 'fill' : 'regular'} className={on ? 'text-brand' : 'text-line'} />
                 </button>
               );
@@ -226,14 +238,35 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
           </PrimaryBtn>
         </>
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[15px] font-bold text-acc">
+        <button type="button" onClick={() => setAdding(true)} className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[0.9375rem] font-bold text-acc">
           <UserPlus size={22} /> Ajouter des amis
         </button>
       )}
-      <button type="button" onClick={leave} className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[15px] font-bold text-heart">
+      <button type="button" onClick={leave} className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[0.9375rem] font-bold text-heart">
         <SignOut size={22} /> Quitter le groupe
       </button>
     </Sheet>
+  );
+}
+
+/** Bulle réagissant à l'appui long (téléphone) ou au clic droit (ordinateur). */
+function Pressable({ onLong, className, style, children }: { onLong: (p: Point) => void; className?: string; style?: CSSProperties; children: ReactNode }) {
+  const lp = useLongPress(onLong);
+  return (
+    <div {...lp} className={cx('select-none [-webkit-touch-callout:none]', className)} style={style}>
+      {children}
+    </div>
+  );
+}
+
+/** Trois points animés : quelqu'un écrit. */
+function TypingDots() {
+  return (
+    <span className="flex items-center gap-1" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className="h-2 w-2 animate-bounce rounded-full bg-mute" style={{ animationDelay: `${i * 0.15}s`, animationDuration: '1s' }} />
+      ))}
+    </span>
   );
 }
 
@@ -246,7 +279,18 @@ export function Chat() {
   const { data: msgs, isLoading } = useMessages(id);
   const [draft, setDraft] = useState('');
   const [info, setInfo] = useState(false);
+  const [menu, setMenu] = useState<{ m: Message; at: Point } | null>(null);
+  const typingIds = useTyping((s) => s[id]) ?? [];
   const list = useRef<HTMLDivElement | null>(null);
+
+  // On quitte la conversation : on n'écrit plus.
+  useEffect(() => () => sendTyping(id, false), [id]);
+
+  // Quelqu'un commence à écrire : on garde l'indicateur visible s'il était déjà en bas.
+  useEffect(() => {
+    const el = list.current;
+    if (el && typingIds.length && el.scrollHeight - el.scrollTop - el.clientHeight < 140) toBottom(true);
+  }, [typingIds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Plein écran sur téléphone : la page ne défile plus, seule la liste des messages défile.
   useLockPageScroll(isPhone);
@@ -306,6 +350,7 @@ export function Chat() {
     const text = draft.trim();
     if ((!text && !file) || progress !== null) return;
     const attachment = file;
+    sendTyping(id, false);
     setDraft('');
     setFile(null);
     try {
@@ -342,10 +387,55 @@ export function Chat() {
     }
   };
 
+  /** Ajoute, change ou retire ma réaction (même emoji : retirée). */
+  const react = async (m: Message, emoji: string) => {
+    const mine = m.reactions.find((r) => me && r.userIds.includes(me.id))?.emoji;
+    try {
+      const reactions = await api<Message['reactions']>(`/api/messages/${m.id}/reaction`, mine === emoji ? { method: 'DELETE' } : { method: 'PUT', body: { emoji } });
+      qc.setQueryData<Message[]>(['messages', id], (old) => old?.map((x) => (x.id === m.id ? { ...x, reactions } : x)));
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+
   if (isLoading || !me) return <ScreenLoader />;
 
   const byId = new Map((conv?.members ?? []).map((m) => [m.id, m]));
   const group = !!conv?.isGroup;
+
+  // Accusé de lecture sous mon dernier message, s'il est le dernier de la conversation.
+  const lastReal = [...(msgs ?? [])].reverse().find((m) => m.meta?.type !== 'system');
+  const seenBy =
+    lastReal && lastReal.senderId === me.id
+      ? (conv?.reads ?? []).filter((r) => r.at >= lastReal.createdAt && byId.has(r.userId)).map((r) => byId.get(r.userId)!)
+      : null;
+  const others = (conv?.members ?? []).filter((u) => u.id !== me.id);
+  const receipt =
+    seenBy === null
+      ? null
+      : seenBy.length === 0
+        ? 'Envoyé'
+        : !group
+          ? 'Vu'
+          : seenBy.length >= others.length
+            ? 'Vu par tout le monde'
+            : `Vu par ${seenBy.map((u) => u.displayName.split(' ')[0]).join(', ')}`;
+  const typers = typingIds.map((uid) => byId.get(uid)).filter((u): u is UserLite => !!u);
+
+  const menuActions = (m: Message): MenuAction[] => {
+    const acts: MenuAction[] = [];
+    if (m.text) acts.push({ label: 'Copier', icon: <Copy size={18} />, onClick: () => void navigator.clipboard?.writeText(m.text).then(() => toast('Copié')) });
+    if (m.senderId !== me.id) {
+      const author = byId.get(m.senderId);
+      acts.push({
+        label: 'Signaler',
+        icon: <Flag size={18} />,
+        danger: true,
+        onClick: () => openReport({ targetType: 'message', targetId: m.id, authorName: author?.displayName.split(' ')[0] }),
+      });
+    }
+    return acts;
+  };
 
   const person = conv && (
     <button
@@ -355,7 +445,7 @@ export function Chat() {
     >
       <ConvAvatar isGroup={group} user={conv.user} members={conv.members.filter((m) => m.id !== me.id)} size={40} />
       <span className="min-w-0">
-        <span className="block truncate text-[17px] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
+        <span className="block truncate text-[1.0625rem] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
         {group && <span className="block truncate text-xs font-semibold text-mute">{conv.members.length} membres · infos du groupe</span>}
       </span>
       {group && <CaretRight size={16} className="ml-auto flex-none text-mute" />}
@@ -395,13 +485,14 @@ export function Chat() {
                     {story.media.kind === 'video' && story.media.poster ? (
                       <img src={story.media.poster} alt="Story" className="h-full w-full object-cover" />
                     ) : (
-                      <MediaView media={story.media} />
+                      <MediaView media={story.media} sizes="128px" />
                     )}
                   </div>
                 )}
               </div>
             )}
-            <div
+            <Pressable
+              onLong={(at) => setMenu({ m, at })}
               className={cx(
                 'animate-in rounded-[22px] text-base leading-[1.4] break-words',
                 m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
@@ -421,10 +512,50 @@ export function Chat() {
                   Rejoindre le salon
                 </button>
               )}
-            </div>
+            </Pressable>
+            {m.reactions.length > 0 && (
+              <div className={cx('-mt-2.5 flex flex-wrap gap-1 px-2', mine ? 'justify-end' : 'justify-start')}>
+                {m.reactions.map((r) => {
+                  const minePick = r.userIds.includes(me.id);
+                  const names = r.userIds.map((uid) => (uid === me.id ? 'toi' : (byId.get(uid)?.displayName.split(' ')[0] ?? '?'))).join(', ');
+                  return (
+                    <button
+                      key={r.emoji}
+                      type="button"
+                      onClick={() => react(m, r.emoji)}
+                      aria-label={`${r.emoji} : ${names}${minePick ? ' (toucher pour retirer)' : ''}`}
+                      title={names}
+                      className={cx(
+                        'tap flex h-7 items-center gap-0.5 rounded-full border-2 border-solid border-card px-1.5 text-[0.9375rem] leading-none shadow-pill',
+                        minePick ? 'bg-tint' : 'bg-card',
+                      )}
+                    >
+                      {r.emoji}
+                      {r.userIds.length > 1 && <span className="text-xs font-bold text-ink">{r.userIds.length}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {m.id === lastReal?.id && receipt && (
+              <span className="px-1 text-[0.75rem] font-semibold text-mute" aria-live="polite">
+                {receipt}
+              </span>
+            )}
           </div>
         );
       })}
+      {typers.length > 0 && (
+        <div className="flex flex-none items-end gap-1.5 self-start" aria-live="polite">
+          {group && <Avatar user={typers[0]} size={24} />}
+          <div className="flex h-10 items-center gap-2 rounded-[22px] bg-soft px-3.5">
+            <TypingDots />
+            <span className="text-[0.8125rem] font-semibold text-mute">
+              {group ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'écrivent' : 'écrit'}…` : 'écrit…'}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -439,7 +570,7 @@ export function Chat() {
       </button>
       <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-3xl bg-soft px-4">
         <span className="h-3 w-3 flex-none animate-pulse rounded-full bg-heart" />
-        <span className="text-[15px] font-bold tabular-nums">{fmtDuration(recorder.elapsed) ?? '0:00'}</span>
+        <span className="text-[0.9375rem] font-bold tabular-nums">{fmtDuration(recorder.elapsed) ?? '0:00'}</span>
         <span className="flex h-6 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
           {Array.from({ length: 24 }, (_, i) => (
             <span
@@ -491,7 +622,11 @@ export function Chat() {
         <input
           className="field min-w-0 flex-1"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            sendTyping(id, !!e.target.value.trim());
+          }}
+          onBlur={() => sendTyping(id, false)}
           onFocus={() => setTimeout(() => toBottom(), 250)}
           maxLength={1000}
           placeholder={file ? 'Ajoute un texte…' : group ? 'Écris au groupe…' : 'Écris un message…'}
@@ -514,6 +649,16 @@ export function Chat() {
     <>
       {info && conv?.isGroup && <GroupSheet conv={conv} onClose={() => setInfo(false)} />}
       {viewing && <MediaLightbox media={viewing} onClose={() => setViewing(null)} />}
+      {menu && (
+        <ReactionPicker
+          at={menu.at}
+          emojis={MESSAGE_REACTIONS}
+          current={menu.m.reactions.find((r) => r.userIds.includes(me.id))?.emoji ?? null}
+          onPick={(e) => void react(menu.m, e)}
+          onClose={() => setMenu(null)}
+          actions={menuActions(menu.m)}
+        />
+      )}
     </>
   );
 

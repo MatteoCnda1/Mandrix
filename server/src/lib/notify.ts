@@ -1,8 +1,8 @@
-import type { AppNotification, Badges, NotificationType, UserLite } from '@mandrix/shared';
+import { notifCategory, type AppNotification, type Badges, type NotificationType, type UserLite } from '@mandrix/shared';
 import { sql } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { emitToUser } from '../realtime/io.js';
-import { sendPush, type PushPayload } from './push.js';
+import { prefsOf, sendPush, type PushPayload } from './push.js';
 import { usersByIds } from './users.js';
 
 type NotifRow = typeof schema.notifications.$inferSelect;
@@ -50,6 +50,10 @@ interface NotifyOpts {
 
 export async function notify(opts: NotifyOpts) {
   if (opts.actorId && opts.actorId === opts.userId) return;
+  if (opts.push) sendPush(opts.userId, opts.push, opts.type).catch(() => {});
+  // Catégorie coupée dans la cloche : rien n'est enregistré.
+  const prefs = (await prefsOf([opts.userId])).get(opts.userId) ?? {};
+  if (prefs.bell?.[notifCategory(opts.type)] === false) return;
   const values = {
     userId: opts.userId,
     type: opts.type,
@@ -72,7 +76,6 @@ export async function notify(opts: NotifyOpts) {
   const actor = opts.actorId ? ((await usersByIds([opts.actorId])).get(opts.actorId) ?? null) : null;
   emitToUser(opts.userId, 'notif:new', serializeNotification(row, actor));
   await emitBadges(opts.userId);
-  if (opts.push) sendPush(opts.userId, opts.push).catch(() => {});
 }
 
 /** Notification de masse (déballage du dimanche, rappels…). */
@@ -80,5 +83,5 @@ export async function notifyMany(userIds: string[], type: NotificationType, data
   for (const userId of userIds) {
     await notify({ userId, type, data, push: null, dedupeKey });
   }
-  if (push && userIds.length) await sendPush(userIds, push).catch(() => {});
+  if (push && userIds.length) await sendPush(userIds, push, type).catch(() => {});
 }
