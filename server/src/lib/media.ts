@@ -6,6 +6,7 @@ import { pipeline } from 'node:stream/promises';
 import type { MultipartFile } from '@fastify/multipart';
 import type { MediaRef } from '@mandrix/shared';
 import sharp from 'sharp';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { fail } from './http.js';
@@ -38,7 +39,12 @@ interface MediaLike {
   posterPath?: string | null;
   /** Variante des requêtes SQL brutes : la miniature existe-t-elle ? */
   hasPoster?: boolean | null;
+  /** Largeurs des variantes réduites (photos). */
+  variants?: number[] | null;
 }
+
+/** Largeurs des variantes WebP générées pour chaque photo (miniatures, fil, plein écran). */
+export const VARIANT_WIDTHS = [360, 720, 1280];
 
 export function mediaRef(m: MediaLike | null | undefined): MediaRef | null {
   if (!m || !m.id) return null;
@@ -52,11 +58,47 @@ export function mediaRef(m: MediaLike | null | undefined): MediaRef | null {
     poster: video && (m.posterPath || m.hasPoster) ? `/media/${m.id}/poster` : null,
     duration: m.duration ?? null,
     processing: m.status === 'processing',
+    srcSet:
+      m.kind === 'image' && m.variants?.length && m.width
+        ? [...m.variants.map((w) => `/media/${m.id}?w=${w} ${w}w`), `/media/${m.id} ${m.width}w`].join(', ')
+        : null,
   };
 }
 
+/** Génère les variantes réduites d'une photo WebP déjà enregistrée ; renvoie les largeurs créées. */
+export async function makeVariants(rel: string, width: number | null): Promise<number[]> {
+  if (!width) return [];
+  const made: number[] = [];
+  for (const w of VARIANT_WIDTHS) {
+    if (w >= width * 0.9) break;
+    try {
+      await sharp(path.join(mediaDir, rel)).resize({ width: w }).webp({ quality: 76 }).toFile(path.join(mediaDir, variantPath(rel, w)));
+      made.push(w);
+    } catch {
+      break;
+    }
+  }
+  return made;
+}
+
+/** Photos plus anciennes sans variantes : traitées en tâche de fond, par lots. */
+export async function backfillVariants() {
+  for (;;) {
+    const rows = await db
+      .select({ id: schema.media.id, path: schema.media.path, width: schema.media.width })
+      .from(schema.media)
+      .where(and(eq(schema.media.kind, 'image'), isNull(schema.media.variants), eq(schema.media.mime, 'image/webp')))
+      .limit(20);
+    if (rows.length === 0) return;
+    for (const r of rows) {
+      const variants = await makeVariants(r.path, r.width).catch(() => []);
+      await db.update(schema.media).set({ variants }).where(eq(schema.media.id, r.id));
+    }
+  }
+}
+
 /** Colonnes SQL à sélectionner (alias de table `m`) pour construire un MediaRef. */
-export const MEDIA_SQL_COLUMNS = `m.status as "mediaStatus", m.duration as "mediaDuration", (m.poster_path is not null) as "mediaPoster"`;
+export const MEDIA_SQL_COLUMNS = `m.status as "mediaStatus", m.duration as "mediaDuration", (m.poster_path is not null) as "mediaPoster", m.variants as "mediaVariants"`;
 
 interface SaveOpts {
   accept?: 'image' | 'video' | 'audio' | 'any';
@@ -102,6 +144,8 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
     }
     const relPath = path.join(rel, `${id}.webp`);
     await fs.writeFile(path.join(mediaDir, relPath), out.data);
+    // Les photos scellées de la Pellicule n'ont pas besoin de miniatures avant le déballage : faites quand même, c'est rapide.
+    const variants = await makeVariants(relPath, out.info.width);
     const [row] = await db
       .insert(schema.media)
       .values({
@@ -114,6 +158,7 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
         height: out.info.height,
         size: out.info.size,
         sealedUntil: opts.sealedUntil ?? null,
+        variants,
       })
       .returning();
     return row;
@@ -168,6 +213,9 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
   enqueueVideo(id);
   return row;
 }
+
+/** Chemin d'une variante réduite d'une photo (`…/id.webp` → `…/id.w720.webp`). */
+export const variantPath = (rel: string, width: number) => rel.replace(/\.webp$/, `.w${width}.webp`);
 
 export async function deleteMediaFile(relPath: string) {
   await fs.rm(path.join(mediaDir, relPath), { force: true });

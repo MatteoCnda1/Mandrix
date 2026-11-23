@@ -1,4 +1,4 @@
-import type { Comment, Page, Post } from '@mandrix/shared';
+import { POLL_MAX_OPTIONS, REACTIONS, type Comment, type Page, type Post, type PostSearch } from '@mandrix/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -7,11 +7,12 @@ import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
 import { mediaRef, saveUpload } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
-import { getPost, loadPolls, selectPosts } from '../lib/posts.js';
+import { notifyMentions } from '../lib/mentions.js';
+import { getPost, loadPolls, notBlocked, selectPosts } from '../lib/posts.js';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
 import { upsertPoolItem } from './pool.js';
 
-const { posts, likes, reposts, comments, commentLikes, pollOptions, pollVotes, media } = schema;
+const { posts, likes, reposts, comments, commentLikes, pollOptions, pollVotes, media, postReactions } = schema;
 const PAGE = 15;
 
 const uuid = z.string().uuid('Média invalide');
@@ -27,8 +28,11 @@ const createSchema = z.discriminatedUnion('kind', [
     pollKind: z.enum(['text', 'image', 'slider']),
     options: z
       .array(z.object({ label: z.string().trim().max(30), mediaId: uuid.optional() }))
-      .max(4)
+      .max(POLL_MAX_OPTIONS)
       .default([]),
+    /** Durée en heures (null ou absent : sans fin). */
+    durationHours: z.number().int().min(1).max(24 * 30).nullable().optional(),
+    isPublic: z.boolean().default(false),
   }),
 ]);
 
@@ -38,6 +42,11 @@ async function postAuthor(postId: string) {
   const [p] = await db.select({ authorId: posts.authorId, kind: posts.kind }).from(posts).where(eq(posts.id, postId)).limit(1);
   if (!p) fail(404, 'Post introuvable');
   return p!;
+}
+
+async function reactionsOf(postId: string, viewerId: string) {
+  const [post] = await selectPosts(viewerId, { where: sql`p.id = ${postId}`, limit: 1 });
+  return { reactions: post?.reactions ?? [], myReaction: post?.myReaction ?? null };
 }
 
 const KIND_LABEL: Record<string, string> = { photo: 'ta photo', video: 'ta vidéo', poll: 'ton sondage', meme: 'ton mème' };
@@ -105,6 +114,7 @@ export default async function postRoutes(app: FastifyInstance) {
         .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null })
         .returning();
       if (body.pool) await upsertPoolItem({ mediaId: body.mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
+      await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id });
       return getPost(me.id, p.id);
     }
 
@@ -113,6 +123,7 @@ export default async function postRoutes(app: FastifyInstance) {
     if (body.pollKind === 'text') {
       options = options.filter((o) => o.label);
       if (options.length < 2) fail(400, 'Ajoute au moins deux options');
+      if (new Set(options.map((o) => o.label.toLowerCase())).size !== options.length) fail(400, 'Deux options sont identiques');
     } else if (body.pollKind === 'image') {
       if (options.length !== 2 || options.some((o) => !o.mediaId)) fail(400, 'Ajoute une photo pour chaque option');
       const ids = options.map((o) => o.mediaId!);
@@ -121,7 +132,12 @@ export default async function postRoutes(app: FastifyInstance) {
     } else {
       options = [];
     }
-    const [p] = await db.insert(posts).values({ authorId: me.id, kind: 'poll', pollKind: body.pollKind, text: body.text }).returning();
+    const pollEndsAt = body.durationHours ? new Date(Date.now() + body.durationHours * 3600_000) : null;
+    const [p] = await db
+      .insert(posts)
+      .values({ authorId: me.id, kind: 'poll', pollKind: body.pollKind, text: body.text, pollEndsAt, pollPublic: body.isPublic })
+      .returning();
+    await notifyMentions(me, body.text, { postId: p.id, kind: 'poll', where: 'post', id: p.id });
     if (options.length) {
       await db.insert(pollOptions).values(
         options.map((o, i) => ({ postId: p.id, label: o.label || `Option ${i + 1}`, mediaId: o.mediaId ?? null, position: i })),
@@ -159,6 +175,39 @@ export default async function postRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  /** Réaction emoji (appui long sur le cœur) : une par personne, modifiable. */
+  app.put('/api/posts/:id/reaction', async (req) => {
+    const me = requireUser(req);
+    const id = uuidParam(req.params);
+    const { emoji } = parse(z.object({ emoji: z.enum(REACTIONS) }), req.body);
+    const p = await postAuthor(id);
+    const [before] = await db.select().from(postReactions).where(and(eq(postReactions.postId, id), eq(postReactions.userId, me.id))).limit(1);
+    await db
+      .insert(postReactions)
+      .values({ postId: id, userId: me.id, emoji })
+      .onConflictDoUpdate({ target: [postReactions.postId, postReactions.userId], set: { emoji, createdAt: new Date() } });
+    if (!before && p.authorId !== me.id) {
+      // Une seule notification par post, mise à jour à chaque nouvelle réaction.
+      const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(postReactions).where(eq(postReactions.postId, id));
+      await notify({
+        userId: p.authorId,
+        type: 'reaction',
+        actorId: me.id,
+        data: { postId: id, kind: p.kind, emoji, others: n - 1 },
+        dedupeKey: `reaction:${id}`,
+        push: n === 1 ? { title: me.displayName, body: `a réagi ${emoji} à ${KIND_LABEL[p.kind] ?? 'ton post'}`, url: `/p/${id}`, tag: `reaction:${id}` } : null,
+      });
+    }
+    return reactionsOf(id, me.id);
+  });
+
+  app.delete('/api/posts/:id/reaction', async (req) => {
+    const me = requireUser(req);
+    const id = uuidParam(req.params);
+    await db.delete(postReactions).where(and(eq(postReactions.postId, id), eq(postReactions.userId, me.id)));
+    return reactionsOf(id, me.id);
+  });
+
   app.delete('/api/posts/:id/like', async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
@@ -191,6 +240,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const body = parse(z.object({ optionId: z.string().uuid().optional(), value: z.number().int().min(0).max(100).optional() }), req.body);
     const [p] = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
     if (!p || p.kind !== 'poll') return fail(404, 'Sondage introuvable');
+    if (p.pollEndsAt && p.pollEndsAt <= new Date()) fail(409, 'Ce sondage est terminé');
     if (p.pollKind === 'slider') {
       if (body.value === undefined) fail(400, 'Valeur manquante');
     } else {
@@ -204,7 +254,7 @@ export default async function postRoutes(app: FastifyInstance) {
       .insert(pollVotes)
       .values(values)
       .onConflictDoUpdate({ target: [pollVotes.postId, pollVotes.userId], set: { optionId: values.optionId, value: values.value } });
-    const polls = await loadPolls(me.id, [{ id, kind: p.pollKind ?? 'text' }]);
+    const polls = await loadPolls(me.id, [{ id, kind: p.pollKind ?? 'text', endsAt: p.pollEndsAt, isPublic: p.pollPublic }]);
     return polls.get(id);
   });
 
@@ -217,7 +267,10 @@ export default async function postRoutes(app: FastifyInstance) {
       select c.id, c.author_id as "authorId", c.text, c.created_at as "createdAt",
         (select count(*)::int from comment_likes cl where cl.comment_id = c.id) as likes,
         exists(select 1 from comment_likes cl where cl.comment_id = c.id and cl.user_id = ${me.id}) as liked
-      from comments c where c.post_id = ${id} order by c.created_at asc limit 300`);
+      from comments c where c.post_id = ${id}
+        and (c.hidden_at is null or c.author_id = ${me.id})
+        and ${notBlocked(me.id, sql`c.author_id`)}
+      order by c.created_at asc limit 300`);
     const list = [...rows];
     const authors = await usersByIds(list.map((r) => r.authorId));
     return list.map((r) => ({
@@ -244,6 +297,7 @@ export default async function postRoutes(app: FastifyInstance) {
       data: { postId: id, kind: p.kind, text: text.slice(0, 80) },
       push: { title: me.displayName, body: `a commenté ${KIND_LABEL[p.kind] ?? 'ton post'} : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `comment:${id}` },
     });
+    await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id });
     const authors = await usersByIds([me.id]);
     return { id: c.id, postId: id, author: authors.get(me.id)!, text: c.text, createdAt: c.createdAt.toISOString(), likes: 0, liked: false };
   });

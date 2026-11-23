@@ -9,11 +9,14 @@ import { env, mediaDir } from './env.js';
 import { authHook } from './lib/auth.js';
 import { HttpError } from './lib/http.js';
 import { attachSocket } from './realtime/socket.js';
+import accountRoutes from './routes/account.js';
 import authRoutes from './routes/auth.js';
+import dailyRoutes from './routes/daily.js';
 import mediaRoutes from './routes/media.js';
 import messageRoutes from './routes/messages.js';
 import notificationRoutes from './routes/notifications.js';
 import pelliculeRoutes from './routes/pellicule.js';
+import socialRoutes from './routes/social.js';
 import poolRoutes from './routes/pool.js';
 import postRoutes from './routes/posts.js';
 import storyRoutes from './routes/stories.js';
@@ -65,12 +68,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(authRoutes);
+  await app.register(accountRoutes);
   await app.register(userRoutes);
   await app.register(postRoutes);
   await app.register(storyRoutes);
   await app.register(poolRoutes);
   await app.register(pelliculeRoutes);
   await app.register(messageRoutes);
+  await app.register(socialRoutes);
+  await app.register(dailyRoutes);
   await app.register(notificationRoutes);
   await app.register(mediaRoutes);
 

@@ -1,3 +1,4 @@
+import { notifCategory, type NotifCategory, type NotificationPrefs, type NotificationType } from '@mandrix/shared';
 import { eq, inArray } from 'drizzle-orm';
 import webpush from 'web-push';
 import { db, schema } from '../db/index.js';
@@ -44,9 +45,45 @@ export interface PushPayload {
   tag?: string;
 }
 
-export async function sendPush(userIds: string | string[], payload: PushPayload) {
+/** Heure de Paris (0–23), quel que soit le fuseau du serveur. */
+export function parisHour(d = new Date()) {
+  return Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Paris' }).format(d));
+}
+
+export function inQuietHours(prefs: NotificationPrefs, hour = parisHour()) {
+  const q = prefs.quiet;
+  if (!q || q.start === q.end) return false;
+  return q.start < q.end ? hour >= q.start && hour < q.end : hour >= q.start || hour < q.end;
+}
+
+export async function prefsOf(ids: string[]) {
+  const map = new Map<string, NotificationPrefs>();
+  if (ids.length === 0) return map;
+  const rows = await db
+    .select({ id: schema.users.id, prefs: schema.users.notificationPrefs })
+    .from(schema.users)
+    .where(inArray(schema.users.id, ids));
+  for (const r of rows) map.set(r.id, r.prefs ?? {});
+  return map;
+}
+
+/** Garde les destinataires qui acceptent ce push maintenant (catégorie active, hors heures calmes). */
+export async function pushRecipients(ids: string[], category: NotifCategory) {
+  const prefs = await prefsOf(ids);
+  return ids.filter((id) => {
+    const p = prefs.get(id) ?? {};
+    return p.push?.[category] !== false && !inQuietHours(p);
+  });
+}
+
+/**
+ * Envoie un push. `kind` (type de notification ou « message ») applique les préférences
+ * de chaque destinataire ; sans `kind`, l'envoi est inconditionnel.
+ */
+export async function sendPush(userIds: string | string[], payload: PushPayload, kind?: NotificationType | 'message') {
   if (!publicKey) return;
-  const ids = Array.isArray(userIds) ? userIds : [userIds];
+  let ids = Array.isArray(userIds) ? userIds : [userIds];
+  if (kind) ids = await pushRecipients(ids, notifCategory(kind));
   if (ids.length === 0) return;
   const subs = await db.select().from(schema.pushSubscriptions).where(inArray(schema.pushSubscriptions.userId, ids));
   const body = JSON.stringify(payload);

@@ -20,6 +20,7 @@ export interface Me extends UserLite {
   bio: string | null;
   isAdmin: boolean;
   createdAt: string;
+  notificationPrefs: NotificationPrefs;
 }
 
 export type Friendship = 'self' | 'none' | 'pending_out' | 'pending_in' | 'friends';
@@ -37,6 +38,8 @@ export interface UserProfile extends UserLite {
   stats: { posts: number; friends: number; memesWon: number };
   streak: StreakInfo;
   friendship: Friendship;
+  /** Je bloque cette personne. */
+  blockedByMe: boolean;
 }
 
 export interface UserSearchResult extends UserLite {
@@ -61,9 +64,26 @@ export interface MediaRef {
   duration: number | null;
   /** Vidéo en cours de transcodage. */
   processing: boolean;
+  /** Photos : variantes réduites pour `srcset` (null si aucune). */
+  srcSet: string | null;
 }
 
 export type PostKind = 'photo' | 'video' | 'poll' | 'meme';
+
+/** Réactions proposées par un appui long (le tap reste le « j'aime »). */
+export const REACTIONS = ['😂', '😍', '😮', '😢', '🔥', '👏'] as const;
+/** Réactions des messages : le cœur en premier. */
+export const MESSAGE_REACTIONS = ['❤️', ...REACTIONS] as const;
+
+export interface ReactionCount {
+  emoji: string;
+  count: number;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  userIds: ID[];
+}
 export type PollKind = 'text' | 'image' | 'slider';
 export type PoolScope = 'public' | 'friends';
 
@@ -72,7 +92,18 @@ export interface PollOption {
   label: string;
   media: MediaRef | null;
   votes: number;
+  /** Qui a voté pour cette option (sondage public), sinon null. */
+  voters: UserLite[] | null;
 }
+
+/** Durées proposées dans le composer (en heures ; null : sans fin). */
+export const POLL_DURATIONS = [
+  { hours: 1, label: '1 h' },
+  { hours: 24, label: '24 h' },
+  { hours: 72, label: '3 jours' },
+  { hours: null, label: 'Sans fin' },
+] as const;
+export const POLL_MAX_OPTIONS = 6;
 
 export interface Poll {
   kind: PollKind;
@@ -83,6 +114,14 @@ export interface Poll {
   myValue: number | null;
   /** Moyenne 0–100 pour un sondage curseur. */
   average: number | null;
+  /** Fin des votes (null : sans fin). */
+  endsAt: string | null;
+  /** Votes terminés : résultat figé. */
+  closed: boolean;
+  /** Les votes de chacun sont visibles. */
+  isPublic: boolean;
+  /** Sondage curseur public : la valeur de chacun. */
+  sliderVotes: { user: UserLite; value: number }[] | null;
 }
 
 export interface Post {
@@ -101,6 +140,59 @@ export interface Post {
   pool: PoolScope | null;
   repostedBy: UserLite | null;
   poll: Poll | null;
+  /** Réactions emoji, les plus fréquentes d'abord. */
+  reactions: ReactionCount[];
+  myReaction: string | null;
+}
+
+export interface PostSearch {
+  posts: Post[];
+  users: UserLite[];
+}
+
+export interface FriendSuggestion {
+  user: UserLite;
+  mutual: number;
+  /** Prénoms de quelques amis en commun. */
+  via: string[];
+}
+
+export const MENTION_RE = /(^|[^\p{L}\p{N}_.])@([a-z0-9._]{3,20})/giu;
+export const HASHTAG_RE = /(^|[^\p{L}\p{N}_&])#([\p{L}\p{N}_]{2,40})/gu;
+
+/** Pseudos mentionnés (@pseudo) dans un texte, sans doublon, en minuscules. */
+export function extractMentions(text: string): string[] {
+  return [...new Set([...text.matchAll(MENTION_RE)].map((m) => m[2].toLowerCase().replace(/\.+$/, '')))].filter((u) => u.length >= 3);
+}
+
+/** Hashtags (#mot) d'un texte, sans doublon, en minuscules. */
+export function extractHashtags(text: string): string[] {
+  return [...new Set([...text.matchAll(HASHTAG_RE)].map((m) => m[2].toLowerCase()))];
+}
+
+export type TextPart = { type: 'text'; value: string } | { type: 'mention'; username: string; value: string } | { type: 'hashtag'; tag: string; value: string };
+
+/** Découpe un texte en morceaux (texte, @mention, #hashtag) pour un rendu sans HTML injecté. */
+export function splitRichText(text: string): TextPart[] {
+  const re = new RegExp(`${MENTION_RE.source}|${HASHTAG_RE.source}`, 'giu');
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const lead = m[1] ?? m[3] ?? '';
+    const start = m.index! + lead.length;
+    if (start > last) parts.push({ type: 'text', value: text.slice(last, start) });
+    if (m[2]) {
+      const username = m[2].toLowerCase().replace(/\.+$/, '');
+      const value = `@${m[2].replace(/\.+$/, '')}`;
+      parts.push({ type: 'mention', username, value });
+      last = start + value.length;
+    } else {
+      parts.push({ type: 'hashtag', tag: m[4].toLowerCase(), value: `#${m[4]}` });
+      last = start + 1 + m[4].length;
+    }
+  }
+  if (last < text.length) parts.push({ type: 'text', value: text.slice(last) });
+  return parts;
 }
 
 export interface Page<T> {
@@ -199,6 +291,7 @@ export interface Message {
   meta: MessageMeta;
   /** Pièce jointe : photo, vidéo ou message vocal (kind « audio »). */
   media: MediaRef | null;
+  reactions: MessageReaction[];
   createdAt: string;
 }
 
@@ -234,6 +327,19 @@ export interface ConversationDetail {
   /** Tous les membres, moi compris. */
   members: UserLite[];
   createdBy: ID | null;
+  /** Dernière lecture de chaque autre membre (accusés « Vu »). */
+  reads: ReadMark[];
+}
+
+export interface ReadMark {
+  userId: ID;
+  at: string;
+}
+
+export interface TypingEvent {
+  conversationId: ID;
+  userId: ID;
+  typing: boolean;
 }
 
 export const GROUP_MAX_MEMBERS = 20;
@@ -261,7 +367,38 @@ export type NotificationType =
   | 'streak'
   | 'shot_like'
   | 'invite_joined'
-  | 'moment';
+  | 'moment'
+  | 'reaction'
+  | 'mention'
+  | 'poll_ended'
+  | 'daily_meme';
+
+/** Catégories réglables dans « Notifications » (profil). */
+export const NOTIF_CATEGORIES = [
+  { key: 'social', label: 'J’aime et réactions', types: ['like', 'reaction', 'repost', 'shot_like'] },
+  { key: 'comments', label: 'Commentaires et mentions', types: ['comment', 'mention'] },
+  { key: 'friends', label: 'Amis et parrainages', types: ['friend_request', 'friend_accept', 'invite_joined'] },
+  { key: 'messages', label: 'Messages', types: [] },
+  { key: 'game', label: 'Make It Friends et mème du jour', types: ['game_invite', 'pool_added', 'pool_drawn', 'daily_meme'] },
+  { key: 'pellicule', label: 'Pellicule et déballage', types: ['unpack', 'streak', 'moment'] },
+  { key: 'polls', label: 'Fin de mes sondages', types: ['poll_ended'] },
+] as const satisfies readonly { key: string; label: string; types: readonly NotificationType[] }[];
+
+export type NotifCategory = (typeof NOTIF_CATEGORIES)[number]['key'];
+
+export interface NotificationPrefs {
+  /** Catégories coupées en push. */
+  push?: Partial<Record<NotifCategory, boolean>>;
+  /** Catégories coupées dans la cloche. */
+  bell?: Partial<Record<NotifCategory, boolean>>;
+  /** Heures calmes (heures locales de Paris) : pas de push, la cloche reste remplie. */
+  quiet?: { start: number; end: number } | null;
+}
+
+export function notifCategory(type: NotificationType | 'message'): NotifCategory {
+  if (type === 'message') return 'messages';
+  return NOTIF_CATEGORIES.find((c) => (c.types as readonly string[]).includes(type))?.key ?? 'social';
+}
 
 export interface AppNotification {
   id: ID;
@@ -293,6 +430,43 @@ export interface InviteInfo {
   invited: number;
 }
 
+// ——— Signalements, blocages, compte ———
+
+export type ReportTarget = 'post' | 'comment' | 'story' | 'message' | 'user';
+export const REPORT_REASONS = ['Contenu choquant', 'Harcèlement ou moquerie', 'Spam', 'Infos personnelles', 'Autre'] as const;
+/** Nombre de signalements qui masque un contenu en attendant l'admin. */
+export const REPORT_HIDE_THRESHOLD = 3;
+
+export interface ModerationCase {
+  targetType: ReportTarget;
+  targetId: ID;
+  reports: number;
+  reasons: string[];
+  reporters: UserLite[];
+  /** Auteur du contenu (ou compte signalé). */
+  author: UserLite | null;
+  /** Aperçu : texte et média éventuel. */
+  text: string;
+  media: MediaRef | null;
+  /** Lien pour ouvrir le contenu dans l'app. */
+  url: string | null;
+  hidden: boolean;
+  authorSuspended: boolean;
+  createdAt: string;
+}
+
+export interface BlockedUser extends UserLite {
+  blockedAt: string;
+}
+
+export interface SessionInfo {
+  id: string;
+  current: boolean;
+  device: string;
+  createdAt: string;
+  lastSeenAt: string | null;
+}
+
 export interface ReportedItem {
   id: ID;
   media: MediaRef;
@@ -316,6 +490,57 @@ export const GAME = {
     { value: 2, label: 'Légendaire', points: 100 },
   ],
 } as const;
+
+// ——— Mème du jour et saisons ———
+
+/** Horaires (Paris) du mème du jour : tirage le matin, votes le soir, résultats le lendemain. */
+export const DAILY = { drawHour: 8, voteHour: 18, pointsPerVote: 50, winnerBonus: 100 } as const;
+export type DailyPhase = 'caption' | 'vote' | 'closed';
+
+export interface DailyCaption {
+  id: ID;
+  text: string;
+  mine: boolean;
+  /** Résultats seulement (phase « closed »). */
+  votes: number | null;
+  user: UserLite | null;
+  winner: boolean;
+}
+
+export interface DailyMeme {
+  day: string;
+  media: MediaRef;
+  phase: DailyPhase;
+  /** Ouverture des votes. */
+  voteAt: string;
+  /** Fin des votes. */
+  closeAt: string;
+  participants: number;
+  myCaption: string | null;
+  myVote: ID | null;
+  /** Vide pendant l'écriture ; anonymes pendant le vote ; signées avec les votes ensuite. */
+  captions: DailyCaption[];
+}
+
+export interface DailyState {
+  today: DailyMeme | null;
+  yesterday: DailyMeme | null;
+}
+
+export interface SeasonEntry {
+  user: UserLite;
+  points: number;
+  memes: number;
+  wins: number;
+}
+
+export interface SeasonState {
+  month: string;
+  label: string;
+  ranking: SeasonEntry[];
+  /** Champions des saisons précédentes. */
+  champions: { month: string; label: string; user: UserLite; points: number }[];
+}
 
 export type GameStage = 'lobby' | 'caption' | 'vote' | 'results' | 'final';
 export type GameSource = 'public' | 'friends';
@@ -368,11 +593,15 @@ export interface ServerToClientEvents {
   'game:state': (room: GameRoom | null) => void;
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
+  'dm:typing': (e: TypingEvent) => void;
+  'dm:read': (e: ReadMark & { conversationId: ID }) => void;
+  'dm:reaction': (e: { conversationId: ID; messageId: ID; reactions: MessageReaction[] }) => void;
   badges: (b: Badges) => void;
   'media:ready': (mediaId: ID) => void;
 }
 
 export interface ClientToServerEvents {
+  'dm:typing': (conversationId: ID, typing: boolean) => void;
   'game:create': (ack: Ack<GameRoom>) => void;
   'game:join': (code: string, ack: Ack<GameRoom>) => void;
   'game:leave': (ack: Ack) => void;

@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { env } from '../env.js';
 import { parseCookieHeader, SESSION_COOKIE, userFromToken } from '../lib/auth.js';
 import { HttpError } from '../lib/http.js';
+import { relayTyping } from '../routes/messages.js';
 import * as game from './game.js';
 import { setIO, type IO } from './io.js';
 
@@ -64,6 +65,10 @@ export function attachSocket(app: FastifyInstance) {
     socket.on('game:rate', (memeId, rating, ack) => wrap(ack, () => game.rate(userId, memeId, rating)));
     socket.on('game:next', (ack) => wrap(ack, () => game.next(userId)));
     socket.on('game:publish', (ack) => wrap(ack, async () => void (await game.publish(userId))));
+
+    socket.on('dm:typing', (conversationId, typing) => {
+      relayTyping(userId, conversationId, typing).catch(() => {});
+    });
 
     socket.on('disconnect', () => game.onDisconnect(userId, socket.id));
   });

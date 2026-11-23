@@ -5,11 +5,12 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
+import { isBlockedBetween } from '../lib/blocks.js';
 import { ensureInviteCode } from '../lib/invite.js';
 import { env } from '../env.js';
 import { saveUpload } from '../lib/media.js';
 import { emitBadges, notify } from '../lib/notify.js';
-import { selectPosts } from '../lib/posts.js';
+import { notBlocked, selectPosts } from '../lib/posts.js';
 import { streakFor } from '../lib/streak.js';
 import { areFriends, friendIds, friendshipMap, toLite, toMe, usersByIds } from '../lib/users.js';
 
@@ -71,7 +72,13 @@ export default async function userRoutes(app: FastifyInstance) {
     const rows = await db
       .select({ id: users.id, username: users.username, displayName: users.displayName, avatarMediaId: users.avatarMediaId })
       .from(users)
-      .where(and(ne(users.id, me.id), or(ilike(users.username, `%${q}%`), ilike(users.displayName, `%${q}%`))))
+      .where(
+        and(
+          ne(users.id, me.id),
+          or(ilike(users.username, `%${q}%`), ilike(users.displayName, `%${q}%`)),
+          notBlocked(me.id, sql`${users.id}`),
+        ),
+      )
       .limit(20);
     const fm = await friendshipMap(me.id, rows.map((r) => r.id));
     return rows.map((r) => ({ ...toLite(r), friendship: fm.get(r.id) ?? 'none' }));
@@ -82,6 +89,13 @@ export default async function userRoutes(app: FastifyInstance) {
     const { username } = req.params as { username: string };
     const [u] = await db.select().from(users).where(eq(users.username, username.toLowerCase())).limit(1);
     if (!u) return fail(404, 'Utilisateur introuvable');
+    const [blockRow] = await db
+      .select()
+      .from(schema.blocks)
+      .where(or(and(eq(schema.blocks.blockerId, me.id), eq(schema.blocks.blockedId, u.id)), and(eq(schema.blocks.blockerId, u.id), eq(schema.blocks.blockedId, me.id))))
+      .limit(1);
+    // Bloqué par cette personne : son profil n'existe plus pour moi.
+    if (blockRow && blockRow.blockerId === u.id) return fail(404, 'Utilisateur introuvable');
     const [stats] = await db.execute<{ posts: number; memesWon: number }>(sql`
       select
         (select count(*)::int from posts where author_id = ${u.id}) as posts,
@@ -95,6 +109,7 @@ export default async function userRoutes(app: FastifyInstance) {
       stats: { posts: stats.posts, friends: friends.length, memesWon: stats.memesWon },
       streak: await streakFor(u.id),
       friendship: fm.get(u.id) ?? 'none',
+      blockedByMe: !!blockRow,
     };
   });
 
@@ -142,6 +157,7 @@ export default async function userRoutes(app: FastifyInstance) {
     if (otherId === me.id) fail(400, 'Tu ne peux pas t’ajouter toi-même');
     const [other] = await db.select({ id: users.id }).from(users).where(eq(users.id, otherId)).limit(1);
     if (!other) fail(404, 'Utilisateur introuvable');
+    if (await isBlockedBetween(me.id, otherId)) fail(403, 'Impossible d’ajouter cette personne');
 
     const [incoming] = await db
       .select()

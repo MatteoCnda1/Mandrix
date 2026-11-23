@@ -1,4 +1,4 @@
-import type { Poll, PollKind, PoolScope, Post, PostKind } from '@mandrix/shared';
+import type { Poll, PollKind, PoolScope, Post, PostKind, ReactionCount, UserLite } from '@mandrix/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from './media.js';
@@ -19,6 +19,7 @@ interface PostRow extends Record<string, unknown> {
   mediaStatus: string | null;
   mediaDuration: number | null;
   mediaPoster: boolean | null;
+  mediaVariants: number[] | null;
   likes: number;
   comments: number;
   reposts: number;
@@ -26,7 +27,16 @@ interface PostRow extends Record<string, unknown> {
   reposted: boolean;
   pool: PoolScope | null;
   repostedById: string | null;
+  reactions: ReactionCount[];
+  myReaction: string | null;
+  pollEndsAt: Date | null;
+  pollPublic: boolean;
 }
+
+/** Ni bloqué ni bloquant, par rapport au lecteur (`who` : colonne SQL de l'auteur). */
+export const notBlocked = (viewerId: string, who: SQL) => sql`not exists (
+  select 1 from blocks b
+  where (b.blocker_id = ${viewerId} and b.blocked_id = ${who}) or (b.blocker_id = ${who} and b.blocked_id = ${viewerId}))`;
 
 interface SelectOpts {
   where: SQL;
@@ -59,10 +69,16 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
       exists(select 1 from reposts r where r.post_id = p.id and r.user_id = ${viewerId}) as reposted,
       (select pi.scope from pool_items pi where pi.media_id = p.media_id and pi.status = 'active') as pool,
       ${repostedBy} as "repostedById",
+      (select coalesce(json_agg(json_build_object('emoji', x.emoji, 'count', x.n) order by x.n desc, x.first), '[]'::json)
+        from (select pr.emoji, count(*)::int as n, min(pr.created_at) as first from post_reactions pr where pr.post_id = p.id group by pr.emoji) x) as reactions,
+      (select pr.emoji from post_reactions pr where pr.post_id = p.id and pr.user_id = ${viewerId}) as "myReaction",
+      p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic",
       ${sortAt} as "sortAt"
     from posts p
     left join media m on m.id = p.media_id
-    where ${opts.where}
+    where (${opts.where})
+      and (p.hidden_at is null or p.author_id = ${viewerId})
+      and ${notBlocked(viewerId, sql`p.author_id`)}
     order by ${opts.orderBy ?? sql`"sortAt" desc`}
     limit ${opts.limit ?? 20} offset ${opts.offset ?? 0}
   `);
@@ -71,7 +87,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
   const usersMap = await usersByIds(list.flatMap((r) => [r.authorId, r.repostedById]));
   const polls = await loadPolls(
     viewerId,
-    list.filter((r) => r.kind === 'poll').map((r) => ({ id: r.id, kind: r.pollKind ?? 'text' })),
+    list.filter((r) => r.kind === 'poll').map((r) => ({ id: r.id, kind: r.pollKind ?? 'text', endsAt: r.pollEndsAt, isPublic: r.pollPublic })),
   );
 
   return list.map((r) => ({
@@ -80,7 +96,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     author: usersMap.get(r.authorId)!,
     text: r.text,
     media: r.mediaId
-      ? mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH, status: r.mediaStatus, duration: r.mediaDuration, hasPoster: r.mediaPoster })
+      ? mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH, status: r.mediaStatus, duration: r.mediaDuration, hasPoster: r.mediaPoster, variants: r.mediaVariants })
       : null,
     location: r.location,
     createdAt: new Date(r.createdAt).toISOString(),
@@ -92,10 +108,19 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     pool: r.pool,
     repostedBy: r.repostedById ? (usersMap.get(r.repostedById) ?? null) : null,
     poll: polls.get(r.id) ?? null,
+    reactions: r.reactions ?? [],
+    myReaction: r.myReaction,
   }));
 }
 
-export async function loadPolls(viewerId: string, posts: { id: string; kind: PollKind }[]): Promise<Map<string, Poll>> {
+export interface PollRef {
+  id: string;
+  kind: PollKind;
+  endsAt: Date | string | null;
+  isPublic: boolean;
+}
+
+export async function loadPolls(viewerId: string, posts: PollRef[]): Promise<Map<string, Poll>> {
   const map = new Map<string, Poll>();
   if (posts.length === 0) return map;
   const ids = uuidArray(posts.map((p) => p.id));
@@ -125,10 +150,30 @@ export async function loadPolls(viewerId: string, posts: { id: string; kind: Pol
     select post_id as "postId", option_id as "optionId", value
     from poll_votes where user_id = ${viewerId} and post_id = any(${ids})`);
 
+  // Sondages publics : qui a voté quoi.
+  const publicIds = posts.filter((p) => p.isPublic).map((p) => p.id);
+  const ballots = publicIds.length
+    ? [
+        ...(await db.execute<{ postId: string; userId: string; optionId: string | null; value: number | null }>(sql`
+          select post_id as "postId", user_id as "userId", option_id as "optionId", value
+          from poll_votes where post_id = any(${uuidArray(publicIds)}) order by created_at`)),
+      ]
+    : [];
+  const voters = await usersByIds(ballots.map((b) => b.userId));
+  const now = Date.now();
+
   for (const p of posts) {
     const st = [...stats].find((s) => s.postId === p.id);
     const my = [...mine].find((s) => s.postId === p.id);
+    const endsAt = p.endsAt ? new Date(p.endsAt) : null;
+    const mineBallots = ballots.filter((b) => b.postId === p.id && voters.has(b.userId));
+    const votersOf = (optionId: string): UserLite[] | null =>
+      p.isPublic ? mineBallots.filter((b) => b.optionId === optionId).map((b) => voters.get(b.userId)!) : null;
     map.set(p.id, {
+      endsAt: endsAt ? endsAt.toISOString() : null,
+      closed: !!endsAt && endsAt.getTime() <= now,
+      isPublic: p.isPublic,
+      sliderVotes: p.isPublic && p.kind === 'slider' ? mineBallots.map((b) => ({ user: voters.get(b.userId)!, value: b.value ?? 0 })) : null,
       kind: p.kind,
       options: [...options]
         .filter((o) => o.postId === p.id)
@@ -137,6 +182,7 @@ export async function loadPolls(viewerId: string, posts: { id: string; kind: Pol
           label: o.label,
           media: o.mediaId ? mediaRef({ id: o.mediaId, kind: o.mediaKind ?? 'image', width: o.mediaW, height: o.mediaH }) : null,
           votes: o.votes,
+          voters: votersOf(o.id),
         })),
       total: st?.total ?? 0,
       myVote: my?.optionId ?? null,
