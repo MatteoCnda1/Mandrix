@@ -54,14 +54,15 @@ export const useMe = () =>
     staleTime: 5 * 60_000,
   });
 
-const infinite = <T>(key: unknown[], url: (page: number) => string) => ({
+const infinite = <T>(key: unknown[], url: (page: number | string) => string, initialPageParam: number | string = 0) => ({
   queryKey: key,
-  queryFn: ({ pageParam }: { pageParam: number }) => api<Page<T>>(url(pageParam)),
-  initialPageParam: 0,
+  queryFn: ({ pageParam }: { pageParam: number | string }) => api<Page<T>>(url(pageParam)),
+  initialPageParam,
   getNextPageParam: (last: Page<T>) => last.next ?? undefined,
 });
 
-export const useFeed = () => useInfiniteQuery(infinite<Post>(['feed'], (p) => `/api/feed?page=${p}`));
+/** Fil paginé par curseur (le serveur renvoie le curseur de la page suivante). */
+export const useFeed = () => useInfiniteQuery(infinite<Post>(['feed'], (c) => (c ? `/api/feed?cursor=${c}` : '/api/feed'), ''));
 export const useReels = () => useInfiniteQuery(infinite<Post>(['reels'], (p) => `/api/reels?page=${p}`));
 export const useStories = () => useQuery({ queryKey: ['stories'], queryFn: () => api<StoryGroup[]>('/api/stories') });
 export const usePost = (id: string, enabled = true) =>

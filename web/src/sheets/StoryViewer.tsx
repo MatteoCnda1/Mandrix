@@ -1,6 +1,8 @@
-import { PaperPlaneRight, Trash, X } from '@phosphor-icons/react';
+import type { StoryView } from '@mandrix/shared';
+import { Eye, PaperPlaneRight, Trash, X } from '@phosphor-icons/react';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, MediaView, confirmAction } from '../components/ui';
+import { Avatar, MediaView, Sheet, confirmAction } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
@@ -23,6 +25,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const [reply, setReply] = useState('');
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [viewersOpen, setViewersOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // Temps déjà écoulé sur la photo en cours (remis à zéro à chaque story, conservé pendant une pause).
   const elapsed = useRef(0);
@@ -200,6 +203,18 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
             <X size={20} />
           </button>
         </div>
+        {mine && story.views !== null && (
+          <button
+            type="button"
+            onClick={() => {
+              setPaused(true);
+              setViewersOpen(true);
+            }}
+            className="tap absolute bottom-4 left-1/2 flex h-11 -translate-x-1/2 items-center gap-2 rounded-full border-0 bg-white/15 px-4 text-sm font-bold text-white backdrop-blur"
+          >
+            <Eye size={18} /> {story.views} vue{story.views > 1 ? 's' : ''}
+          </button>
+        )}
         {!mine && (
           <form
             className="absolute right-3.5 bottom-4 left-3.5 flex gap-2"
@@ -222,8 +237,39 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
           </form>
         )}
       </div>
+      {viewersOpen && (
+        <ViewersSheet
+          storyId={story.id}
+          onClose={() => {
+            setViewersOpen(false);
+            setPaused(false);
+          }}
+        />
+      )}
       <VideoProgress videoRef={videoRef} active={story.media.kind === 'video'} onProgress={setProgress} onEnd={next} storyId={story.id} />
     </div>
+  );
+}
+
+/** Qui a vu ma story. */
+function ViewersSheet({ storyId, onClose }: { storyId: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({ queryKey: ['story-viewers', storyId], queryFn: () => api<StoryView[]>(`/api/stories/${storyId}/viewers`) });
+  return (
+    <Sheet title={`Vue par ${data?.length ?? '…'}`} onClose={onClose}>
+      <div className="flex flex-col gap-0.5">
+        {isLoading && <div className="py-6 text-center text-sm text-mute">Chargement…</div>}
+        {data?.length === 0 && <div className="py-6 text-center text-sm text-mute">Personne ne l’a encore vue.</div>}
+        {data?.map((v) => (
+          <div key={v.user.id} className="flex items-center gap-3 rounded-3xl p-2">
+            <Avatar user={v.user} size={44} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[0.9375rem] font-bold">{v.user.displayName}</span>
+              <span className="block text-[0.8125rem] text-mute">{timeAgo(v.at)}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Sheet>
   );
 }
 

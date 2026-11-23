@@ -4,6 +4,7 @@ import {
   CheckCircle,
   DotsThree,
   Flag,
+  PencilSimple,
   Heart,
   Lock,
   Play,
@@ -14,7 +15,8 @@ import {
 } from '@phosphor-icons/react';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { deletePost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
+import { api, errMsg } from '../lib/api';
+import { deletePost, patchPost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
 import { fmtCount, plural, timeAgo } from '../lib/format';
 import { useLongPress, useNow, type Point } from '../lib/hooks';
 import { useDoubleTap } from '../lib/gestures';
@@ -22,9 +24,9 @@ import { MediaLightbox } from './ChatMedia';
 import { useHeartBurst } from './HeartBurst';
 import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
-import { RichText } from './RichText';
-import { openPool, useUI } from '../lib/store';
-import { Avatar, confirmAction, cx, fmtDuration, MediaView, ratioOf, VideoProcessing } from './ui';
+import { MentionSuggestions, RichText } from './RichText';
+import { openPool, toast, useUI } from '../lib/store';
+import { Avatar, confirmAction, cx, fmtDuration, MediaView, PrimaryBtn, ratioOf, Sheet, VideoProcessing } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -308,7 +310,44 @@ function VideoTeaser({ post }: { post: Post }) {
   );
 }
 
-function PostMenu({ post, onClose }: { post: Post; onClose: () => void }) {
+/** Modifier la légende d'un de ses posts. */
+function EditCaption({ post, onClose }: { post: Post; onClose: () => void }) {
+  const [text, setText] = useState(post.text);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const updated = await api<Post>(`/api/posts/${post.id}`, { method: 'PATCH', body: { text: text.trim() } });
+      patchPost(post.id, (p) => ({ ...p, text: updated.text, edited: updated.edited }));
+      toast('Légende modifiée');
+      onClose();
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title="Modifier la légende" onClose={onClose}>
+      <textarea
+        ref={ref}
+        className="field min-h-[110px] resize-none py-3"
+        value={text}
+        maxLength={280}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Ta légende, @mentionne un ami, #hashtag…"
+        autoFocus
+      />
+      <MentionSuggestions value={text} onChange={setText} inputRef={ref} className="-mt-1" />
+      <PrimaryBtn disabled={busy || text.trim() === post.text} onClick={save}>
+        Enregistrer
+      </PrimaryBtn>
+    </Sheet>
+  );
+}
+
+function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; onEdit: () => void }) {
   const nav = useNavigate();
   const { data: me } = useMe();
   const mine = me && (post.author.id === me.id || me.isAdmin);
@@ -320,6 +359,18 @@ function PostMenu({ post, onClose }: { post: Post; onClose: () => void }) {
         <button type="button" className={item} onClick={() => nav(`/u/${post.author.username}`)}>
           <User size={20} /> Voir le profil
         </button>
+        {me && post.author.id === me.id && (post.kind === 'photo' || post.kind === 'video') && (
+          <button
+            type="button"
+            className={item}
+            onClick={() => {
+              onClose();
+              onEdit();
+            }}
+          >
+            <PencilSimple size={20} /> Modifier la légende
+          </button>
+        )}
         {me && post.author.id !== me.id && (
           <button
             type="button"
@@ -385,6 +436,7 @@ export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 1
 export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
+  const [editing, setEditing] = useState(false);
   const isPoll = post.kind === 'poll';
   const small = isPoll;
   return (
@@ -402,6 +454,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
             {!small && (
               <div className="truncate text-[0.8125rem] text-mute">
                 {timeAgo(post.createdAt)}
+                {post.edited ? ' · modifié' : ''}
                 {post.location ? ` · ${post.location}` : ''}
               </div>
             )}
@@ -418,7 +471,8 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
             <DotsThree size={22} />
           </button>
         </div>
-        {menu && <PostMenu post={post} onClose={() => setMenu(false)} />}
+        {menu && <PostMenu post={post} onClose={() => setMenu(false)} onEdit={() => setEditing(true)} />}
+        {editing && <EditCaption post={post} onClose={() => setEditing(false)} />}
       </div>
 
       {post.kind === 'meme' && <div className="px-2.5 py-1 text-center text-xl leading-tight font-extrabold tracking-[-.02em] text-balance">{post.text}</div>}

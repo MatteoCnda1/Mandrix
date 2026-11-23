@@ -81,6 +81,10 @@ export function connectSocket() {
       old ? { ...old, reads: [...old.reads.filter((r) => r.userId !== e.userId), { userId: e.userId, at: e.at }] } : old,
     );
   });
+  socket.on('dm:update', (m: Message) => {
+    qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => old?.map((x) => (x.id === m.id ? m : x)));
+    qc.invalidateQueries({ queryKey: ['conversations'] });
+  });
   socket.on('dm:reaction', (e) => {
     qc.setQueryData<Message[]>(['messages', e.conversationId], (old) => old?.map((m) => (m.id === e.messageId ? { ...m, reactions: e.reactions } : m)));
   });
