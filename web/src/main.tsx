@@ -8,7 +8,7 @@ import { ConfirmHost, Logo } from './components/ui';
 import { UpdateBanner } from './components/UpdateBanner';
 import './index.css';
 import { qc, useMe } from './lib/data';
-import { useKeyboardViewport } from './lib/keyboard';
+import { preventPinchZoom, useKeyboardViewport } from './lib/keyboard';
 import { flushQueue } from './lib/pelliculeQueue';
 import { connectSocket, disconnectSocket } from './lib/socket';
 import { toast, useUI } from './lib/store';
@@ -134,6 +134,8 @@ if (import.meta.env.PROD) {
   // Active la version en attente puis recharge la page.
   useUI.setState({ applyUpdate: () => void updateSW(true) });
 }
+
+preventPinchZoom();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

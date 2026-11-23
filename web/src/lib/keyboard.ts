@@ -59,3 +59,27 @@ export function useLockPageScroll(active = true) {
     };
   }, [active]);
 }
+
+/**
+ * Bloque le zoom au pincement : Safari iOS ignore « user-scalable=no » depuis iOS 10,
+ * il faut annuler ses évènements de geste. Les autres navigateurs reçoivent deux doigts
+ * en touchmove ; sur ordinateur, le pincement du trackpad arrive en molette + Ctrl.
+ */
+export function preventPinchZoom() {
+  const stop = (e: Event) => e.preventDefault();
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, stop, { passive: false });
+  document.addEventListener(
+    'touchmove',
+    (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    },
+    { passive: false },
+  );
+  window.addEventListener(
+    'wheel',
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false },
+  );
+}

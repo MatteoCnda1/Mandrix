@@ -307,6 +307,8 @@ html[data-theme='dark'] {
     -webkit-font-smoothing: antialiased;
     -webkit-text-size-adjust: 100%;
     overscroll-behavior-y: none;
+    /* Défilement seulement : pas de zoom au pincement ni au double tap. */
+    touch-action: pan-x pan-y;
   }
   /* ——— Fond Aurore (dégradés radiaux animés, sans filtre de flou pour rester fluide) ——— */
   .aurora {
