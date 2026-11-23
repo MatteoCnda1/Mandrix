@@ -6,6 +6,7 @@ import { parseCookieHeader, SESSION_COOKIE, userFromToken } from '../lib/auth.js
 import { HttpError } from '../lib/http.js';
 import { relayTyping } from '../routes/messages.js';
 import * as game from './game.js';
+import * as whois from './whois.js';
 import { socketConnected, socketDisconnected } from './presence.js';
 import { setIO, type IO } from './io.js';
 
@@ -53,6 +54,7 @@ export function attachSocket(app: FastifyInstance) {
     const userId = socket.data.userId;
     socket.join(`u:${userId}`);
     game.onConnect(userId, socket.id);
+    whois.onConnect(userId, socket.id);
     socketConnected(userId).catch(() => {});
 
     socket.on('game:create', (ack) => wrap(ack, () => game.createRoom(userId)));
@@ -68,12 +70,22 @@ export function attachSocket(app: FastifyInstance) {
     socket.on('game:next', (ack) => wrap(ack, () => game.next(userId)));
     socket.on('game:publish', (ack) => wrap(ack, async () => void (await game.publish(userId))));
 
+    socket.on('whois:create', (ack) => wrap(ack, () => whois.createRoom(userId)));
+    socket.on('whois:join', (code, ack) => wrap(ack, () => whois.joinRoom(userId, code)));
+    socket.on('whois:leave', (ack) => wrap(ack, () => whois.leaveRoom(userId)));
+    socket.on('whois:sync', (ack) => wrap(ack, () => whois.syncRoom(userId)));
+    socket.on('whois:settings', (s, ack) => wrap(ack, () => whois.updateSettings(userId, s ?? {})));
+    socket.on('whois:start', (ack) => wrap(ack, () => whois.startGame(userId)));
+    socket.on('whois:vote', (target, ack) => wrap(ack, () => whois.vote(userId, target)));
+    socket.on('whois:next', (ack) => wrap(ack, () => whois.next(userId)));
+
     socket.on('dm:typing', (conversationId, typing, activity) => {
       relayTyping(userId, conversationId, typing, activity).catch(() => {});
     });
 
     socket.on('disconnect', () => {
       game.onDisconnect(userId, socket.id);
+      whois.onDisconnect(userId, socket.id);
       socketDisconnected(userId).catch(() => {});
     });
   });

@@ -15,6 +15,7 @@ import {
   X,
 } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { GuessQuiz, GuessSummary } from '../components/GuessQuiz';
 import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
@@ -283,6 +284,8 @@ export function Unpack() {
   };
 
   const locked = !r;
+  // « Qui a pris ça ? » à faire : les photos attendent la fin du quiz (#88).
+  const quizTodo = r?.quiz === 'todo';
   const label = r?.weekLabel ?? data.current.weekLabel;
   const count = r?.count ?? data.current.count;
   const people = r?.people ?? data.current.people;
@@ -300,16 +303,19 @@ export function Unpack() {
         <button
           type="button"
           onClick={toggle}
-          disabled={locked}
+          disabled={locked || quizTodo}
           className={cx(
             'tap flex h-[52px] items-center gap-2 rounded-[26px] border-0 px-[22px] text-[0.9375rem] font-bold transition-[background,color,transform] duration-[400ms] active:scale-[.96]',
-            locked ? 'cursor-not-allowed bg-line text-mute' : revealed ? 'bg-ink text-inv' : 'bg-brand text-white shadow-blue',
+            locked || quizTodo ? 'cursor-not-allowed bg-line text-mute' : revealed ? 'bg-ink text-inv' : 'bg-brand text-white shadow-blue',
           )}
         >
-          {locked ? <LockSimple size={18} weight="fill" /> : revealed ? <ArrowCounterClockwise size={18} /> : <Package size={18} weight="fill" />}
-          <span>{locked ? 'Ouverture dimanche à 20h' : revealed ? 'Refermer' : 'Déballer la semaine'}</span>
+          {locked || quizTodo ? <LockSimple size={18} weight="fill" /> : revealed ? <ArrowCounterClockwise size={18} /> : <Package size={18} weight="fill" />}
+          <span>{locked ? 'Ouverture dimanche à 20h' : quizTodo ? 'Devine d’abord' : revealed ? 'Refermer' : 'Déballer la semaine'}</span>
         </button>
       </div>
+
+      {quizTodo && me && <GuessQuiz meId={me.id} />}
+      {r && !quizTodo && me && <GuessSummary meId={me.id} />}
 
       {r && revealed && r.top.length > 0 && (
         <div className="card flex animate-in flex-col gap-3.5 p-[18px]" style={{ animationDelay: '1s', animationDuration: '.6s' }}>
@@ -381,9 +387,9 @@ export function Unpack() {
         </div>
       )}
 
-      {r && r.photos.length === 0 && <div className="card p-6 text-center text-[0.9375rem] text-mute">Personne n’a pris de photo cette semaine.</div>}
+      {r && !quizTodo && r.photos.length === 0 && <div className="card p-6 text-center text-[0.9375rem] text-mute">Personne n’a pris de photo cette semaine.</div>}
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+      <div className={cx('grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3', quizTodo && 'hidden')}>
         {(r ? r.photos : Array.from({ length: backs }, (_, i) => ({ id: `b${i}` }) as unknown as Shot)).map((ph, i) => {
           const open = !!r && revealed;
           return (

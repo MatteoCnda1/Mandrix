@@ -1,13 +1,15 @@
 import path from 'node:path';
 import type { Multipart, MultipartFile } from '@fastify/multipart';
-import { DAY_SHORT, SHOT_UNDO_MINUTES, type PelliculeState, type Shot, type UnpackState } from '@mandrix/shared';
+import { DAY_SHORT, SHOT_UNDO_MINUTES, type GuessState, type PelliculeState, type Shot, type UnpackState } from '@mandrix/shared';
 import { ZipArchive } from 'archiver';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { requireUser } from '../lib/auth.js';
-import { fail, uuidParam } from '../lib/http.js';
+import { fail, parse, uuidParam } from '../lib/http.js';
+import { answer, guessState, lastRevealAt, quizStatus, skip } from '../lib/guess.js';
+import { z } from 'zod';
 import { deleteMediaFile, mediaRef, saveUpload, variantPath } from '../lib/media.js';
 import { activeMoment, isOnTime } from '../lib/moment.js';
 import { notify } from '../lib/notify.js';
@@ -104,6 +106,8 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
     if (Number.isNaN(revealAt.getTime())) return fail(400, 'Semaine inconnue');
     if (revealAt > new Date()) return fail(403, 'Cette semaine n’est pas encore déballée');
     const mineOnly = q.scope !== 'all';
+    // L'album complet donne les auteurs : pas avant d'avoir joué (ou passé) « Qui a pris ça ? ».
+    if (!mineOnly && (await quizStatus(me.id, revealAt)) === 'todo') return fail(403, 'Joue d’abord à « Qui a pris ça ? » (ou passe)');
     const rows = await db.execute<{ takenAt: Date; path: string; username: string }>(sql`
       select s.taken_at as "takenAt", m.path, u.username
       from shots s join media m on m.id = s.media_id join users u on u.id = s.user_id
@@ -132,10 +136,9 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const next = nextReveal();
     const current = { ...(await batchCounts(next)), weekLabel: weekLabel(next) };
-    const [last] = await db.execute<{ r: Date | null }>(sql`select max(reveal_at) as r from shots where reveal_at <= now()`);
-    if (!last?.r) return { nextRevealAt: next.toISOString(), current, revealed: null };
-
-    const revealAt = new Date(last.r);
+    const revealAt = await lastRevealAt();
+    if (!revealAt) return { nextRevealAt: next.toISOString(), current, revealed: null };
+    const quiz = await quizStatus(me.id, revealAt);
     const rows = await db.execute<{ id: string; userId: string; takenAt: Date; mediaId: string; kind: string; width: number | null; height: number | null; likes: number; liked: boolean; pool: 'public' | 'friends' | null; onTime: boolean }>(sql`
       select s.id, s.user_id as "userId", s.taken_at as "takenAt", m.id as "mediaId", m.kind, m.width, m.height,
         (select count(*)::int from shot_likes l where l.shot_id = s.id) as likes,
@@ -168,6 +171,8 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
     }
     const busiest = [...perDay.entries()].sort((a, b) => b[1] - a[1])[0];
     const counts = await batchCounts(revealAt);
+    // Quiz à faire : les photos (et leurs auteurs) attendent.
+    const hidden = quiz === 'todo';
     return {
       nextRevealAt: next.toISOString(),
       current,
@@ -177,11 +182,28 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
         count: counts.count,
         people: counts.people,
         busiestDay: busiest ? DAY_LONG[busiest[0]] : null,
-        photos,
-        top: [...photos].sort((a, b) => b.likes - a.likes || a.takenAt.localeCompare(b.takenAt)).slice(0, 3),
+        photos: hidden ? [] : photos,
+        top: hidden ? [] : [...photos].sort((a, b) => b.likes - a.likes || a.takenAt.localeCompare(b.takenAt)).slice(0, 3),
+        quiz,
       },
     };
   });
+
+  // ——— Qui a pris ça ? ———
+
+  app.get('/api/pellicule/guess', async (req): Promise<GuessState | null> => {
+    const me = requireUser(req);
+    const revealAt = await lastRevealAt();
+    return revealAt ? guessState(me.id, revealAt) : null;
+  });
+
+  app.post('/api/pellicule/guess', async (req) => {
+    const me = requireUser(req);
+    const body = parse(z.object({ shotId: z.string().uuid(), userId: z.string().uuid() }), req.body);
+    return answer(me.id, body.shotId, body.userId);
+  });
+
+  app.post('/api/pellicule/guess/skip', async (req) => skip(requireUser(req).id));
 
   /** Annuler une photo prise par erreur, dans les minutes qui suivent. */
   app.delete('/api/pellicule/shots/:id', async (req) => {

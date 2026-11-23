@@ -3,11 +3,15 @@ import { useState } from 'react';
 import { Avatar, PrimaryBtn, Sheet, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { useFriends } from '../lib/data';
-import { useGame } from '../lib/socket';
-import { closeSheet, toast } from '../lib/store';
+import { useGame, useWhois } from '../lib/socket';
+import { closeSheet, toast, useUI } from '../lib/store';
 
 export function InviteSheet() {
-  const room = useGame((s) => s.room);
+  const game = useUI((s) => s.inviteGame);
+  const mif = useGame((s) => s.room);
+  const whois = useWhois((s) => s.room);
+  const room = game === 'whois' ? whois : mif;
+  const gameName = game === 'whois' ? 'Qui de nous… ?' : 'Make It Friends';
   const { data } = useFriends();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -37,9 +41,9 @@ export function InviteSheet() {
 
   const link = `${location.origin}/jeu?code=${room.code}`;
   const share = async () => {
-    const text = `Rejoins mon salon Make It Friends sur Mandrix : ${room.code}`;
+    const text = `Rejoins mon salon ${gameName} sur Mandrix : ${room.code}`;
     try {
-      if (navigator.share) await navigator.share({ title: 'Make It Friends', text, url: link });
+      if (navigator.share) await navigator.share({ title: gameName, text, url: link });
       else {
         await navigator.clipboard.writeText(link);
         toast('Lien copié');

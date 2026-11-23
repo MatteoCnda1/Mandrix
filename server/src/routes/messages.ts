@@ -762,11 +762,12 @@ export default async function messageRoutes(app: FastifyInstance) {
   /** Invitation à un salon Make It Friends. */
   app.post('/api/game/invite', perMinute(10), async (req) => {
     const me = requireUser(req);
-    const body = parse(z.object({ code: z.string().regex(/^MDRX-\d{3}$/), userIds: z.array(z.string().uuid()).min(1).max(8) }), req.body);
+    const body = parse(z.object({ code: z.string().regex(/^(MDRX|QDN)-\d{3}$/), userIds: z.array(z.string().uuid()).min(1).max(8) }), req.body);
+    const gameName = body.code.startsWith('QDN') ? 'Qui de nous… ?' : 'Make It Friends';
     let sent = 0;
     for (const uid of body.userIds) {
       if (!(await areFriends(me.id, uid)) || uid === me.id) continue;
-      await sendDm(me, uid, `Rejoins mon salon Make It Friends, code ${body.code}.`, { type: 'game_invite', code: body.code });
+      await sendDm(me, uid, `Rejoins mon salon ${gameName}, code ${body.code}.`, { type: 'game_invite', code: body.code });
       await notify({ userId: uid, type: 'game_invite', actorId: me.id, data: { code: body.code }, dedupeKey: `game_invite:${me.id}` });
       sent++;
     }

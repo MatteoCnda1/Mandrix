@@ -6,8 +6,9 @@ import { DailyMemeView } from '../components/Daily';
 import { Avatar, MediaView, Podium, PrimaryBtn, Seg, confirmAction, cx } from '../components/ui';
 import { qc, useMe, usePoolStats } from '../lib/data';
 import { useNow } from '../lib/hooks';
-import { gameEmit, useGame } from '../lib/socket';
-import { openSheet, toast, useUI } from '../lib/store';
+import { gameEmit, useGame, useWhois } from '../lib/socket';
+import { openInvite, toast, useUI } from '../lib/store';
+import { joinWhois, WhoisHome, WhoisRoomView } from './Whois';
 
 function Hero({ room }: { room?: GameRoom | null }) {
   const { data: pool } = usePoolStats();
@@ -75,7 +76,9 @@ function EmptyPoolCard() {
   );
 }
 
-function NoRoom({ tab, setTab }: { tab: 'live' | 'jour'; setTab: (t: 'live' | 'jour') => void }) {
+type Tab = 'live' | 'jour' | 'qdn';
+
+function NoRoom({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const connected = useGame((s) => s.connected);
@@ -87,14 +90,24 @@ function NoRoom({ tab, setTab }: { tab: 'live' | 'jour'; setTab: (t: 'live' | 'j
   };
   const tabs = (
     <Seg
+      size="sm"
       value={tab}
       onChange={setTab}
       options={[
-        { value: 'live' as const, label: 'Partie en direct' },
+        { value: 'live' as const, label: 'Mèmes en direct' },
         { value: 'jour' as const, label: 'Mème du jour' },
+        { value: 'qdn' as const, label: 'Qui de nous ?' },
       ]}
     />
   );
+  if (tab === 'qdn') {
+    return (
+      <div className="flex animate-in flex-col gap-3.5">
+        {tabs}
+        <WhoisHome />
+      </div>
+    );
+  }
   if (tab === 'jour') {
     return (
       <div className="flex animate-in flex-col gap-3.5">
@@ -175,7 +188,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
           ))}
           {room.players.length < GAME.maxPlayers && (
             <div className="flex w-[60px] flex-col items-center gap-1.5">
-              <button type="button" aria-label="Inviter" onClick={() => openSheet('invite')} className="tap grid h-[54px] w-[54px] place-items-center rounded-full border-2 border-dashed border-[#8FA3B5] bg-transparent text-ink">
+              <button type="button" aria-label="Inviter" onClick={() => openInvite('mif')} className="tap grid h-[54px] w-[54px] place-items-center rounded-full border-2 border-dashed border-[#8FA3B5] bg-transparent text-ink">
                 <Plus size={20} />
               </button>
               <span className="text-[0.8125rem] font-semibold">Inviter</span>
@@ -470,6 +483,7 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
 export function Game() {
   const { data: me } = useMe();
   const room = useGame((s) => s.room);
+  const whois = useWhois((s) => s.room);
   const synced = useGame((s) => s.synced);
   const [params, setParams] = useSearchParams();
   // Dernier code rejoint : une nouvelle invitation (autre code) fonctionne même sans quitter l'écran.
@@ -483,14 +497,22 @@ export function Game() {
     }
     if (!synced || joined.current === code) return;
     joined.current = code;
+    // Invitation « Qui de nous… ? » (QDN-123) ou Make It Friends (MDRX-123).
+    if (/^QDN/i.test(code)) {
+      if (whois?.code !== code.toUpperCase()) void joinWhois(code);
+      setParams({ onglet: 'qdn' }, { replace: true });
+      return;
+    }
     if (room?.code !== code.toUpperCase()) void enterRoom('game:join', code);
     setParams({}, { replace: true });
   }, [code, synced]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tab = params.get('onglet') === 'jour' ? 'jour' : 'live';
-  const setTab = (t: 'live' | 'jour') => setParams(t === 'jour' ? { onglet: 'jour' } : {}, { replace: true });
+  const onglet = params.get('onglet');
+  const tab: Tab = onglet === 'jour' || onglet === 'qdn' ? onglet : 'live';
+  const setTab = (t: Tab) => setParams(t === 'live' ? {} : { onglet: t }, { replace: true });
 
   if (!me) return null;
+  if (whois && (tab === 'qdn' || !room)) return <WhoisRoomView room={whois} meId={me.id} />;
   if (!room) return <NoRoom tab={tab} setTab={setTab} />;
   return (
     <div data-screen-label="Make It Friends">

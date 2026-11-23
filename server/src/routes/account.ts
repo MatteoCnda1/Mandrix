@@ -154,6 +154,10 @@ export default async function accountRoutes(app: FastifyInstance) {
     const shots = await q(sql`
       select s.id, s.taken_at as "takenAt", s.reveal_at as "revealAt", s.on_time as "onTime", s.media_id as "mediaId"
       from shots s where s.user_id = ${me.id} and s.reveal_at <= now() order by s.taken_at`);
+    const games = {
+      quiDeNous: await q(sql`select text, created_at as "createdAt" from whois_questions where author_id = ${me.id} order by created_at`),
+      quiAPrisCa: await q(sql`select reveal_at as "revealAt", status, score, created_at as "createdAt" from guess_rounds where user_id = ${me.id} order by reveal_at`),
+    };
     const files = await q<{ id: string; path: string }>(sql`
       select id, path from media where owner_id = ${me.id} and (sealed_until is null or sealed_until <= now()) and status <> 'processing'`);
 
@@ -165,6 +169,7 @@ export default async function accountRoutes(app: FastifyInstance) {
     zip.append(json(comments), { name: 'commentaires.json' });
     zip.append(json(messages), { name: 'messages.json' });
     zip.append(json(shots), { name: 'pellicule.json' });
+    zip.append(json(games), { name: 'jeux.json' });
     zip.append(
       'Export Mandrix\n\nLes fichiers JSON sont lisibles dans n’importe quel éditeur de texte.\n' +
         'Le dossier medias/ contient tes photos, vidéos et vocaux ; leur nom correspond au champ « mediaId ».\n',

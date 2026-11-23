@@ -36,6 +36,7 @@ const SettingsPage = lazy(() => import('./screens/Settings').then((m) => ({ defa
 const ResetPassword = lazy(() => import('./screens/ResetPassword').then((m) => ({ default: m.ResetPassword })));
 const Admin = lazy(() => import('./screens/Admin').then((m) => ({ default: m.Admin })));
 const Unpack = lazy(() => import('./screens/Unpack').then((m) => ({ default: m.Unpack })));
+const Retro = lazy(() => import('./screens/Retro').then((m) => ({ default: m.Retro })));
 
 const page = (el: ReactNode) => <Suspense fallback={<ScreenLoader />}>{el}</Suspense>;
 
@@ -129,6 +130,7 @@ const router = createBrowserRouter([
       { path: 'recherche', element: page(<Search />) },
       { path: 'reglages', element: page(<SettingsPage />) },
       { path: 'admin', element: page(<Admin />) },
+      { path: 'retro', element: page(<Retro />) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

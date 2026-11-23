@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 23 novembre 2026 (lot 6, issues #73 à #86).
+> Dernière mise à jour : 23 novembre 2026 (lot 7, issues #88 à #90).
 
 ## 1. L'idée
 
@@ -92,6 +92,10 @@ La file reprend au démarrage (`resumeVideoQueue`).
 - **Moment Mandrix** : chaque jour, à une heure aléatoire (`MOMENT_START_HOUR`–`MOMENT_END_HOUR`), notification ; 10 minutes pour prendre la photo, badge « pile à l'heure » (`on_time`).
 - Série de semaines, rappel du samedi.
 - Déballage : cartes qui se retournent, top 3, rétrospective animée, album zip (`/api/pellicule/archive?scope=mine|all`).
+- **Qui a pris ça ?** (#88, `server/src/lib/guess.ts`) : avant de déballer, on devine l'auteur de 8 photos au plus (pas les siennes,
+  réparties entre les auteurs, tirage stable par empreinte md5). Tant que le quiz est à faire (`revealed.quiz = 'todo'`), le serveur
+  renvoie les photos vides et refuse l'album complet ; « Passer » débloque. 20 points par bonne réponse (`shot_guesses`,
+  `guess_rounds`), comptés dans la saison. Pas de quiz avec moins de deux autres auteurs.
 
 ### Make It Friends
 Jeu temps réel 2 à 8 joueurs : une image tirée du pool, chacun écrit une légende, tout le monde vote.
@@ -102,8 +106,20 @@ podium avec départage par auteur en cas d'égalité. Correctif : la création d
 par personne modifiable jusqu'à 18 h, votes anonymes de 18 h à minuit, résultats le lendemain. Chaque vote vaut 50 points,
 le gagnant +100. Les légendes rejoignent la table `memes`.
 
+### Qui de nous… ?
+(#89, `server/src/realtime/whois.ts`, onglet « Qui de nous ? » de `/jeu`) Salon temps réel de 3 à 8 joueurs, codes `QDN-###`,
+évènements `whois:*`. Une question, chacun désigne un joueur (soi compris), révélation anonyme ; +10 points à qui a voté comme la
+majorité, « titres » en fin de partie. Questions de base (`server/src/lib/whoisDeck.ts`) + questions de la bande (`whois_questions`,
+celles des joueurs et de leurs amis, au plus la moitié du paquet). Invitations par message comme Make It Friends (`/jeu?code=QDN-123`).
+
+### Rétro de l'année
+(#90, `/retro`, `server/src/lib/retro.ts`) Diapositives plein écran : posts et j'aime reçus, post le plus aimé, Pellicule (série record),
+mèmes, Qui a pris ça ?, messages et acolyte, réaction préférée, amis, mois le plus actif, chiffres de la bande. Carte sur le fil du
+1er décembre au 31 janvier (`retroYear()` dans `shared`), ligne « Ma rétro » dans le profil, notification `retro` le 1er décembre à 10 h.
+
 ### Galerie des mèmes
-Classement de la **saison** (mois en cours : somme des `memes.score`, parties et mèmes du jour), champions des mois passés,
+Classement de la **saison** (mois en cours : somme des `memes.score`, parties et mèmes du jour, + 20 points par bonne réponse à
+« Qui a pris ça ? »), champions des mois passés,
 puis podium des mèmes les plus aimés.
 
 ### Messages
@@ -249,6 +265,7 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 | `0008_pin_birthday_gallery` | épinglage, anniversaire, carrousel |
 | `0009_message_client_id` | identifiant d'envoi des messages (anti-doublon) |
 | `0010_share_replies_group_photo` | réponses aux commentaires (`parent_id`), photo de groupe, post épinglé du profil |
+| `0011_guess_whois` | « Qui a pris ça ? » (`shot_guesses`, `guess_rounds`), questions de « Qui de nous… ? » (`whois_questions`) |
 
 ## 9. Pistes ouvertes
 
