@@ -52,12 +52,12 @@ export interface FriendsList {
 export interface MediaRef {
   id: ID;
   url: string;
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'audio';
   width: number | null;
   height: number | null;
   /** Miniature (vidéos). */
   poster: string | null;
-  /** Durée en secondes (vidéos). */
+  /** Durée en secondes (vidéos, vocaux). */
   duration: number | null;
   /** Vidéo en cours de transcodage. */
   processing: boolean;
@@ -197,7 +197,20 @@ export interface Message {
   senderId: ID;
   text: string;
   meta: MessageMeta;
+  /** Pièce jointe : photo, vidéo ou message vocal (kind « audio »). */
+  media: MediaRef | null;
   createdAt: string;
+}
+
+/** Libellé court d'une pièce jointe (aperçu de conversation, notification). */
+export function attachmentLabel(kind: MediaRef['kind'] | null | undefined, duration?: number | null): string {
+  if (kind === 'audio') {
+    const s = Math.round(duration ?? 0);
+    return `🎤 Message vocal${s ? ` (${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')})` : ''}`;
+  }
+  if (kind === 'video') return '🎥 Vidéo';
+  if (kind === 'image') return '📷 Photo';
+  return '';
 }
 
 export interface Conversation {

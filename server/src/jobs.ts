@@ -59,6 +59,7 @@ export function startJobs() {
         and not exists (select 1 from memes mm where mm.media_id = m.id)
         and not exists (select 1 from users u where u.avatar_media_id = m.id)
         and not exists (select 1 from messages msg where msg.meta->'media'->>'id' = m.id::text)
+        and not exists (select 1 from messages msg where msg.media_id = m.id)
       limit 500`);
     for (const o of orphans) {
       await db.execute(sql`delete from media where id = ${o.id}`);

@@ -136,6 +136,20 @@ async function processVideo(id: string) {
   emitToUser(m.ownerId, 'media:ready', id);
 }
 
+/**
+ * Convertit un message vocal en AAC mono (.m4a) — format lu par Safari, Chrome et Firefox.
+ * Synchrone (quelques centaines de ms pour un vocal) : le message est jouable dès l'envoi.
+ */
+export async function transcodeVoice(srcAbs: string, outAbs: string): Promise<{ ok: boolean; duration: number | null }> {
+  if (!(await hasFfmpeg())) return { ok: false, duration: null };
+  const r = await run('ffmpeg', ['-y', '-i', srcAbs, '-vn', '-c:a', 'aac', '-b:a', '64k', '-ac', '1', '-ar', '44100', '-movflags', '+faststart', outAbs], 120_000);
+  if (r.code !== 0) {
+    await fs.rm(outAbs, { force: true });
+    return { ok: false, duration: (await probe(srcAbs)).duration };
+  }
+  return { ok: true, duration: (await probe(outAbs)).duration };
+}
+
 const queue: string[] = [];
 let running = false;
 

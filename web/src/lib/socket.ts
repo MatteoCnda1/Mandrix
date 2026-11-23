@@ -47,7 +47,7 @@ export function connectSocket() {
     }
   });
   socket.on('media:ready', () => {
-    for (const k of [['feed'], ['reels'], ['stories'], ['user-posts'], ['post'], ['memes']]) qc.invalidateQueries({ queryKey: k });
+    for (const k of [['feed'], ['reels'], ['stories'], ['user-posts'], ['post'], ['memes'], ['messages']]) qc.invalidateQueries({ queryKey: k });
   });
   socket.on('dm:new', (m: Message) => {
     qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));

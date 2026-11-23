@@ -99,7 +99,7 @@ export default async function postRoutes(app: FastifyInstance) {
     if (body.kind === 'photo' || body.kind === 'video') {
       const [m] = await db.select().from(media).where(eq(media.id, body.mediaId)).limit(1);
       if (!m || m.ownerId !== me.id) fail(400, 'Média introuvable');
-      if ((body.kind === 'photo') !== (m!.kind === 'image')) fail(400, body.kind === 'photo' ? 'Ce fichier n’est pas une photo' : 'Ce fichier n’est pas une vidéo');
+      if (m!.kind !== (body.kind === 'photo' ? 'image' : 'video')) fail(400, body.kind === 'photo' ? 'Ce fichier n’est pas une photo' : 'Ce fichier n’est pas une vidéo');
       const [p] = await db
         .insert(posts)
         .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null })
