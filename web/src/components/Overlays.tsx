@@ -23,7 +23,7 @@ export function Overlays() {
       {composer && <Composer key={composer.mode} mode={composer.mode} initialKind={composer.kind} initialPool={composer.pool} />}
       {commentsFor && <CommentsSheet postId={commentsFor} />}
       {poolFor && <PoolSheet target={poolFor} />}
-      {story && <StoryViewer start={story} />}
+      {story && <StoryViewer key={`${story.group}:${story.index}`} start={story} />}
       {sheet === 'friends' && <FriendsSheet />}
       {sheet === 'editProfile' && <EditProfileSheet />}
       {sheet === 'invite' && <InviteSheet />}

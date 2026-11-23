@@ -18,6 +18,9 @@ import { useEffect, useState } from 'react';
 import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
+import { ZoomableImage } from '../components/Zoomable';
+import { useMediaGestures } from '../lib/gestures';
+import { lockScroll, useScrollLock } from '../lib/scrollLock';
 import { useNow } from '../lib/hooks';
 import { openPool } from '../lib/store';
 
@@ -37,11 +40,16 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [photos.length, onClose]);
+  useScrollLock();
+  const gestures = useMediaGestures({
+    onSwipeDown: onClose,
+    onSwipeX: (dir) => setI((x) => Math.max(0, Math.min(photos.length - 1, x - dir))),
+  });
   if (!shot) return null;
   const nav = 'tap absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur';
   return (
-    <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.94)] p-3" role="dialog" aria-modal="true">
-      <div className="relative flex h-[min(88vh,820px)] w-full max-w-[520px] animate-drop flex-col overflow-hidden rounded-[36px] bg-night">
+    <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.94)] p-3" role="dialog" aria-modal="true" aria-label={`Photo de ${shot.author.displayName}`}>
+      <div className="relative flex h-[min(88vh,820px)] w-full max-w-[520px] animate-drop flex-col overflow-hidden rounded-[36px] bg-night" style={gestures.style}>
         <div className="flex items-center gap-2.5 p-3.5 text-white">
           <Avatar user={shot.author} size={40} />
           <div className="min-w-0 flex-1">
@@ -56,7 +64,13 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
           </button>
         </div>
         <div className="relative min-h-0 flex-1">
-          <MediaView key={shot.id} media={shot.media} fit="contain" />
+          {shot.media.kind === 'image' ? (
+            <ZoomableImage key={shot.id} media={shot.media} onDismiss={onClose} onSwipeX={(dir) => setI((x) => Math.max(0, Math.min(photos.length - 1, x - dir)))} />
+          ) : (
+            <div {...gestures.handlers} className="absolute inset-0 touch-none select-none">
+              <MediaView key={shot.id} media={shot.media} fit="contain" />
+            </div>
+          )}
           {i > 0 && (
             <button type="button" aria-label="Photo précédente" onClick={() => setI(i - 1)} className={cx(nav, 'left-3')}>
               <CaretLeft size={20} />
@@ -117,19 +131,24 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
       if (e.key === ' ') setPaused((p) => !p);
     };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const release = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      release();
     };
   }, [onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const gestures = useMediaGestures({
+    onTap: (zone) => go(zone === 'left' ? -1 : 1),
+    onHold: (on) => setPaused(on),
+    onSwipeDown: onClose,
+    onSwipeX: (dir) => go(-dir),
+  });
   const shot = photos[i];
   const next = photos[i + 1];
   return (
     <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.94)] p-3" role="dialog" aria-modal="true" aria-label={`Rétrospective : ${label}`}>
-      <div className="relative h-[min(88vh,820px)] w-full max-w-[460px] animate-drop overflow-hidden rounded-[36px] bg-night">
+      <div className="relative h-[min(88vh,820px)] w-full max-w-[460px] animate-drop overflow-hidden rounded-[36px] bg-night" style={gestures.style}>
         {shot ? (
           <>
             <div key={shot.id} className="absolute inset-0 overflow-hidden">
@@ -192,16 +211,16 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
         </div>
         {shot && (
           <>
-            <button type="button" aria-label="Photo précédente" onClick={() => go(-1)} className="absolute top-20 bottom-28 left-0 w-[30%] cursor-pointer border-0 bg-transparent" />
-            <button
-              type="button"
-              aria-label="Photo suivante (maintenir pour mettre en pause)"
-              onClick={() => go(1)}
-              onPointerDown={() => setPaused(true)}
-              onPointerUp={() => setPaused(false)}
-              onPointerLeave={() => setPaused(false)}
-              className="absolute top-20 right-0 bottom-28 w-[70%] cursor-pointer border-0 bg-transparent"
-            />
+            <div {...gestures.handlers} aria-hidden className="absolute inset-x-0 top-20 bottom-28 cursor-pointer touch-none select-none [-webkit-touch-callout:none]" />
+            <button type="button" onClick={() => go(-1)} className="sr-only">
+              Photo précédente
+            </button>
+            <button type="button" onClick={() => go(1)} className="sr-only">
+              Photo suivante
+            </button>
+            <button type="button" onClick={() => setPaused((p) => !p)} className="sr-only">
+              {paused ? 'Reprendre' : 'Mettre en pause'}
+            </button>
           </>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useScrollLock } from './scrollLock';
 
 // Clavier virtuel (iPhone surtout) : Safari réduit la « zone visible » et fait défiler la page
 // pour garder le champ actif à l'écran, ce qui fait remonter tout l'écran. On publie la taille
@@ -47,17 +48,7 @@ export function useKeyboardViewport() {
 
 /** Bloque le défilement de la page (l'écran gère son propre défilement interne). */
 export function useLockPageScroll(active = true) {
-  useEffect(() => {
-    if (!active) return;
-    const html = document.documentElement;
-    const prev = [html.style.overflow, document.body.style.overflow];
-    html.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-    return () => {
-      html.style.overflow = prev[0];
-      document.body.style.overflow = prev[1];
-    };
-  }, [active]);
+  useScrollLock(active);
 }
 
 /**

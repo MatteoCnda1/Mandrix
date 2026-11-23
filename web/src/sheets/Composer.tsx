@@ -1,7 +1,6 @@
 import { POLL_DURATIONS, POLL_MAX_OPTIONS, type MediaRef, type PollKind, type Post } from '@mandrix/shared';
 import { Eye, Image as ImageIcon, Plus, Sticker, X } from '@phosphor-icons/react';
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { MentionSuggestions } from '../components/RichText';
 import { Seg, Sheet, Switch, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
@@ -55,7 +54,6 @@ function DropZone({ file, accept, label, onPick, onClear, aspect = '16 / 9' }: {
 }
 
 export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2; initialPool?: boolean }) {
-  const nav = useNavigate();
   const { data: config } = useConfig();
   const [kind, setKind] = useState<0 | 1 | 2>(initialKind ?? 0);
   const [file, setFile] = useState<File | null>(null);
@@ -121,8 +119,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
       }
       if (mode === 'post') {
         for (const k of [['feed'], ['reels'], ['user-posts'], ['pool-stats']]) qc.invalidateQueries({ queryKey: k });
-        nav('/');
-        window.scrollTo(0, 0);
+        // On reste sur l'écran d'où l'on publiait (jeu, profil…) ; sur le fil, on remonte voir le post.
+        if (window.location.pathname === '/') window.scrollTo({ top: 0, behavior: 'smooth' });
       }
       close();
     } catch (e) {
@@ -134,7 +132,12 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const pubLabel = busy ? (progress! < 1 ? `Envoi… ${Math.round(progress! * 100)} %` : 'Publication…') : 'Publier';
 
   return (
-    <Sheet title={mode === 'story' ? 'Nouvelle story' : 'Nouveau post'} onClose={close}>
+    <Sheet
+      title={mode === 'story' ? 'Nouvelle story' : 'Nouveau post'}
+      onClose={close}
+      locked={busy}
+      onLockedClose={() => toast('Envoi en cours, encore quelques secondes…')}
+    >
       {mode === 'story' ? (
         <>
           <DropZone file={file} accept="image/*,video/*" label="Touche pour ajouter une photo ou une vidéo" onPick={pick} onClear={() => setFile(null)} aspect="4 / 5" />

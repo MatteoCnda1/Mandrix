@@ -1,5 +1,6 @@
-import { conversationName, MESSAGE_REACTIONS, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
+import { attachmentLabel, conversationName, MESSAGE_REACTIONS, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
 import {
+  ArrowBendUpLeft,
   CaretLeft,
   CaretRight,
   ChatCircleDots,
@@ -21,14 +22,16 @@ import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, EmptyCard, MediaView, PrimaryBtn, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
+import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
+import { useSwipeX } from '../lib/gestures';
 import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
 import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
 import { qc, useConversation, useConversations, useFriends, useMe, useMessages } from '../lib/data';
 import { shortTime } from '../lib/format';
-import { useNow } from '../lib/hooks';
+import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
+import { useGoBack } from '../lib/nav';
 import { sendTyping, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
@@ -59,9 +62,11 @@ export function Messages() {
   const { data, isLoading } = useConversations();
   const now = useNow(60_000);
   const typing = useTyping();
+  const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['conversations'] }));
   if (isLoading) return <ScreenLoader />;
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
+      <PullIndicator pull={pull} refreshing={refreshing} />
       <button
         type="button"
         onClick={() => openSheet('newMessage')}
@@ -250,11 +255,58 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
 }
 
 /** Bulle réagissant à l'appui long (téléphone) ou au clic droit (ordinateur). */
-function Pressable({ onLong, className, style, children }: { onLong: (p: Point) => void; className?: string; style?: CSSProperties; children: ReactNode }) {
+/**
+ * Bulle : appui long (ou clic droit) = réactions et actions ; glisser vers la droite = répondre.
+ */
+function Pressable({
+  onLong,
+  onReply,
+  className,
+  style,
+  children,
+}: {
+  onLong: (p: Point) => void;
+  onReply: () => void;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
   const lp = useLongPress(onLong);
+  const sw = useSwipeX((dir) => dir === 1 && onReply(), { threshold: 56, max: 80 });
+  const dx = Math.max(0, sw.dx);
   return (
-    <div {...lp} className={cx('select-none [-webkit-touch-callout:none]', className)} style={style}>
-      {children}
+    <div className="relative">
+      <span
+        aria-hidden
+        className="absolute top-1/2 -left-9 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-soft text-mute"
+        style={{ opacity: Math.min(1, dx / 56), transform: `translateY(-50%) scale(${0.6 + Math.min(1, dx / 56) * 0.4})` }}
+      >
+        <ArrowBendUpLeft size={16} weight="bold" />
+      </span>
+      <div
+        onPointerDown={(e) => {
+          lp.onPointerDown(e);
+          sw.handlers.onPointerDown(e);
+        }}
+        onPointerMove={(e) => {
+          lp.onPointerMove(e);
+          sw.handlers.onPointerMove(e);
+        }}
+        onPointerUp={() => {
+          lp.onPointerUp();
+          sw.handlers.onPointerUp();
+        }}
+        onPointerCancel={() => {
+          lp.onPointerCancel();
+          sw.handlers.onPointerCancel();
+        }}
+        onContextMenu={lp.onContextMenu}
+        onClickCapture={lp.onClickCapture}
+        className={cx('touch-pan-y select-none [-webkit-touch-callout:none]', className)}
+        style={{ ...style, transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform .2s ease' }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -270,9 +322,15 @@ function TypingDots() {
   );
 }
 
+/** Une conversation par instance : passer d'une conversation à l'autre repart d'un état vide. */
 export function Chat() {
   const { id = '' } = useParams();
+  return <ChatView key={id} id={id} />;
+}
+
+function ChatView({ id }: { id: string }) {
   const nav = useNavigate();
+  const goBack = useGoBack();
   const { isPhone } = useViewport();
   const { data: me } = useMe();
   const { data: conv } = useConversation(id);
@@ -280,6 +338,19 @@ export function Chat() {
   const [draft, setDraft] = useState('');
   const [info, setInfo] = useState(false);
   const [menu, setMenu] = useState<{ m: Message; at: Point } | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const startReply = (m: Message) => {
+    setReplyTo(m);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+  /** Fait défiler jusqu'au message cité et le met en évidence un instant. */
+  const showOriginal = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (!el) return toast('Message trop ancien pour être affiché', 'error');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 900, iterations: 2 });
+  };
   const typingIds = useTyping((s) => s[id]) ?? [];
   const list = useRef<HTMLDivElement | null>(null);
 
@@ -343,7 +414,14 @@ export function Chat() {
       const m = await upload<MediaRef>('/api/media', attachment, name, (p) => setProgress(p));
       mediaId = m.id;
     }
-    append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId } }));
+    const quoted = replyTo;
+    setReplyTo(null);
+    try {
+      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id } }));
+    } catch (e) {
+      setReplyTo(quoted);
+      throw e;
+    }
   };
 
   const send = async () => {
@@ -424,6 +502,7 @@ export function Chat() {
 
   const menuActions = (m: Message): MenuAction[] => {
     const acts: MenuAction[] = [];
+    acts.push({ label: 'Répondre', icon: <ArrowBendUpLeft size={18} />, onClick: () => startReply(m) });
     if (m.text) acts.push({ label: 'Copier', icon: <Copy size={18} />, onClick: () => void navigator.clipboard?.writeText(m.text).then(() => toast('Copié')) });
     if (m.senderId !== me.id) {
       const author = byId.get(m.senderId);
@@ -470,7 +549,7 @@ export function Chat() {
         const sender = byId.get(m.senderId);
         const story = m.meta?.type === 'story_reply' ? m.meta : null;
         return (
-          <div key={m.id} className={cx('flex max-w-[82%] flex-none flex-col gap-1', mine ? 'items-end self-end' : 'items-start self-start')}>
+          <div key={m.id} id={`msg-${m.id}`} className={cx('flex max-w-[82%] flex-none flex-col gap-1', mine ? 'items-end self-end' : 'items-start self-start')}>
             {showSender && (
               <span className="mt-1 flex items-center gap-1.5 pl-1 text-xs font-bold text-mute">
                 {sender && <Avatar user={sender} size={20} />}
@@ -493,6 +572,7 @@ export function Chat() {
             )}
             <Pressable
               onLong={(at) => setMenu({ m, at })}
+              onReply={() => startReply(m)}
               className={cx(
                 'animate-in rounded-[22px] text-base leading-[1.4] break-words',
                 m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
@@ -500,6 +580,22 @@ export function Chat() {
               )}
               style={{ animationDuration: '.35s' }}
             >
+              {m.meta?.type === 'reply' && (
+                <button
+                  type="button"
+                  onClick={() => showOriginal((m.meta as { replyTo: { id: string } }).replyTo.id)}
+                  className={cx(
+                    'tap mb-1.5 block w-full rounded-[14px] border-0 border-l-[3px] border-solid px-2.5 py-1.5 text-left text-[0.8125rem] leading-snug',
+                    mine ? 'border-white/70 bg-white/15 text-white' : 'border-brand bg-card/70 text-ink',
+                    m.media && m.media.kind !== 'audio' && 'mx-1 mt-1 w-auto',
+                  )}
+                >
+                  <span className="block font-bold">
+                    {m.meta.replyTo.senderId === me.id ? 'Toi' : (byId.get(m.meta.replyTo.senderId)?.displayName.split(' ')[0] ?? 'Message')}
+                  </span>
+                  <span className="line-clamp-2 opacity-85">{m.meta.replyTo.text}</span>
+                </button>
+              )}
               {m.media?.kind === 'audio' && <VoicePlayer media={m.media} mine={mine} />}
               {m.media && m.media.kind !== 'audio' && <MessagePhotoVideo media={m.media} onOpen={() => setViewing(m.media)} />}
               {m.text && <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>{m.text}</span>}
@@ -589,6 +685,20 @@ export function Chat() {
   ) : (
     <div className="flex flex-none flex-col gap-2">
       {picker.input}
+      {replyTo && (
+        <div className="flex items-center gap-2.5 rounded-[18px] border-0 border-l-[3px] border-solid border-brand bg-soft py-1.5 pr-1.5 pl-3">
+          <ArrowBendUpLeft size={18} className="flex-none text-acc" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.8125rem] font-bold">
+              Répondre à {replyTo.senderId === me.id ? 'toi-même' : (byId.get(replyTo.senderId)?.displayName.split(' ')[0] ?? 'ce message')}
+            </span>
+            <span className="block truncate text-[0.8125rem] text-mute">{replyTo.text || attachmentLabel(replyTo.media?.kind, replyTo.media?.duration)}</span>
+          </span>
+          <button type="button" aria-label="Annuler la réponse" onClick={() => setReplyTo(null)} className="tap grid h-9 w-9 flex-none place-items-center rounded-full border-0 bg-card text-ink">
+            <X size={16} />
+          </button>
+        </div>
+      )}
       {file && preview && (
         <div className="flex items-center gap-2.5 rounded-[22px] bg-soft p-1.5 pr-2">
           <div className="h-14 w-14 flex-none overflow-hidden rounded-[16px] bg-night">
@@ -620,6 +730,7 @@ export function Chat() {
           <Paperclip size={20} />
         </button>
         <input
+          ref={inputRef}
           className="field min-w-0 flex-1"
           value={draft}
           onChange={(e) => {
@@ -671,7 +782,7 @@ export function Chat() {
             <button
               type="button"
               aria-label="Retour : Messages"
-              onClick={() => nav('/messages')}
+              onClick={() => goBack('/messages')}
               className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-acc active:scale-95"
             >
               <CaretLeft size={20} weight="bold" />

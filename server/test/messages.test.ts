@@ -22,6 +22,15 @@ describe('messages privés', () => {
     expect((await call(lea, 'GET', '/api/badges')).body.messages).toBe(0);
   });
 
+  it('répond à un message en le citant, dans la même conversation seulement', async () => {
+    const { id } = (await call(mathis, 'POST', '/api/conversations', { userId: lea.id })).body;
+    const orig = (await call<Message>(lea, 'POST', `/api/conversations/${id}/messages`, { text: 'On se retrouve où ?' })).body;
+    const reply = (await call<Message>(mathis, 'POST', `/api/conversations/${id}/messages`, { text: 'Devant le ciné', replyToId: orig.id })).body;
+    expect(reply.meta).toEqual({ type: 'reply', replyTo: { id: orig.id, senderId: lea.id, text: 'On se retrouve où ?' } });
+    const other = (await call(mathis, 'POST', '/api/conversations', { userId: noah.id })).body.id;
+    expect((await call(mathis, 'POST', `/api/conversations/${other}/messages`, { text: 'Hop', replyToId: orig.id })).status).toBe(400);
+  });
+
   it('garde la photo de la story dans la réponse', async () => {
     const m = await upload(noah, '/api/media', await jpeg('#7BD389'));
     const story = (await call(noah, 'POST', '/api/stories', { mediaId: m.body.id })).body;

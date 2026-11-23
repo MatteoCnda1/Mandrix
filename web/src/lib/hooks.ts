@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isScrollLocked } from './scrollLock';
 
 /** Horloge qui se met à jour toutes les `ms` millisecondes. */
 export function useNow(ms = 1000) {
@@ -50,7 +51,7 @@ export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
     let active = false;
     let dist = 0;
     const onStart = (e: TouchEvent) => {
-      if (busy.current || window.scrollY > 0 || document.body.style.overflow === 'hidden') return;
+      if (busy.current || window.scrollY > 0 || isScrollLocked()) return;
       startY = e.touches[0].clientY;
       dist = 0;
       active = true;

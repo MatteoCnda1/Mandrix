@@ -1,7 +1,8 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
-import { CircleNotch, X } from '@phosphor-icons/react';
+import { ArrowClockwise, CircleNotch, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { lockScroll } from '../lib/scrollLock';
 import { twMerge } from 'tailwind-merge';
 import logoSymbol from '../assets/logo/mandrix-symbol.svg';
 import { useUI } from '../lib/store';
@@ -76,7 +77,22 @@ export function Switch({ on }: { on: boolean }) {
 }
 
 /** Feuille du bas (HIG) : poignée, fermeture par glissement vers le bas, Échap ou tap sur le fond. */
-export function Sheet({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  wide,
+  locked,
+  onLockedClose,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+  /** Fermeture impossible (envoi en cours…) : `onLockedClose` explique pourquoi. */
+  locked?: boolean;
+  onLockedClose?: () => void;
+}) {
   const [dragY, setDragY] = useState(0);
   const [closing, setClosing] = useState(false);
   const drag = useRef<{ y: number; t: number } | null>(null);
@@ -109,20 +125,83 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (lockedRef.current) onLockedClose?.();
+      else onClose();
+    };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const release = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      release();
     };
   }, [onClose]);
 
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+
+  // Glisser vers le bas depuis le contenu (pas seulement la poignée), quand il est défilé tout en haut.
+  const dismissRef = useRef<() => void>(() => {});
+  const [touching, setTouching] = useState(false);
+  useEffect(() => {
+    const el = panel.current;
+    if (!el) return;
+    let start: { y: number; x: number } | null = null;
+    let active = false;
+    let dy = 0;
+    const down = (e: TouchEvent) => {
+      const t = e.target as HTMLElement;
+      if (el.scrollTop > 0 || e.touches.length !== 1 || t.closest('input, textarea, select, [data-no-sheet-drag]')) return (start = null);
+      start = { y: e.touches[0].clientY, x: e.touches[0].clientX };
+      active = false;
+      dy = 0;
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      const y = e.touches[0].clientY - start.y;
+      const x = e.touches[0].clientX - start.x;
+      if (!active) {
+        if (y > 8 && y > Math.abs(x) && el.scrollTop <= 0) {
+          active = true;
+          setTouching(true);
+        }
+        else if (Math.abs(y) > 8 || Math.abs(x) > 8) return void (start = null);
+        else return;
+      }
+      e.preventDefault();
+      dy = Math.max(0, y);
+      setDragY(dy);
+    };
+    const up = () => {
+      if (active) {
+        if (dy > 120) dismissRef.current();
+        else setDragY(0);
+      }
+      start = null;
+      active = false;
+      setTouching(false);
+    };
+    el.addEventListener('touchstart', down, { passive: true });
+    el.addEventListener('touchmove', move, { passive: false });
+    el.addEventListener('touchend', up);
+    el.addEventListener('touchcancel', up);
+    return () => {
+      el.removeEventListener('touchstart', down);
+      el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', up);
+      el.removeEventListener('touchcancel', up);
+    };
+  }, []);
   const dismiss = () => {
+    if (lockedRef.current) {
+      setDragY(0);
+      return onLockedClose?.();
+    }
     setClosing(true);
     setTimeout(onClose, 220);
   };
+  dismissRef.current = dismiss;
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
     drag.current = { y: e.clientY, t: Date.now() };
@@ -142,7 +221,7 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
 
   return createPortal(
     <div
-      className="fixed inset-x-0 z-40 flex items-end justify-center"
+      className="fixed inset-x-0 z-[62] flex items-end justify-center"
       style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
       role="dialog"
       aria-modal="true"
@@ -165,7 +244,7 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
           animation: 'mxSheet .45s cubic-bezier(.2,.9,.2,1) backwards',
           paddingBottom: 'calc(18px + var(--safe-b))',
           transform: closing ? 'translateY(100%)' : dragY ? `translateY(${dragY}px)` : undefined,
-          transition: drag.current ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
+          transition: drag.current || touching ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
         }}
       >
         <div
@@ -238,7 +317,7 @@ export function ConfirmHost() {
   };
   const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[1.0625rem] transition-colors active:bg-soft';
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
       <div onClick={() => answer(false)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
       <div className="relative flex w-full max-w-[420px] animate-sheet flex-col gap-2">
         <div className="overflow-hidden rounded-[24px] bg-card text-center">
@@ -288,7 +367,7 @@ export function Toast() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed left-1/2 z-50 flex h-12 max-w-[calc(100vw-32px)] items-center gap-2 rounded-3xl bg-hero px-[18px] text-sm font-bold whitespace-nowrap text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
+      className="pointer-events-none fixed left-1/2 z-[85] flex h-12 max-w-[calc(100vw-32px)] items-center gap-2 rounded-3xl bg-hero px-[18px] text-sm font-bold whitespace-nowrap text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
       style={{
         bottom: 'calc(var(--toast-bottom, 28px) + env(safe-area-inset-bottom))',
         transform: `translate(-50%, ${t ? '0px' : '20px'})`,
@@ -347,6 +426,26 @@ export function MediaView({ media, className, style, controls, autoPlay, muted =
       style={style}
       onClick={onClick}
     />
+  );
+}
+
+/** Indicateur « tirer pour rafraîchir » (voir usePullToRefresh). */
+export function PullIndicator({ pull, refreshing }: { pull: number; refreshing: boolean }) {
+  return (
+    <div
+      className="-mb-3.5 flex items-end justify-center overflow-hidden"
+      style={{ height: pull, transition: pull && !refreshing ? 'none' : 'height .3s cubic-bezier(.2,.9,.2,1)' }}
+      aria-hidden={!refreshing}
+    >
+      <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-card text-acc shadow-pill">
+        <ArrowClockwise
+          size={20}
+          weight="bold"
+          className={refreshing ? 'animate-spin' : undefined}
+          style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)`, opacity: Math.min(1, pull / 60) }}
+        />
+      </span>
+    </div>
   );
 }
 

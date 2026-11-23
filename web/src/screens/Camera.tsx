@@ -30,6 +30,8 @@ function useCamera(facing: 'user' | 'environment') {
       .then((s) => {
         if (cancelled) return s.getTracks().forEach((t) => t.stop());
         stream = s;
+        // iOS coupe la caméra quand l'app passe en arrière-plan : on la relance au retour.
+        s.getVideoTracks()[0]?.addEventListener('ended', () => !cancelled && setRetry((r) => r + 1));
         if (videoRef.current) {
           videoRef.current.srcObject = s;
           videoRef.current.play().catch(() => {});
@@ -37,8 +39,16 @@ function useCamera(facing: 'user' | 'environment') {
         setState('live');
       })
       .catch((e: DOMException) => setState(e.name === 'NotAllowedError' ? 'denied' : 'unavailable'));
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || cancelled) return;
+      const track = stream?.getVideoTracks()[0];
+      if (stream && (!track || track.readyState === 'ended' || track.muted)) setRetry((r) => r + 1);
+      else videoRef.current?.play().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisible);
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [facing, retry]);

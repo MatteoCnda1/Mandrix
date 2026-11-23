@@ -18,6 +18,7 @@ const useReport = create<{ req: ReportReq | null }>(() => ({ req: null }));
 
 /** Ouvre la feuille « Signaler » pour un post, un commentaire, une story, un message ou un compte. */
 export const openReport = (req: ReportReq) => useReport.setState({ req });
+export const closeReport = () => useReport.setState({ req: null });
 
 const LABEL: Record<ReportTarget, string> = {
   post: 'ce post',

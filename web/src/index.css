@@ -94,6 +94,7 @@ html[data-theme='dark'] {
 
   --animate-in: mxIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pop: mxPop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+  --animate-burst: mxBurst 0.8s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
   --animate-float: mxFloat 6s ease-in-out infinite;
   --animate-breath: mxBreath 1.4s ease-in-out infinite;
   --animate-shimmer: mxShimmer 1.4s linear infinite;
@@ -121,6 +122,27 @@ html[data-theme='dark'] {
     to {
       opacity: 1;
       transform: none;
+    }
+  }
+  @keyframes mxBurst {
+    0% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    25% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+    45% {
+      transform: scale(0.95);
+    }
+    75% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.1) translateY(-24px);
+      opacity: 0;
     }
   }
   @keyframes mxPop {

@@ -5,7 +5,8 @@ import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { NotificationList } from '../components/Notifications';
 import { PostCard } from '../components/PostCard';
-import { Avatar, confirmAction, cx, EmptyCard, MediaView, PrimaryBtn, ScreenLoader } from '../components/ui';
+import { Avatar, confirmAction, cx, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader } from '../components/ui';
+import { usePullToRefresh } from '../lib/hooks';
 import { api, errMsg } from '../lib/api';
 import { qc, useBadges, useMe, usePost, useReports } from '../lib/data';
 import { timeAgo } from '../lib/format';
@@ -26,9 +27,13 @@ export function NotificationsPage() {
       api('/api/notifications/read', { method: 'POST' }).then(() => qc.setQueryData(['badges'], { ...badges, notifications: 0 }));
     }
   }, [badges?.notifications]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['notifications'] }));
   return (
-    <div className="card animate-in p-2.5">
-      <NotificationList />
+    <div className="flex flex-col gap-3.5">
+      <PullIndicator pull={pull} refreshing={refreshing} />
+      <div className="card animate-in p-2.5">
+        <NotificationList />
+      </div>
     </div>
   );
 }

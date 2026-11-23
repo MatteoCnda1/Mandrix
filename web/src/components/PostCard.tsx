@@ -12,11 +12,14 @@ import {
   Trash,
   User,
 } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { deletePost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
 import { fmtCount, plural, timeAgo } from '../lib/format';
 import { useLongPress, useNow, type Point } from '../lib/hooks';
+import { useDoubleTap } from '../lib/gestures';
+import { MediaLightbox } from './ChatMedia';
+import { useHeartBurst } from './HeartBurst';
 import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
 import { RichText } from './RichText';
@@ -346,6 +349,39 @@ function PostMenu({ post, onClose }: { post: Post; onClose: () => void }) {
   );
 }
 
+/** Photo (ou mème) du fil : tap = plein écran zoomable, double tap = j'aime avec un grand cœur. */
+export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 100vw, 640px' }: { post: Post; ratio: string; className?: string; sizes?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const burst = useHeartBurst();
+  const onTap = useDoubleTap(
+    () => setOpen(true),
+    (p) => {
+      if (!post.liked) void toggleLike(post);
+      burst.show(ref.current, p);
+    },
+  );
+  if (!post.media) return null;
+  return (
+    <>
+      <div
+        ref={ref}
+        role="button"
+        tabIndex={0}
+        aria-label="Ouvrir en grand (toucher deux fois pour aimer)"
+        onClick={onTap}
+        onKeyDown={(e) => e.key === 'Enter' && setOpen(true)}
+        className={cx('ph relative cursor-zoom-in overflow-hidden rounded-3xl select-none [-webkit-touch-callout:none]', className)}
+        style={{ aspectRatio: ratio }}
+      >
+        <MediaView media={post.media} sizes={sizes} autoPlay={post.media.kind === 'video'} />
+        {burst.node}
+      </div>
+      {open && <MediaLightbox media={post.media} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
@@ -387,16 +423,8 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
 
       {post.kind === 'meme' && <div className="px-2.5 py-1 text-center text-xl leading-tight font-extrabold tracking-[-.02em] text-balance">{post.text}</div>}
 
-      {post.kind === 'photo' && post.media && (
-        <div className="ph overflow-hidden rounded-3xl" style={{ aspectRatio: ratioOf(post.media) }}>
-          <MediaView media={post.media} sizes="(max-width: 700px) 100vw, 640px" />
-        </div>
-      )}
-      {post.kind === 'meme' && post.media && (
-        <div className="ph overflow-hidden rounded-3xl" style={{ aspectRatio: ratioOf(post.media, '4 / 3') }}>
-          <MediaView media={post.media} autoPlay={post.media.kind === 'video'} />
-        </div>
-      )}
+      {post.kind === 'photo' && post.media && <TapMedia post={post} ratio={ratioOf(post.media)} />}
+      {post.kind === 'meme' && post.media && <TapMedia post={post} ratio={ratioOf(post.media, '4 / 3')} />}
       {post.kind === 'video' && post.media && <VideoTeaser post={post} />}
 
       {isPoll && post.poll && (

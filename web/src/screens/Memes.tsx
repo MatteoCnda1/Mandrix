@@ -1,6 +1,7 @@
 import { Heart, Trophy } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { SeasonBoard } from '../components/Daily';
+import { TapMedia } from '../components/PostCard';
 import { Avatar, EmptyCard, MediaView, Podium, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
 import { toggleLike, useMemes } from '../lib/data';
 import { fmtCount } from '../lib/format';
@@ -48,7 +49,7 @@ export function Memes() {
           {items.map((m) => (
             <article key={m.id} className="card flex flex-col gap-2.5 p-3">
               <div className="grid min-h-11 place-items-center px-1.5 py-0.5 text-center text-[1.0625rem] leading-tight font-extrabold tracking-[-.02em] text-balance">{m.text}</div>
-              <div className="ph aspect-[4/3] overflow-hidden rounded-[20px]">{m.media && <MediaView media={m.media} autoPlay={m.media.kind === 'video'} sizes="(max-width: 600px) 100vw, 340px" />}</div>
+              <TapMedia post={m} ratio="4 / 3" className="rounded-[20px]" sizes="(max-width: 600px) 100vw, 340px" />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap truncate border-0 bg-transparent pl-1 text-[0.8125rem] text-mute">
                   Légende de {m.author.displayName}

@@ -1,8 +1,8 @@
 import type { StoryGroup } from '@mandrix/shared';
-import { ArrowClockwise, ArrowRight, LockSimple, MagnifyingGlass, Plus, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, LockSimple, MagnifyingGlass, Plus, UsersThree } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
-import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
+import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx, PullIndicator } from '../components/ui';
 import { qc, useFeed, useMe, usePellicule, useStories } from '../lib/data';
 import { countdown } from '../lib/format';
 import { useNow, usePullToRefresh, useSentinel } from '../lib/hooks';
@@ -103,7 +103,8 @@ export function Feed() {
   const { data: pel } = usePellicule();
   const now = useNow(1000);
   const cd = countdown(pel?.nextRevealAt, now);
-  const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
+  // Pagination par décalage : un post publié pendant le défilement peut réapparaître sur la page suivante.
+  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []).filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
   const sentinel = useSentinel(() => feed.hasNextPage && !feed.isFetchingNextPage && feed.fetchNextPage(), !!feed.hasNextPage);
   const { pull, refreshing } = usePullToRefresh(() =>
     Promise.all([feed.refetch(), qc.invalidateQueries({ queryKey: ['stories'] }), qc.invalidateQueries({ queryKey: ['pellicule'] })]),
@@ -113,20 +114,7 @@ export function Feed() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <div
-        className="-mb-3.5 flex items-end justify-center overflow-hidden"
-        style={{ height: pull, transition: pull && !refreshing ? 'none' : 'height .3s cubic-bezier(.2,.9,.2,1)' }}
-        aria-hidden={!refreshing}
-      >
-        <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-card text-acc shadow-pill">
-          <ArrowClockwise
-            size={20}
-            weight="bold"
-            className={refreshing ? 'animate-spin' : undefined}
-            style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)`, opacity: Math.min(1, pull / 60) }}
-          />
-        </span>
-      </div>
+      <PullIndicator pull={pull} refreshing={refreshing} />
       <button
         type="button"
         onClick={() => nav('/recherche')}

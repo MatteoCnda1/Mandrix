@@ -2,8 +2,10 @@ import type { Post } from '@mandrix/shared';
 import { ArrowDown, ArrowUp, ChatCircle, CheckCircle, Heart, Play, Repeat, SpeakerHigh, SpeakerSlash, Sticker } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type TouchEvent, type WheelEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { useHeartBurst } from '../components/HeartBurst';
+import { useDoubleTap } from '../lib/gestures';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
-import { removeFromPool, toggleLike, toggleRepost, useMe, useReels } from '../lib/data';
+import { removeFromPool, toggleLike, toggleRepost, useMe, useReels, usePost } from '../lib/data';
 import { fmtCount } from '../lib/format';
 import { openPool, useUI } from '../lib/store';
 import { useViewport } from '../lib/theme';
@@ -26,9 +28,19 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
     }
   }, [active, paused]);
 
+  const box = useRef<HTMLDivElement | null>(null);
+  const burst = useHeartBurst();
+  // Tap : pause ; double tap : j'aime (comme sur les autres réseaux).
+  const onTap = useDoubleTap(
+    () => setPaused((p) => !p),
+    (p) => {
+      if (!post.liked) void toggleLike(post);
+      burst.show(box.current, p);
+    },
+  );
   const side = 'tap grid h-[50px] w-[50px] place-items-center rounded-full border-0 bg-white/15 text-white transition-transform duration-200 active:scale-[.88]';
   return (
-    <div className="phdark relative grid h-full place-items-center">
+    <div ref={box} className="phdark relative grid h-full place-items-center">
       {post.media && (
         <video
           ref={ref}
@@ -40,9 +52,10 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
           preload={active ? 'auto' : 'metadata'}
           className="absolute inset-0 h-full w-full object-cover"
           onTimeUpdate={(e) => e.currentTarget.duration && setProgress(e.currentTarget.currentTime / e.currentTarget.duration)}
-          onClick={() => setPaused(!paused)}
+          onClick={onTap}
         />
       )}
+      {burst.node}
       {paused && active && (
         <span className="pointer-events-none relative grid h-[68px] w-[68px] place-items-center rounded-full bg-white/90 text-night">
           <Play size={26} weight="fill" />
@@ -92,17 +105,27 @@ export function Reels() {
   const { isPhone } = useViewport();
   const [params] = useSearchParams();
   const reels = useReels();
-  const items = reels.data?.pages.flatMap((p) => p.items) ?? [];
+  const wanted = params.get('v');
+  // Vidéo ouverte depuis le fil : elle peut ne pas être dans les reels (republication, post ancien) ;
+  // on la charge seule et on la place en tête.
+  const target = usePost(wanted ?? '', !!wanted);
+  const loaded = reels.data?.pages.flatMap((p) => p.items) ?? [];
+  const extra = target.data && target.data.media?.kind === 'video' && !loaded.some((p) => p.id === wanted) ? [target.data] : [];
+  const items = [...extra, ...loaded];
   const [idx, setIdx] = useState(0);
   const [muted, setMuted] = useState(true);
   const lock = useRef(false);
   const touchY = useRef(0);
-  const wanted = params.get('v');
+  const applied = useRef<string | null>(null);
 
+  // Une seule fois par vidéo demandée : le chargement des pages suivantes ne ramène plus au début.
   useEffect(() => {
-    if (!wanted || items.length === 0) return;
+    if (!wanted || applied.current === wanted || items.length === 0) return;
     const i = items.findIndex((p) => p.id === wanted);
-    if (i >= 0) setIdx(i);
+    if (i >= 0) {
+      applied.current = wanted;
+      setIdx(i);
+    }
   }, [wanted, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

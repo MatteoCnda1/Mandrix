@@ -1,10 +1,12 @@
 import { Bell, CaretLeft, Camera, ChatCircleDots, GameController, House, LockSimple, Moon, Package, Play, Plus, Sun, User } from '@phosphor-icons/react';
-import { useEffect, useState, type ComponentType } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { useEffect, useLayoutEffect, useState, type ComponentType } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router';
+import { closeReport } from './Report';
 import { api } from '../lib/api';
 import { qc, useBadges, usePellicule, usePoolStats } from '../lib/data';
 import { countdown } from '../lib/format';
 import { useNow } from '../lib/hooks';
+import { useEdgeSwipeBack, useGoBack, useHistoryTracker } from '../lib/nav';
 import { useUI } from '../lib/store';
 import { useDark, useViewport } from '../lib/theme';
 import { NotificationList } from './Notifications';
@@ -115,12 +117,8 @@ function Header({ isPhone }: { isPhone: boolean }) {
   const [dark, toggleDark] = useDark();
   const { data: badges } = useBadges();
   const info = routeInfo(pathname);
-  const goBack = () => {
-    if (info.back === -1) {
-      if ((window.history.state as { idx?: number } | null)?.idx) nav(-1);
-      else nav('/');
-    } else if (info.back) nav(info.back);
-  };
+  const back = useGoBack();
+  const goBack = () => info.back && back(info.back);
   const round = 'tap grid h-[46px] w-[46px] place-items-center rounded-full border-0 transition-transform duration-200 active:scale-[.94]';
 
   useEffect(() => setOpen(false), [pathname]);
@@ -258,16 +256,37 @@ function Aside() {
   );
 }
 
+/** Position de défilement de chaque page visitée (clé de l'entrée d'historique). */
+const scrollPositions = new Map<string, number>();
+
 export function AppLayout() {
   const { isPhone, isDesktop } = useViewport();
   const { pathname } = useLocation();
   const wide = pathname.startsWith('/deballage') || pathname.startsWith('/jeu/galerie');
   // Conversation sur téléphone : plein écran comme Messages d'iOS (sans en-tête ni onglets).
   const immersive = isPhone && /^\/messages\/[^/]+/.test(pathname);
+  useHistoryTracker();
+  const back = useGoBack();
+  const info = routeInfo(pathname);
+  const swipe = useEdgeSwipeBack(info.back ? () => back(info.back!) : null);
 
+  // Changement d'écran : on ferme les feuilles restées ouvertes, et on remonte en haut,
+  // sauf au retour arrière où l'on retrouve la position quittée (fil, profil…).
+  const navType = useNavigationType();
+  const { key } = useLocation();
+  useLayoutEffect(() => {
+    useUI.getState().closeAll();
+    closeReport();
+    if (navType === 'POP') {
+      const y = scrollPositions.get(key);
+      if (y) requestAnimationFrame(() => window.scrollTo(0, y));
+    } else window.scrollTo(0, 0);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    const save = () => scrollPositions.set(key, window.scrollY);
+    window.addEventListener('scroll', save, { passive: true });
+    return () => window.removeEventListener('scroll', save);
+  }, [key]);
 
   return (
     <div className="min-h-dvh font-sans text-ink" style={{ ['--toast-bottom' as string]: isPhone ? '92px' : '28px' }}>
@@ -283,6 +302,15 @@ export function AppLayout() {
         {isDesktop && <Aside />}
       </div>
       {isPhone && !immersive && <BottomNav />}
+      {swipe > 0 && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed top-1/2 left-0 z-[80] grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-card text-acc shadow-pill"
+          style={{ transform: `translate(${Math.min(swipe, 110) - 40}px, -50%)`, opacity: Math.min(1, swipe / 90) }}
+        >
+          <CaretLeft size={22} weight="bold" />
+        </div>
+      )}
       <Overlays />
       <Toast />
     </div>
