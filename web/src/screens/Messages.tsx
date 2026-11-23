@@ -39,7 +39,7 @@ import { shortTime } from '../lib/format';
 import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
 import { useGoBack } from '../lib/nav';
-import { discardPending, queueMessage, retryPending, useOutbox } from '../lib/outbox';
+import { discardPending, newClientId, queueMessage, retryPending, useOutbox } from '../lib/outbox';
 import { presenceLabel, seedPresence, usePresence } from '../lib/presence';
 import { sendTyping, useRecordingVoice, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
@@ -133,7 +133,7 @@ export function Messages() {
               <ConvRow key={c.id} onOpen={() => nav(`/messages/${c.id}`)} actions={muteActions}>
                 <span className="relative flex-none">
                   <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
-                  {!c.isGroup && c.user && (presences[c.user.id] ?? c.presence)?.online && (
+                  {!c.isGroup && c.user && me?.showPresence && (presences[c.user.id] ?? c.presence)?.online && (
                     <span aria-label="En ligne" className="absolute right-0 bottom-0 h-3.5 w-3.5 rounded-full border-[2.5px] border-solid border-card bg-[#30c463]" />
                   )}
                 </span>
@@ -470,6 +470,7 @@ function ChatView({ id }: { id: string }) {
   const [info, setInfo] = useState(false);
   const [menu, setMenu] = useState<{ m: Message; at: Point } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const lastClientId = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const startReply = (m: Message) => {
     setReplyTo(m);
@@ -617,8 +618,9 @@ function ChatView({ id }: { id: string }) {
     }
     const quoted = replyTo;
     setReplyTo(null);
+    lastClientId.current = newClientId();
     try {
-      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id } }));
+      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id, clientId: lastClientId.current } }));
     } catch (e) {
       setReplyTo(quoted);
       throw e;
@@ -633,16 +635,17 @@ function ChatView({ id }: { id: string }) {
     setDraft('');
     setFile(null);
     // Sans réseau, un message texte attend dans la conversation et part au retour du réseau.
-    const queue = () => {
-      queueMessage(id, text, replyTo?.id);
+    const queue = (clientId: string) => {
+      queueMessage(me!.id, id, text, replyTo?.id, clientId);
       setReplyTo(null);
       requestAnimationFrame(() => toBottom(true));
     };
-    if (!attachment && !navigator.onLine) return queue();
+    if (!attachment && !navigator.onLine) return queue(newClientId());
     try {
       await sendMessage(text, attachment, attachment?.name);
     } catch (e) {
-      if (!attachment && e instanceof ApiError && e.status === 0) return queue();
+      // Même identifiant que la tentative échouée : si le serveur l'avait reçu, pas de doublon.
+      if (!attachment && e instanceof ApiError && e.status === 0) return queue(lastClientId.current ?? newClientId());
       setDraft(text);
       setFile(attachment);
       toast(errMsg(e), 'error');
@@ -763,7 +766,7 @@ function ChatView({ id }: { id: string }) {
       <span className="min-w-0">
         <span className="block truncate text-[1.0625rem] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
         {group && <span className="block truncate text-xs font-semibold text-mute">{conv.members.length} membres · infos du groupe</span>}
-        {!group && conv.user && presenceLabel(presences[conv.user.id] ?? conv.presence) && (
+        {!group && conv.user && me.showPresence && presenceLabel(presences[conv.user.id] ?? conv.presence) && (
           <span className="flex items-center gap-1.5 truncate text-xs font-semibold text-mute">
             {(presences[conv.user.id] ?? conv.presence)?.online && <span className="h-2 w-2 flex-none rounded-full bg-[#30c463]" />}
             {presenceLabel(presences[conv.user.id] ?? conv.presence)}

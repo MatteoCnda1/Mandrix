@@ -7,13 +7,13 @@ export const usePresence = create<Record<string, Presence | null>>(() => ({}));
 
 export const setPresence = (userId: string, p: Presence | null) => usePresence.setState({ [userId]: p });
 
-/** Enregistre la présence reçue avec une conversation, sans écraser une info plus récente du socket. */
+/** Présence reçue avec la liste des conversations : elle fait foi (le socket a pu être coupé). */
 export function seedPresence(entries: [string, Presence | null][]) {
-  const cur = usePresence.getState();
-  const next: Record<string, Presence | null> = {};
-  for (const [id, p] of entries) if (!(id in cur)) next[id] = p;
-  if (Object.keys(next).length) usePresence.setState(next);
+  if (entries.length) usePresence.setState(Object.fromEntries(entries));
 }
+
+/** Reconnexion, présence masquée : on oublie tout et on repart des données du serveur. */
+export const resetPresence = () => usePresence.setState(() => ({}), true);
 
 export function presenceLabel(p: Presence | null | undefined, now = Date.now()) {
   if (!p) return null;

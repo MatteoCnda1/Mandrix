@@ -1,3 +1,4 @@
+import { confirmAction } from '../components/ui';
 import { isStandalone } from './push';
 
 /**
@@ -16,6 +17,10 @@ export async function downloadFile(url: string, fallbackName: string, onProgress
   const blob = await res.blob();
   const file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
   if (isStandalone() && navigator.canShare?.({ files: [file] })) {
+    // iOS exige un geste récent pour ouvrir la feuille de partage : le téléchargement l'a fait expirer,
+    // on demande donc un tap de confirmation, et la feuille s'ouvre dans ce tap.
+    const ok = await confirmAction({ title: 'Fichier prêt', message: `${name} · ${(blob.size / 1048576).toFixed(1).replace('.', ',')} Mo`, confirmLabel: 'Enregistrer' });
+    if (!ok) return;
     try {
       await navigator.share({ files: [file], title: name });
       return;

@@ -34,6 +34,7 @@ interface PostRow extends Record<string, unknown> {
   pollPublic: boolean;
   edited: boolean;
   sortAt: Date;
+  sortKey: string;
 }
 
 /** Ni bloqué ni bloquant, par rapport au lecteur (`who` : colonne SQL de l'auteur). */
@@ -101,7 +102,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
         from (select pr.emoji, count(*)::int as n, min(pr.created_at) as first from post_reactions pr where pr.post_id = p.id group by pr.emoji) x) as reactions,
       (select pr.emoji from post_reactions pr where pr.post_id = p.id and pr.user_id = ${viewerId}) as "myReaction",
       p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic", (p.edited_at is not null) as edited,
-      ${sortAt} as "sortAt"
+      ${sortAt} as "sortAt", (${sortAt})::text as "sortKey"
     from posts p
     left join media m on m.id = p.media_id
     where (${opts.where})
@@ -141,7 +142,8 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     reactions: r.reactions ?? [],
     myReaction: r.myReaction,
     edited: r.edited,
-    sortAt: new Date(r.sortAt).toISOString(),
+    // Texte PostgreSQL complet (microsecondes) : le curseur du fil reste exact.
+    sortAt: r.sortKey,
     gallery: (() => {
       const extra = galleries.get(r.id);
       if (!extra?.length || !r.mediaId) return null;

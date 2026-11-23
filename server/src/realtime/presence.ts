@@ -34,6 +34,8 @@ export async function socketDisconnected(userId: string) {
   sockets.delete(userId);
   const at = new Date();
   await db.update(schema.users).set({ lastSeenAt: at }).where(eq(schema.users.id, userId));
+  // Reconnecté entre-temps (changement de réseau) : pas d'« hors ligne » après le « en ligne ».
+  if (isOnline(userId)) return;
   await broadcast(userId, { online: false, lastSeenAt: at.toISOString() });
 }
 
@@ -41,6 +43,10 @@ export async function socketDisconnected(userId: string) {
 export async function presenceOf(viewer: { id: string; showPresence: boolean }, ids: string[]) {
   const map = new Map<string, Presence>();
   if (!viewer.showPresence || ids.length === 0) return map;
+  // Seulement des amis : un ancien ami (ou bloqué) garde la conversation mais plus la présence.
+  const friends = new Set(await friendIds(viewer.id));
+  ids = ids.filter((id) => friends.has(id));
+  if (ids.length === 0) return map;
   const rows = await db
     .select({ id: schema.users.id, show: schema.users.showPresence, lastSeenAt: schema.users.lastSeenAt })
     .from(schema.users)
@@ -52,6 +58,13 @@ export async function presenceOf(viewer: { id: string; showPresence: boolean }, 
 /** Changement de réglage : les amis voient tout de suite la présence apparaître ou disparaître. */
 export async function presenceChanged(userId: string, show: boolean) {
   const friends = await friendIds(userId);
-  const payload = show ? { online: isOnline(userId), lastSeenAt: null } : { online: false, lastSeenAt: null };
-  for (const f of friends) emitToUser(f, 'presence', { userId, ...payload });
+  if (friends.length === 0) return;
+  const [u] = await db.select({ lastSeenAt: schema.users.lastSeenAt }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  const payload = show ? { online: isOnline(userId), lastSeenAt: u?.lastSeenAt?.toISOString() ?? null } : { online: false, lastSeenAt: null };
+  // Comme pour les autres évènements : seulement les amis qui montrent aussi leur présence.
+  const shows = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(inArray(schema.users.id, friends), eq(schema.users.showPresence, true)));
+  for (const f of shows) emitToUser(f.id, 'presence', { userId, ...payload });
 }

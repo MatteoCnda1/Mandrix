@@ -64,6 +64,13 @@
       "when": 1795453418441,
       "tag": "0008_pin_birthday_gallery",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795453991512,
+      "tag": "0009_message_client_id",
+      "breakpoints": true
     }
   ]
 }

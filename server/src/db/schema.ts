@@ -358,9 +358,11 @@ export const messages = pgTable(
     mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
     /** Supprimé pour tout le monde par son auteur (texte et pièce jointe effacés). */
     deletedAt: ts('deleted_at'),
+    /** Identifiant d'envoi choisi par l'app : un renvoi (file hors ligne) ne crée pas de doublon. */
+    clientId: text('client_id'),
     createdAt: created(),
   },
-  (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt)],
+  (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt), uniqueIndex('messages_client_idx').on(t.senderId, t.clientId)],
 );
 
 export const messageReactions = pgTable(

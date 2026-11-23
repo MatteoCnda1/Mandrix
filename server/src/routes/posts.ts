@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser } from '../lib/auth.js';
-import { fail, parse, uuidParam } from '../lib/http.js';
+import { fail, isUuid, parse, uuidParam } from '../lib/http.js';
 import { mediaRef, saveUpload } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
 import { notifyMentions } from '../lib/mentions.js';
@@ -83,7 +83,9 @@ export default async function postRoutes(app: FastifyInstance) {
     let after: { at: string; id: string } | null = null;
     if (raw) {
       const [at, id] = Buffer.from(raw, 'base64url').toString().split('|');
-      if (!at || !id || Number.isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'Curseur invalide');
+      // Date au format PostgreSQL (microsecondes, fuseau) ou ISO.
+      const stamp = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}(:?\d{2})?)?$/;
+      if (!at || !id || !stamp.test(at) || !isUuid(id)) fail(400, 'Curseur invalide');
       after = { at, id };
     }
     const circle = [me.id, ...(await friendIds(me.id))];
@@ -186,7 +188,7 @@ export default async function postRoutes(app: FastifyInstance) {
   });
 
   /** Modifier la légende de son post (photo, vidéo). Seules les nouvelles @mentions sont notifiées. */
-  app.patch('/api/posts/:id', async (req) => {
+  app.patch('/api/posts/:id', perMinute(10), async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const { text } = parse(z.object({ text: z.string().trim().max(280) }), req.body);
@@ -197,7 +199,7 @@ export default async function postRoutes(app: FastifyInstance) {
       await db.update(posts).set({ text, editedAt: new Date() }).where(eq(posts.id, id));
       const before = new Set(extractMentions(p.text));
       const added = extractMentions(text).filter((u) => !before.has(u));
-      if (added.length) await notifyMentions(me, added.map((u) => `@${u}`).join(' '), { postId: id, kind: p.kind, where: 'post', id: `${id}:${Date.now()}` });
+      if (added.length) await notifyMentions(me, added.map((u) => `@${u}`).join(' '), { postId: id, kind: p.kind, where: 'post', id: `${id}:edit` });
     }
     return getPost(me.id, id);
   });
@@ -253,6 +255,7 @@ export default async function postRoutes(app: FastifyInstance) {
   app.delete('/api/posts/:id/reaction', async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
+    await visiblePost(me.id, id);
     await db.delete(postReactions).where(and(eq(postReactions.postId, id), eq(postReactions.userId, me.id)));
     return reactionsOf(id, me.id);
   });

@@ -93,7 +93,18 @@ export const useConversations = () => useQuery({ queryKey: ['conversations'], qu
 export const useConversation = (id: string) =>
   useQuery({ queryKey: ['conversation', id], queryFn: () => api<ConversationDetail>(`/api/conversations/${id}`) });
 export const useMessages = (id: string) =>
-  useQuery({ queryKey: ['messages', id], queryFn: () => api<Message[]>(`/api/conversations/${id}/messages`) });
+  useQuery({
+    queryKey: ['messages', id],
+    queryFn: async () => {
+      const fresh = await api<Message[]>(`/api/conversations/${id}/messages`);
+      // Rechargement (retour dans l'app…) : on garde les anciens messages chargés en remontant.
+      const old = qc.getQueryData<Message[]>(['messages', id]);
+      if (!old?.length || !fresh.length) return fresh;
+      const ids = new Set(fresh.map((m) => m.id));
+      const older = old.filter((m) => !ids.has(m.id) && m.createdAt < fresh[0].createdAt);
+      return [...older, ...fresh];
+    },
+  });
 export const useNotifications = (enabled = true) =>
   useQuery({ queryKey: ['notifications'], queryFn: () => api<AppNotification[]>('/api/notifications'), enabled });
 export const useBadges = () => useQuery({ queryKey: ['badges'], queryFn: () => api<Badges>('/api/badges'), refetchInterval: 120_000 });
@@ -284,6 +295,12 @@ export async function friendAction(userId: string, action: 'add' | 'remove') {
 
 export async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  // Rien de l'ancien compte ne doit partir depuis le suivant : file d'envoi et brouillons effacés.
+  try {
+    for (const k of ['mandrix.outbox', 'mandrix.draft.post', 'mandrix.draft.poll']) localStorage.removeItem(k);
+  } catch {
+    /* stockage indisponible */
+  }
   qc.clear();
   qc.setQueryData(['me'], null);
 }

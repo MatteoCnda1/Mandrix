@@ -19,6 +19,7 @@ import { qc, useConfig, useMe } from '../lib/data';
 import { timeAgo } from '../lib/format';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '../lib/push';
 import { downloadFile } from '../lib/download';
+import { resetPresence } from '../lib/presence';
 import { disconnectSocket } from '../lib/socket';
 import { toast } from '../lib/store';
 import { AMBIANCES, useAmbiance, useThemePref } from '../lib/theme';
@@ -224,6 +225,9 @@ function PrivacySettings({ me }: { me: Me }) {
   const toggle = async (show: boolean) => {
     try {
       qc.setQueryData(['me'], await api<Me>('/api/me/presence', { method: 'PATCH', body: { show } }));
+      resetPresence();
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      qc.invalidateQueries({ queryKey: ['conversation'] });
     } catch (e) {
       toast(errMsg(e), 'error');
     }

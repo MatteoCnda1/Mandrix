@@ -3,7 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { qc } from './data';
 import { flushOutbox } from './outbox';
-import { setPresence } from './presence';
+import { resetPresence, setPresence } from './presence';
 import { toast } from './store';
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -61,6 +61,10 @@ export function connectSocket() {
       if (res.ok) useGame.setState({ room: res.data ?? null, synced: true });
     });
     qc.invalidateQueries({ queryKey: ['badges'] });
+    // Pendant la coupure, des amis ont pu se connecter ou partir : on recharge la présence.
+    resetPresence();
+    qc.invalidateQueries({ queryKey: ['conversations'] });
+    qc.invalidateQueries({ queryKey: ['conversation'] });
     void flushOutbox();
   });
   socket.on('disconnect', () => useGame.setState({ connected: false }));

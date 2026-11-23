@@ -112,26 +112,27 @@ function Thumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   );
 }
 
-interface Draft {
-  text: string;
+// Deux brouillons distincts : la légende (photo, vidéo) et le sondage. Publier l'un n'efface pas l'autre.
+interface PollDraft {
   q: string;
   opts: string[];
   pollKind: PollKind;
   duration: number | null;
   isPublic: boolean;
 }
-const DRAFT_KEY = 'mandrix.draft.post';
-function loadDraft(): Draft | null {
+const CAPTION_KEY = 'mandrix.draft.post';
+const POLL_KEY = 'mandrix.draft.poll';
+function load<T>(key: string): T | null {
   try {
-    return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
+    return JSON.parse(localStorage.getItem(key) ?? 'null') as T | null;
   } catch {
     return null;
   }
 }
-function saveDraft(d: Draft | null) {
+function save(key: string, value: unknown) {
   try {
-    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-    else localStorage.removeItem(DRAFT_KEY);
+    if (value) localStorage.setItem(key, JSON.stringify(value));
+    else localStorage.removeItem(key);
   } catch {
     /* stockage indisponible */
   }
@@ -139,23 +140,28 @@ function saveDraft(d: Draft | null) {
 
 export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2; initialPool?: boolean }) {
   const { data: config } = useConfig();
-  const [kind, setKind] = useState<0 | 1 | 2>(() => initialKind ?? (mode === 'post' && loadDraft()?.q ? 2 : 0));
+  const [kind, setKind] = useState<0 | 1 | 2>(() => initialKind ?? (mode === 'post' && load<PollDraft>(POLL_KEY)?.q && !load<string>(CAPTION_KEY) ? 2 : 0));
   const [file, setFile] = useState<File | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   // Brouillon gardé si l'on ferme la feuille par erreur (texte et sondage ; les fichiers ne sont pas gardés).
-  const draft = mode === 'post' ? loadDraft() : null;
-  const [text, setText] = useState(draft?.text ?? '');
+  // La légende n'est restaurée que pour une publication ouverte « à vide » (pas depuis le jeu ou les Reels).
+  const caption = mode === 'post' && initialKind === undefined ? load<string>(CAPTION_KEY) : null;
+  const poll = mode === 'post' ? load<PollDraft>(POLL_KEY) : null;
+  const [text, setText] = useState(caption ?? '');
   const [pool, setPool] = useState(!!initialPool);
-  const [pollKind, setPollKind] = useState<PollKind>(draft?.pollKind ?? 'text');
-  const [q, setQ] = useState(draft?.q ?? '');
-  const [opts, setOpts] = useState(draft?.opts ?? ['', '', '']);
-  const [duration, setDuration] = useState<number | null>(draft ? draft.duration : 24);
-  const [isPublic, setIsPublic] = useState(draft?.isPublic ?? false);
+  const [pollKind, setPollKind] = useState<PollKind>(poll?.pollKind ?? 'text');
+  const [q, setQ] = useState(poll?.q ?? '');
+  const [opts, setOpts] = useState(poll?.opts ?? ['', '', '']);
+  const [duration, setDuration] = useState<number | null>(poll ? poll.duration : 24);
+  const [isPublic, setIsPublic] = useState(poll?.isPublic ?? false);
+  useEffect(() => {
+    if (mode === 'post') save(CAPTION_KEY, text.trim() ? text : null);
+  }, [mode, text]);
   useEffect(() => {
     if (mode !== 'post') return;
-    const empty = !text.trim() && !q.trim() && opts.every((o) => !o.trim());
-    saveDraft(empty ? null : { text, q, opts, pollKind, duration, isPublic });
-  }, [mode, text, q, opts, pollKind, duration, isPublic]);
+    const empty = !q.trim() && opts.every((o) => !o.trim());
+    save(POLL_KEY, empty ? null : { q, opts, pollKind, duration, isPublic });
+  }, [mode, q, opts, pollKind, duration, isPublic]);
   const textRef = useRef<HTMLInputElement | null>(null);
   const qRef = useRef<HTMLInputElement | null>(null);
   const [imgOpts, setImgOpts] = useState<(File | null)[]>([null, null]);
@@ -224,7 +230,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         // On reste sur l'écran d'où l'on publiait (jeu, profil…) ; sur le fil, on remonte voir le post.
         if (window.location.pathname === '/') window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      if (mode === 'post') saveDraft(null);
+      if (mode === 'post') save(kind === 2 ? POLL_KEY : CAPTION_KEY, null);
       close();
     } catch (e) {
       toast(errMsg(e), 'error');
