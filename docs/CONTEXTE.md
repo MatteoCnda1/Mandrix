@@ -97,6 +97,7 @@ puis podium des mèmes les plus aimés.
 ### Messages
 - Conversations privées et **groupes** (jusqu'à `GROUP_MAX_MEMBERS`) : création, renommage, ajout de membres, quitter ; messages système.
 - Non-lus, badges, push.
+- **Répondre à un message** : glisser la bulle vers la droite (ou appui long › Répondre) ; citation figée dans `messages.meta` (`type: 'reply'`).
 - **« … écrit »** (socket `dm:typing`, expire après 6 s), **accusés « Vu » / « Vu par … »** (`dm:read`, table `conversation_reads`),
   **réactions** par appui long sur une bulle (❤️ + les six emoji), avec « Copier » et « Signaler ».
 - Chat plein écran sur téléphone ; le clavier ne fait plus remonter tout l'écran (variables `--vvh`, `--kb` via `visualViewport`).
@@ -181,6 +182,14 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 - `@fastify/static` : `cacheControl: false` puis en-têtes à la main (`/assets/` immuable, le reste `no-cache`) ; `HEAD /` doit répondre.
 - Le serveur de dev doit écouter sur 3000 (`PORT=3000 tsx watch …`), Vite sur 5173 avec proxy.
 - Tests d'auth : `env.inviteCode = null` pour tester le parrainage seul.
+- **Retour arrière** : jamais `navigate('/chemin')` pour un bouton retour (ça empile une page et crée des boucles).
+  Utiliser `useGoBack()` (`web/src/lib/nav.ts`) : recule si la page visée est la précédente, sinon remplace.
+- **Blocage du défilement** : toujours `lockScroll()` / `useScrollLock()` (`web/src/lib/scrollLock.ts`, compté), jamais
+  `body.style.overflow` à la main (deux calques fermés ensemble laissaient la page bloquée).
+- **Calques** : visionneuses z-45/55, feuilles z-62, menus d'appui long z-70, confirmations z-80, messages z-85.
+- **Gestes** : `web/src/lib/gestures.ts` (glisser, maintenir, double tap) et `Zoomable.tsx` (pincer pour zoomer) ;
+  le zoom de la page reste bloqué. Glisser depuis le bord gauche = retour, seulement dans la PWA iOS.
+- **Stories** : le visionneur fige la liste à l'ouverture ; le minuteur cumule le temps écoulé par story.
 - Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
 - Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block`.
 - `gh pr update-branch` n'existe pas ici : `gh api -X PUT repos/MatteoCnda1/Mandrix/pulls/<n>/update-branch`.
