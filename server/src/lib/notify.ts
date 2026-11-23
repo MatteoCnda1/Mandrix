@@ -24,8 +24,8 @@ export async function badgesFor(userId: string): Promise<Badges> {
   );
   const [m] = await db.execute<{ m: number }>(sql`
     select count(*)::int as m from conversations c
-    where (c.user_a = ${userId} or c.user_b = ${userId})
-      and exists (
+    join conversation_members cm on cm.conversation_id = c.id and cm.user_id = ${userId}
+    where exists (
         select 1 from messages msg
         where msg.conversation_id = c.id and msg.sender_id <> ${userId}
           and msg.created_at > coalesce(

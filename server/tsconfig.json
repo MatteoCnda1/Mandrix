@@ -1,8 +1,19 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"],
-    "lib": ["ES2023"]
+    "types": [
+      "node"
+    ],
+    "lib": [
+      "ES2023"
+    ]
   },
-  "include": ["src", "drizzle.config.ts", "tsup.config.ts", "../shared/src"]
+  "include": [
+    "src",
+    "test",
+    "drizzle.config.ts",
+    "tsup.config.ts",
+    "vitest.config.ts",
+    "../shared/src"
+  ]
 }

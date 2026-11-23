@@ -14,10 +14,22 @@ export default async function mediaRoutes(app: FastifyInstance) {
     const [m] = await db.select().from(schema.media).where(eq(schema.media.id, id)).limit(1);
     // Une photo de la Pellicule reste invisible jusqu'au déballage.
     if (!m || (m.sealedUntil && m.sealedUntil > new Date())) return reply.code(404).send({ error: 'Introuvable' });
+    if (m.status === 'processing') return reply.code(404).send({ error: 'Vidéo en cours de traitement' });
     // Fichier absent du stockage (partage NAS non monté, suppression manuelle…).
     if (!fs.existsSync(path.join(mediaDir, m.path))) return reply.code(404).send({ error: 'Fichier introuvable' });
     reply.header('Cache-Control', 'private, max-age=31536000, immutable');
     reply.header('X-Content-Type-Options', 'nosniff');
     return reply.type(m.mime).sendFile(m.path, mediaDir, { cacheControl: false });
+  });
+
+  app.get('/media/:id/poster', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!req.user) return reply.code(401).send({ error: 'Non connecté' });
+    if (!isUuid(id)) return reply.code(404).send({ error: 'Introuvable' });
+    const [m] = await db.select().from(schema.media).where(eq(schema.media.id, id)).limit(1);
+    if (!m?.posterPath || (m.sealedUntil && m.sealedUntil > new Date())) return reply.code(404).send({ error: 'Introuvable' });
+    if (!fs.existsSync(path.join(mediaDir, m.posterPath))) return reply.code(404).send({ error: 'Fichier introuvable' });
+    reply.header('Cache-Control', 'private, max-age=31536000, immutable');
+    return reply.type('image/webp').sendFile(m.posterPath, mediaDir, { cacheControl: false });
   });
 }

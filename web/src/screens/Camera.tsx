@@ -1,10 +1,11 @@
 import type { PelliculeState } from '@mandrix/shared';
-import { ArrowRight, CameraRotate, Fire, ImageSquare, LockSimple, WarningCircle } from '@phosphor-icons/react';
+import { ArrowRight, CameraRotate, CloudArrowUp, Fire, ImageSquare, Lightning, LockSimple, WarningCircle } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { cx, useFilePicker } from '../components/ui';
-import { errMsg, upload } from '../lib/api';
+import { errMsg } from '../lib/api';
 import { qc, usePellicule } from '../lib/data';
+import { enqueueShot, flushQueue, NetworkError, onQueueChange, pendingCount, uploadShot } from '../lib/pelliculeQueue';
 import { countdown } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { toast } from '../lib/store';
@@ -62,6 +63,16 @@ function useCamera(facing: 'user' | 'environment') {
 
 const DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
+/** Nombre de photos en attente d'envoi (prises hors ligne). */
+function usePendingShots() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    void pendingCount().then(setN);
+    return onQueueChange(setN);
+  }, []);
+  return n;
+}
+
 export function Camera() {
   const nav = useNavigate();
   const { data: pel } = usePellicule();
@@ -74,18 +85,41 @@ export function Camera() {
   const cd = countdown(pel?.nextRevealAt, now);
   const todayIdx = (new Date(now).getDay() + 6) % 7;
 
+  const pending = usePendingShots();
+  const momentLeft = pel?.moment ? Math.max(0, Math.floor((new Date(pel.moment.endsAt).getTime() - now) / 1000)) : 0;
+
+  useEffect(() => {
+    // Fin du « Moment Mandrix » : on rafraîchit l'état.
+    if (pel?.moment && momentLeft === 0) qc.invalidateQueries({ queryKey: ['pellicule'] });
+  }, [pel?.moment, momentLeft]);
+
   const send = async (blob: Blob) => {
+    const shot = { id: crypto.randomUUID(), blob, takenAt: new Date().toISOString() };
     setSending((n) => n + 1);
     try {
-      const state = await upload<PelliculeState>('/api/pellicule/shots', blob, 'pellicule.jpg');
-      qc.setQueryData(['pellicule'], state);
+      if (!navigator.onLine) throw new NetworkError('Hors ligne');
+      const state = await uploadShot(shot);
+      if (!state) return toast('Photo refusée par le serveur', 'error');
+      qc.setQueryData<PelliculeState>(['pellicule'], state);
       qc.invalidateQueries({ queryKey: ['unpack'] });
       setBump((b) => b + 1);
     } catch (e) {
-      toast(errMsg(e), 'error');
+      if (e instanceof NetworkError) {
+        // Pas de réseau : la photo est gardée sur le téléphone et partira dès que possible.
+        await enqueueShot(shot);
+        setBump((b) => b + 1);
+        toast('Pas de réseau : ta photo partira dès que possible');
+      } else toast(errMsg(e), 'error');
     } finally {
       setSending((n) => n - 1);
     }
+  };
+
+  const retryPending = async () => {
+    const { sent, last } = await flushQueue();
+    if (last) qc.setQueryData(['pellicule'], last);
+    if (sent) qc.invalidateQueries({ queryKey: ['unpack'] });
+    toast(sent ? `${sent} photo${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''}` : 'Toujours pas de réseau', sent ? 'ok' : 'error');
   };
 
   const shoot = async () => {
@@ -131,10 +165,19 @@ export function Camera() {
             </div>
           </div>
         )}
-        <div className="absolute top-3.5 left-3.5 flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-[13px] font-bold text-white tabular-nums backdrop-blur">
-          <LockSimple size={16} weight="fill" />
-          <span>{cd.line}</span>
-        </div>
+        {pel?.moment && momentLeft > 0 ? (
+          <div className="absolute top-3.5 left-3.5 flex h-10 animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[13px] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">
+            <Lightning size={16} weight="fill" />
+            <span>
+              Moment Mandrix · {Math.floor(momentLeft / 60)}:{String(momentLeft % 60).padStart(2, '0')}
+            </span>
+          </div>
+        ) : (
+          <div className="absolute top-3.5 left-3.5 flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-[13px] font-bold text-white tabular-nums backdrop-blur">
+            <LockSimple size={16} weight="fill" />
+            <span>{cd.line}</span>
+          </div>
+        )}
         <div className="absolute top-3.5 right-3.5 flex h-10 items-center gap-1.5 rounded-[20px] bg-white/15 px-3.5 text-[13px] font-bold text-white backdrop-blur">
           <Fire size={16} weight="fill" className="text-ember" />
           <span>{pel?.streak.weeks ?? 0} sem.</span>
@@ -143,7 +186,7 @@ export function Camera() {
         <div className="absolute right-0 bottom-5 left-0 flex items-center justify-center gap-[30px]">
           <div key={bump} className={cx('relative grid h-14 w-14 place-items-center rounded-[18px] bg-white/15 text-white backdrop-blur', bump > 0 && 'animate-pop')}>
             <LockSimple size={22} weight="fill" />
-            <span className="absolute -top-2 -right-2 grid h-6 min-w-6 place-items-center rounded-xl bg-brand px-1.5 text-xs font-extrabold text-white">{total}</span>
+            <span className="absolute -top-2 -right-2 grid h-6 min-w-6 place-items-center rounded-xl bg-brand px-1.5 text-xs font-extrabold text-white">{total + pending}</span>
           </div>
           <button
             type="button"
@@ -187,8 +230,19 @@ export function Camera() {
             })}
           </div>
         </div>
+        {pending > 0 && (
+          <div className="flex items-center gap-2.5 rounded-[22px] bg-soft py-1.5 pr-1.5 pl-3.5 text-sm font-semibold">
+            <CloudArrowUp size={20} className="flex-none text-acc" />
+            <span className="flex-1">
+              {pending} photo{pending > 1 ? 's' : ''} en attente d’envoi
+            </span>
+            <button type="button" onClick={retryPending} className="tap h-10 rounded-[20px] border-0 bg-ink px-3.5 text-[13px] font-bold text-inv active:scale-95">
+              Réessayer
+            </button>
+          </div>
+        )}
         <p className="m-0 text-sm leading-normal text-pretty text-mute">
-          Tes photos restent cachées, même pour toi, jusqu’à dimanche 20h. Elles rejoignent la pellicule publique de Mandrix.
+          Tes photos restent cachées, même pour toi, jusqu’à dimanche 20h. Elles rejoignent la pellicule publique de Mandrix. Sans réseau, elles partent dès que la connexion revient.
         </p>
       </div>
       <button

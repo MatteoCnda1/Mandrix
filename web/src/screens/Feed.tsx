@@ -1,3 +1,4 @@
+import type { StoryGroup } from '@mandrix/shared';
 import { ArrowClockwise, ArrowRight, LockSimple, Plus, UsersThree } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
@@ -8,61 +9,87 @@ import { useNow, usePullToRefresh, useSentinel } from '../lib/hooks';
 import { openSheet, useUI } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
+/** Image d'aperçu d'une story : la photo, ou la miniature de la vidéo. */
+const storyPreview = (g: StoryGroup) => {
+  const next = g.stories.find((st) => !st.seen) ?? g.stories[g.stories.length - 1];
+  return next.media.kind === 'image' ? next.media.url : next.media.poster;
+};
+
+function StoryTile({ group, label, ring, onClick, badge }: { group: StoryGroup; label: string; ring: boolean; onClick: () => void; badge?: React.ReactNode }) {
+  const preview = storyPreview(group);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Story de ${group.user.displayName}`}
+      className="tap flex w-[76px] flex-none flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-ink transition-transform duration-200 active:scale-[.94]"
+    >
+      <span className={cx('relative h-[104px] w-[76px] rounded-[26px] p-[3px] transition-colors duration-[400ms]', ring ? 'bg-gradient-to-br from-azure via-brand2 to-ember' : 'bg-line')}>
+        <span className="ph relative block h-full w-full overflow-hidden rounded-[23px]">
+          {preview ? (
+            <img src={preview} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <span className="absolute inset-0 grid place-items-center text-[15px] font-extrabold text-phink">{group.user.initials}</span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/45 to-transparent" />
+          <span className="pointer-events-none absolute inset-0 rounded-[23px] shadow-[inset_0_0_0_2px_var(--card)]" />
+          <Avatar user={group.user} size={26} className="absolute top-1.5 left-1.5 shadow-[0_0_0_2px_var(--card)]" />
+        </span>
+        {badge}
+      </span>
+      <span className="max-w-full truncate text-xs font-semibold">{label}</span>
+    </button>
+  );
+}
+
 function Stories() {
   const { data: groups } = useStories();
   const { data: me } = useMe();
   const mineIdx = groups?.findIndex((g) => g.user.id === me?.id) ?? -1;
+  const mine = mineIdx >= 0 ? groups![mineIdx] : null;
+  const addStory = () => useUI.getState().openComposer('story');
   return (
     <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-0.5 pt-1 pb-1.5">
-      <button
-        type="button"
-        onClick={() => (mineIdx >= 0 ? useUI.setState({ story: { group: mineIdx, index: 0 } }) : useUI.getState().openComposer('story'))}
-        className="tap flex w-[72px] flex-none flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-ink"
-      >
-        <span className="relative grid h-[92px] w-[68px] place-items-center rounded-3xl bg-card shadow-pill">
-          {mineIdx >= 0 && me ? (
-            <Avatar user={me} size={48} />
-          ) : (
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-white">
-              <Plus size={18} />
-            </span>
-          )}
-          {mineIdx >= 0 && (
+      {mine ? (
+        <StoryTile
+          group={mine}
+          label="Ta story"
+          ring={false}
+          onClick={() => useUI.setState({ story: { group: mineIdx, index: 0 } })}
+          badge={
             <span
               role="button"
               aria-label="Ajouter une story"
               onClick={(e) => {
                 e.stopPropagation();
-                useUI.getState().openComposer('story');
+                addStory();
               }}
               className="absolute -right-1.5 -bottom-1.5 grid h-8 w-8 place-items-center rounded-full bg-brand text-white shadow-[0_0_0_3px_var(--card)] after:absolute after:-inset-2 after:content-['']"
             >
               <Plus size={14} weight="bold" />
             </span>
-          )}
-        </span>
-        <span className="text-xs font-semibold">Ta story</span>
-      </button>
+          }
+        />
+      ) : (
+        <button type="button" onClick={addStory} className="tap flex w-[76px] flex-none flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-ink">
+          <span className="relative grid h-[104px] w-[76px] place-items-center overflow-hidden rounded-[26px] bg-card shadow-pill">
+            {me?.avatarUrl && <img src={me.avatarUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
+            <span className="relative grid h-9 w-9 place-items-center rounded-full bg-brand text-white">
+              <Plus size={18} />
+            </span>
+          </span>
+          <span className="text-xs font-semibold">Ta story</span>
+        </button>
+      )}
       {groups?.map((g, i) =>
         g.user.id === me?.id ? null : (
-          <button
+          <StoryTile
             key={g.user.id}
-            type="button"
-            onClick={() => useUI.setState({ story: { group: i, index: Math.max(0, g.stories.findIndex((s) => !s.seen)) } })}
-            className="tap flex w-[72px] flex-none flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-ink transition-transform duration-200 active:scale-[.94]"
-          >
-            <span className={cx('h-[92px] w-[68px] rounded-3xl p-[3px] transition-colors duration-[400ms]', g.allSeen ? 'bg-line' : 'bg-azure')}>
-              <span className="ph relative grid h-full w-full place-items-center overflow-hidden rounded-[21px] text-[15px] font-extrabold text-phink shadow-[inset_0_0_0_2px_var(--card)]">
-                {g.stories[g.stories.length - 1].media.kind === 'image' ? (
-                  <img src={g.stories[g.stories.length - 1].media.url} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
-                ) : (
-                  g.user.initials
-                )}
-                <span className="pointer-events-none absolute inset-0 rounded-[21px] shadow-[inset_0_0_0_2px_var(--card)]" />
-              </span>
-            </span>
-            <span className="max-w-full truncate text-xs font-semibold">{g.user.displayName.split(' ')[0]}</span>
-          </button>
+            group={g}
+            label={g.user.displayName.split(' ')[0]}
+            ring={!g.allSeen}
+            onClick={() => useUI.setState({ story: { group: i, index: Math.max(0, g.stories.findIndex((st) => !st.seen)) } })}
+          />
         ),
       )}
     </div>

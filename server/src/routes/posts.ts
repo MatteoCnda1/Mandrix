@@ -70,7 +70,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const page = pageOf(req);
     const circle = uuidArray([me.id, ...(await friendIds(me.id))]);
     const items = await selectPosts(me.id, {
-      where: sql`p.kind = 'video' and p.author_id = any(${circle})`,
+      where: sql`p.kind = 'video' and p.author_id = any(${circle}) and coalesce(m.status, 'ready') <> 'processing'`,
       limit: PAGE,
       offset: page * PAGE,
     });

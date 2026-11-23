@@ -8,8 +8,12 @@ import { ConfirmHost, Logo } from './components/ui';
 import { UpdateBanner } from './components/UpdateBanner';
 import './index.css';
 import { qc, useMe } from './lib/data';
+import { useKeyboardViewport } from './lib/keyboard';
+import { flushQueue } from './lib/pelliculeQueue';
 import { connectSocket, disconnectSocket } from './lib/socket';
-import { useUI } from './lib/store';
+import { toast, useUI } from './lib/store';
+
+const toastSent = (n: number) => toast(n > 1 ? `${n} photos en attente envoyées dans ta Pellicule` : 'Photo en attente envoyée dans ta Pellicule');
 import { Camera } from './screens/Camera';
 import { Feed } from './screens/Feed';
 import { Game } from './screens/Game';
@@ -37,10 +41,31 @@ function Splash() {
 function Root() {
   const { data: me, isLoading } = useMe();
   const { pathname } = useLocation();
+  useKeyboardViewport();
 
   useEffect(() => {
     if (me) connectSocket();
     else if (me === null) disconnectSocket();
+  }, [me]);
+
+  useEffect(() => {
+    if (!me) return;
+    const flush = async () => {
+      if (!navigator.onLine) return;
+      const { sent, last } = await flushQueue().catch(() => ({ sent: 0, last: null }));
+      if (!sent) return;
+      if (last) qc.setQueryData(['pellicule'], last);
+      qc.invalidateQueries({ queryKey: ['unpack'] });
+      toastSent(sent);
+    };
+    void flush();
+    const onVisible = () => document.visibilityState === 'visible' && void flush();
+    window.addEventListener('online', flush);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('online', flush);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [me]);
 
   let screen;

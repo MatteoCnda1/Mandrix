@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
-import { mediaRef } from '../lib/media.js';
+import { MEDIA_SQL_COLUMNS, mediaRef } from '../lib/media.js';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
 
 const { stories, storyViews, media } = schema;
@@ -14,11 +14,11 @@ export default async function storyRoutes(app: FastifyInstance) {
   app.get('/api/stories', async (req): Promise<StoryGroup[]> => {
     const me = requireUser(req);
     const circle = [me.id, ...(await friendIds(me.id))];
-    const rows = await db.execute<{ id: string; authorId: string; createdAt: Date; mediaId: string; kind: string; width: number | null; height: number | null; seen: boolean }>(sql`
-      select s.id, s.author_id as "authorId", s.created_at as "createdAt", m.id as "mediaId", m.kind, m.width, m.height,
+    const rows = await db.execute<{ id: string; authorId: string; createdAt: Date; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; seen: boolean }>(sql`
+      select s.id, s.author_id as "authorId", s.created_at as "createdAt", m.id as "mediaId", m.kind, m.width, m.height, ${sql.raw(MEDIA_SQL_COLUMNS)},
         exists(select 1 from story_views v where v.story_id = s.id and v.viewer_id = ${me.id}) as seen
       from stories s join media m on m.id = s.media_id
-      where s.expires_at > now() and s.author_id = any(${uuidArray(circle)})
+      where s.expires_at > now() and m.status <> 'processing' and s.author_id = any(${uuidArray(circle)})
       order by s.created_at asc`);
     const list = [...rows];
     const authors = await usersByIds(list.map((r) => r.authorId));
@@ -30,7 +30,12 @@ export default async function storyRoutes(app: FastifyInstance) {
         groups.set(r.authorId, g);
       }
       const seen = r.authorId === me.id || r.seen;
-      g.stories.push({ id: r.id, media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height })!, createdAt: new Date(r.createdAt).toISOString(), seen });
+      g.stories.push({
+        id: r.id,
+        media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height, duration: r.mediaDuration, hasPoster: r.mediaPoster })!,
+        createdAt: new Date(r.createdAt).toISOString(),
+        seen,
+      });
       if (!seen) g.allSeen = false;
     }
     const latest = (g: StoryGroup) => g.stories[g.stories.length - 1].createdAt;

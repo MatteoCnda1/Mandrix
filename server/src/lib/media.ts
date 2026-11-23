@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { fail } from './http.js';
+import { enqueueVideo } from './video.js';
 
 const VIDEO_MIMES: Record<string, string> = {
   'video/mp4': '.mp4',
@@ -16,16 +17,35 @@ const VIDEO_MIMES: Record<string, string> = {
   'video/quicktime': '.mov',
 };
 
-export function mediaRef(m: { id: string; kind: string; width?: number | null; height?: number | null } | null | undefined): MediaRef | null {
+interface MediaLike {
+  id: string;
+  kind: string;
+  width?: number | null;
+  height?: number | null;
+  status?: string | null;
+  duration?: number | null;
+  posterPath?: string | null;
+  /** Variante des requêtes SQL brutes : la miniature existe-t-elle ? */
+  hasPoster?: boolean | null;
+}
+
+export function mediaRef(m: MediaLike | null | undefined): MediaRef | null {
   if (!m || !m.id) return null;
+  const video = m.kind === 'video';
   return {
     id: m.id,
     url: `/media/${m.id}`,
-    kind: m.kind === 'video' ? 'video' : 'image',
+    kind: video ? 'video' : 'image',
     width: m.width ?? null,
     height: m.height ?? null,
+    poster: video && (m.posterPath || m.hasPoster) ? `/media/${m.id}/poster` : null,
+    duration: m.duration ?? null,
+    processing: m.status === 'processing',
   };
 }
+
+/** Colonnes SQL à sélectionner (alias de table `m`) pour construire un MediaRef. */
+export const MEDIA_SQL_COLUMNS = `m.status as "mediaStatus", m.duration as "mediaDuration", (m.poster_path is not null) as "mediaPoster"`;
 
 interface SaveOpts {
   accept?: 'image' | 'video' | 'any';
@@ -81,8 +101,9 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
     return row;
   }
 
-  const relPath = path.join(rel, `${id}${VIDEO_MIMES[mime]}`);
-  const abs = path.join(mediaDir, relPath);
+  // La vidéo d'origine est gardée de côté puis transcodée en MP4 H.264 en arrière-plan.
+  const sourceRel = path.join(rel, `${id}.src${VIDEO_MIMES[mime]}`);
+  const abs = path.join(mediaDir, sourceRel);
   await pipeline(file.file, createWriteStream(abs));
   if (file.file.truncated) {
     await fs.rm(abs, { force: true });
@@ -91,8 +112,21 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
   const { size } = await fs.stat(abs);
   const [row] = await db
     .insert(schema.media)
-    .values({ id, ownerId, kind: 'video', mime, path: relPath, width: null, height: null, size, sealedUntil: opts.sealedUntil ?? null })
+    .values({
+      id,
+      ownerId,
+      kind: 'video',
+      mime: 'video/mp4',
+      path: path.join(rel, `${id}.mp4`),
+      sourcePath: sourceRel,
+      status: 'processing',
+      width: null,
+      height: null,
+      size,
+      sealedUntil: opts.sealedUntil ?? null,
+    })
     .returning();
+  enqueueVideo(id);
   return row;
 }
 

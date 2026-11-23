@@ -23,8 +23,9 @@ RUN npm ci --omit=dev --workspace=server --include-workspace-root=false --no-aud
 
 # ——— 3. Image finale ———
 FROM node:24-slim
+# ffmpeg : transcodage des vidéos (HEVC d'iPhone → H.264) et miniatures.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends tzdata \
+  && apt-get install -y --no-install-recommends tzdata ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
     TZ=Europe/Paris \

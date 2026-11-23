@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Types, tests et build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: mandrix
+          POSTGRES_PASSWORD: mandrix
+          POSTGRES_DB: mandrix_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mandrix -d mandrix_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://mandrix:mandrix@localhost:5432/mandrix_test
+      TZ: Europe/Paris
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Installer ffmpeg (tests de transcodage vidéo)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Vérifier les types (serveur + PWA)
+        run: npm run typecheck
+
+      - name: Tests d'API (Vitest + PostgreSQL)
+        run: npm test
+
+      - name: Build de production (PWA + serveur)
+        run: npm run build
+
+  docker:
+    name: Image Docker
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Construire l'image (sans publication)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          tags: mandrix:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

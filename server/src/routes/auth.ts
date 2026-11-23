@@ -32,7 +32,7 @@ const loginSchema = z.object({
 });
 
 export default async function authRoutes(app: FastifyInstance) {
-  const limited = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
+  const limited = { config: { rateLimit: { max: env.authRateLimit, timeWindow: '1 minute' } } };
 
   app.get('/api/config', async (): Promise<AppConfig> => ({
     // Le tout premier compte (l'admin) s'inscrit sans code ; ensuite il faut être parrainé.

@@ -47,7 +47,11 @@ function Tile({ post, ratio }: { post: Post; ratio: string }) {
       {post.media?.kind === 'image' && <img src={post.media.url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
       {post.media?.kind === 'video' && (
         <>
-          <video src={`${post.media.url}#t=0.1`} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" />
+          {post.media.poster ? (
+            <img src={post.media.poster} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          ) : !post.media.processing ? (
+            <video src={`${post.media.url}#t=0.1`} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover" />
+          ) : null}
           <Play size={22} weight="fill" className="absolute top-2 right-2 text-white drop-shadow" />
         </>
       )}

@@ -1,5 +1,7 @@
 # Mandrix
 
+[![CI](https://github.com/MatteoCnda1/Mandrix/actions/workflows/ci.yml/badge.svg)](https://github.com/MatteoCnda1/Mandrix/actions/workflows/ci.yml)
+
 Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine.
 
 PWA sociale auto-hébergée (homelab Proxmox + NAS), installable sur téléphone, avec notifications push.
@@ -10,17 +12,17 @@ PWA sociale auto-hébergée (homelab Proxmox + NAS), installable sur téléphone
 | --- | --- |
 | **Fil** | Stories 24 h, photos, vidéos, sondages (choix, photos, curseur emoji), j'aime, commentaires, republication |
 | **Reels** | Vidéos verticales en plein écran, défilement tactile / molette / clavier |
-| **La Pellicule** | Appareil photo intégré : les photos restent scellées (même pour leur auteur) jusqu'au dimanche 20h, série de semaines |
-| **Déballage** | Ouverture des photos de la semaine (cartes qui se retournent), récap du top 3, envoi dans le pool |
+| **La Pellicule** | Appareil photo intégré : photos scellées (même pour leur auteur) jusqu'au dimanche 20h, série de semaines, « Moment Mandrix » quotidien à heure aléatoire, envoi différé des photos prises hors ligne |
+| **Déballage** | Ouverture des photos de la semaine (cartes qui se retournent), badge « pile à l'heure », récap du top 3, rétrospective animée, album à télécharger (zip) |
 | **Make It Friends** | Jeu multijoueur temps réel (2 à 8) : une image tirée du pool, une légende, tout le monde vote |
 | **Galerie des mèmes** | Podium des mèmes les plus aimés |
 | **Profil** | Statistiques, série, amis, code de parrainage, mode sombre, notifications push, installation, modération (admin) |
-| **Messages** | Discussions privées entre amis, réponses aux stories, invitations aux salons |
+| **Messages** | Discussions privées et groupes entre amis, réponses aux stories (avec la photo), invitations aux salons |
 
 ## Stack
 
 - **Front** : React 19, Vite 7, TypeScript, Tailwind CSS 4, TanStack Query, Zustand, `vite-plugin-pwa` (Workbox)
-- **Back** : Node 24, Fastify 5, Socket.io 4, Drizzle ORM, PostgreSQL 17, sharp (images), web-push
+- **Back** : Node 24, Fastify 5, Socket.io 4, Drizzle ORM, PostgreSQL 17, sharp (images), ffmpeg (vidéos), web-push
 - **Déploiement** : Docker Compose sur une VM Proxmox, médias et sauvegardes sur le NAS (NFS), Cloudflare Tunnel
 
 ## Structure
@@ -57,11 +59,21 @@ Autres commandes :
 
 ```bash
 npm run typecheck                       # vérification TypeScript (serveur + PWA)
+npm test                                # tests d'API (base « mandrix_test » sur le PostgreSQL de dev, ffmpeg conseillé)
 npm run build                           # build de production
 npm run db:generate                     # nouvelle migration après modification de server/src/db/schema.ts
 npm run icons                           # régénère les icônes PWA depuis la mascotte
 npm run cli -w server -- make-admin <pseudo>
 ```
+
+## Intégration continue
+
+À chaque push sur `main` et chaque pull request, GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) :
+
+1. vérifie les types du serveur et de la PWA ;
+2. lance les tests d'API (`server/test/`) sur un PostgreSQL 17 éphémère, transcodage vidéo compris ;
+3. compile la PWA et le serveur ;
+4. construit l'image Docker de production.
 
 ## Déploiement
 
