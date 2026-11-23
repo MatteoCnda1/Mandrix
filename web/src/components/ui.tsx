@@ -66,7 +66,7 @@ export function Seg<T extends string | number>({ options, value, onChange, class
 
 export function Switch({ on }: { on: boolean }) {
   return (
-    <span className={cx('relative h-[30px] w-[52px] flex-none rounded-[15px] transition-colors duration-300', on ? 'bg-brand' : 'bg-line')}>
+    <span className={cx('relative inline-block h-[30px] w-[52px] flex-none rounded-[15px] align-middle transition-colors duration-300', on ? 'bg-brand' : 'bg-line')}>
       <span
         className="absolute top-[3px] left-[3px] h-6 w-6 rounded-full bg-white transition-transform duration-[350ms] ease-spring"
         style={{ transform: on ? 'translateX(22px)' : 'none' }}

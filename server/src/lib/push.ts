@@ -47,7 +47,8 @@ export interface PushPayload {
 
 /** Heure de Paris (0–23), quel que soit le fuseau du serveur. */
 export function parisHour(d = new Date()) {
-  return Number(new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Paris' }).format(d));
+  const part = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Europe/Paris' }).formatToParts(d).find((p) => p.type === 'hour');
+  return Number(part?.value ?? d.getHours()) % 24;
 }
 
 export function inQuietHours(prefs: NotificationPrefs, hour = parisHour()) {

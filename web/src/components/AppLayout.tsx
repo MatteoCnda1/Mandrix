@@ -14,11 +14,11 @@ import { cx, Logo, Toast } from './ui';
 type IconC = ComponentType<{ size?: number; weight?: 'regular' | 'fill' | 'bold' }>;
 
 const NAV: { to: string; icon: IconC; label: string; long: string; match: string[] }[] = [
-  { to: '/', icon: House, label: 'Fil', long: 'Pour toi', match: ['/', '/p/'] },
+  { to: '/', icon: House, label: 'Fil', long: 'Pour toi', match: ['/', '/p/', '/recherche'] },
   { to: '/reels', icon: Play, label: 'Reels', long: 'Reels', match: ['/reels'] },
   { to: '/pellicule', icon: Camera, label: 'Pellicule', long: 'La Pellicule', match: ['/pellicule', '/deballage'] },
   { to: '/jeu', icon: GameController, label: 'Jeu', long: 'Make It Friends', match: ['/jeu'] },
-  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation'] },
+  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation', '/reglages'] },
 ];
 
 /** Titre de l'écran et destination du bouton « retour » (navigation hiérarchique, HIG). */

@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
 import { mediaDir } from '../src/env.js';
-import { inQuietHours, pushRecipients } from '../src/lib/push.js';
+import { inQuietHours, parisHour, pushRecipients } from '../src/lib/push.js';
 import { app, befriend, call, jpeg, makeUser, upload, useApp, type TestUser } from './helpers.js';
 
 useApp();
@@ -44,6 +44,10 @@ describe('préférences de notifications', () => {
   });
 
   it('respecte les heures calmes et les catégories coupées en push', async () => {
+    // Heure de Paris, été comme hiver.
+    expect(parisHour(new Date('2026-01-15T22:30:00Z'))).toBe(23);
+    expect(parisHour(new Date('2026-07-15T22:30:00Z'))).toBe(0);
+    expect(parisHour(new Date('2026-07-15T06:00:00Z'))).toBe(8);
     expect(inQuietHours({ quiet: { start: 23, end: 8 } }, 2)).toBe(true);
     expect(inQuietHours({ quiet: { start: 23, end: 8 } }, 12)).toBe(false);
     expect(inQuietHours({ quiet: { start: 13, end: 14 } }, 13)).toBe(true);
