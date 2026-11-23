@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Yesteryear&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+:root{--sky:linear-gradient(180deg,#86C5F4 0%,#C9E5FA 38%,#EDF6FD 100%);--page:#C9E5FA;--card:#fff;--ink:#0B0F14;--inv:#fff;--soft:#F1F5F9;--mute:#5C6B7A;--body:#1D2B38;--tint:#BFE0FA;--glass:rgba(255,255,255,.75);--hero:#0B0F14;--acc:#0E76C6;--line:#D5DEE7;--ph:repeating-linear-gradient(135deg,#D6E9F8 0 12px,#E3F0FA 12px 24px);--ph2:repeating-linear-gradient(45deg,#DCE6EE 0 12px,#E8EFF5 12px 24px);--phink:#3D5A73;--skel:#E3EDF6}
+html[data-theme="dark"]{--sky:linear-gradient(180deg,#0E2A47 0%,#0B1622 45%,#080C11 100%);--page:#0B1622;--card:#16212D;--ink:#EEF4FA;--inv:#0B0F14;--soft:#223141;--mute:#A3B4C5;--body:#C6D3DF;--tint:#1F4F7A;--glass:rgba(22,33,45,.78);--hero:#1E2D3D;--acc:#6FC0FF;--line:#2C3C4D;--ph:repeating-linear-gradient(135deg,#1B2A3A 0 12px,#213244 12px 24px);--ph2:repeating-linear-gradient(45deg,#1F2B37 0 12px,#263442 12px 24px);--phink:#9FB6CA;--skel:#1B2836}
+body{margin:0;background:var(--page)}
+*{box-sizing:border-box}
+a{color:var(--acc)}a:hover{color:var(--ink)}
+@keyframes mxIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes mxPop{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes mxPop2{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes mxFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes mxProg{from{width:0}to{width:100%}}
+@keyframes mxGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes mxProgB{from{width:0}to{width:100%}}
+@keyframes mxBreath{0%,100%{opacity:.14}50%{opacity:.42}}
+@keyframes mxShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes mxFade{from{opacity:0}to{opacity:1}}
+@keyframes mxSheet{from{transform:translateY(100%)}to{transform:none}}
+@keyframes mxDrop{from{opacity:0;transform:translateY(-8px) scale(.94)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:var(--sky) fixed;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:var(--ink)">
+
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Landing" style="max-width:1120px;margin:0 auto;min-height:100vh;padding:clamp(24px,5vw,56px);display:flex;flex-wrap:wrap;align-items:center;gap:clamp(32px,6vw,72px);animation:mxIn .6s cubic-bezier(.2,.8,.2,1) both">
+  <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:22px">
+    <div style="position:relative;width:1em;height:1em;font-size:72px;flex:none">
+      <div style="position:absolute;left:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+      <div style="position:absolute;right:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+      <div style="position:absolute;inset:.04em;border-radius:50%;background:var(--ink)"></div>
+      <div style="position:absolute;left:.23em;top:.37em;width:.54em;height:.48em;border-radius:.24em .24em .27em .27em;background:var(--card)"></div>
+      <div style="position:absolute;left:.36em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+      <div style="position:absolute;left:.56em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+      <div style="position:absolute;left:.44em;top:.66em;width:.12em;height:.03em;border-radius:.02em;background:var(--ink)"></div>
+      <div style="position:absolute;left:.5em;top:.76em;width:.36em;height:.17em;border-radius:.09em;background:#2A9DF4;transform:rotate(-30deg)"></div>
+      <div style="position:absolute;right:-.06em;top:.02em;width:.13em;height:.13em;border-radius:50%;background:var(--ink)"></div>
+      <div style="position:absolute;right:-.2em;top:-.14em;width:.09em;height:.09em;border-radius:50%;background:var(--ink)"></div>
+    </div>
+    <h1 style="margin:0;font:400 clamp(76px,13vw,140px)/.95 'Yesteryear',cursive">Mandrix</h1>
+    <p style="margin:0;max-width:440px;font-size:18px;line-height:1.5;color:var(--body);text-wrap:pretty">Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine.</p>
+    <div style="background:var(--card);border-radius:32px;padding:14px;display:flex;flex-direction:column;gap:10px;max-width:440px;box-shadow:0 10px 30px rgba(20,90,160,.12)">
+      <input placeholder="Pseudo" style="height:52px;border:0;border-radius:26px;background:var(--soft);padding:0 20px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6">
+      <input type="email" placeholder="Adresse e-mail" style="height:52px;border:0;border-radius:26px;background:var(--soft);padding:0 20px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6">
+      <button onClick="{{ enter }}" style="height:54px;border:0;border-radius:27px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .2s,background .2s" style-hover="background:#0E76C6" style-active="transform:scale(.97)"><span>Créer mon compte</span><i class="ph ph-arrow-right" style="font-size:20px"></i></button>
+    </div>
+    <button onClick="{{ enter }}" style="align-self:flex-start;border:0;background:none;padding:10px 4px;font:inherit;font-weight:600;font-size:15px;color:var(--ink);text-decoration:underline;text-underline-offset:4px;cursor:pointer">J'ai déjà un compte</button>
+  </div>
+  <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:20px;padding:0 8px">
+    <div style="transform:rotate(-3deg);align-self:flex-start;width:min(100%,340px)"><div style="background:var(--card);border-radius:30px;padding:18px;display:flex;align-items:center;gap:14px;box-shadow:0 14px 34px rgba(20,90,160,.16);animation:mxFloat 6s ease-in-out infinite">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;flex:none"><i class="ph-fill ph-house" style="font-size:24px"></i></div>
+      <div><div style="font-weight:800;font-size:18px">Le fil</div><div style="font-size:14px;color:var(--mute);line-height:1.4">Posts, vidéos et sondages de tes amis.</div></div>
+    </div></div>
+    <div style="transform:rotate(2.5deg);align-self:flex-end;width:min(100%,340px)"><div style="background:var(--hero);color:#FFFFFF;border-radius:30px;padding:18px;display:flex;align-items:center;gap:14px;box-shadow:0 14px 34px rgba(11,15,20,.25);animation:mxFloat 6s ease-in-out -2s infinite">
+      <div style="width:52px;height:52px;border-radius:50%;background:#FFFFFF;color:#0b0f14;display:grid;place-items:center;flex:none"><i class="ph-fill ph-sticker" style="font-size:24px"></i></div>
+      <div><div style="font-weight:800;font-size:18px;letter-spacing:-.03em">Make It Friends</div><div style="font-size:14px;color:#C6D3DF;line-height:1.4">Tes photos deviennent des mèmes à légender.</div></div>
+    </div></div>
+    <div style="transform:rotate(-1.5deg);align-self:center;width:min(100%,340px)"><div style="background:#0E76C6;color:#fff;border-radius:30px;padding:18px;display:flex;align-items:center;gap:14px;box-shadow:0 14px 34px rgba(14,118,198,.3);animation:mxFloat 6s ease-in-out -4s infinite">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--card);color:var(--acc);display:grid;place-items:center;flex:none"><i class="ph-fill ph-camera" style="font-size:24px"></i></div>
+      <div><div style="font-weight:800;font-size:18px">La Pellicule</div><div style="font-size:14px;line-height:1.4">Des photos toute la semaine, déballées le dimanche.</div></div>
+    </div></div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;justify-content:center;gap:28px;max-width:1320px;margin:0 auto;padding:clamp(12px,2.4vw,24px)">
+
+  <sc-if value="{{ notPhone }}" hint-placeholder-val="{{ false }}">
+  <nav style="position:sticky;top:24px;align-self:flex-start;flex:none;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px;height:56px;padding:0 6px;margin-bottom:8px">
+      <div style="position:relative;width:1em;height:1em;font-size:42px;flex:none">
+        <div style="position:absolute;left:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+        <div style="position:absolute;right:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+        <div style="position:absolute;inset:.04em;border-radius:50%;background:var(--ink)"></div>
+        <div style="position:absolute;left:.23em;top:.37em;width:.54em;height:.48em;border-radius:.24em .24em .27em .27em;background:var(--card)"></div>
+        <div style="position:absolute;left:.36em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+        <div style="position:absolute;left:.56em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+        <div style="position:absolute;left:.44em;top:.66em;width:.12em;height:.03em;border-radius:.02em;background:var(--ink)"></div>
+        <div style="position:absolute;left:.5em;top:.76em;width:.36em;height:.17em;border-radius:.09em;background:#2A9DF4;transform:rotate(-30deg)"></div>
+      </div>
+      <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ false }}"><div style="font:400 40px/1 'Yesteryear',cursive;padding-right:8px">Mandrix</div></sc-if>
+    </div>
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+      <button onClick="{{ n.go }}" style="display:flex;align-items:center;gap:12px;height:54px;padding:0 16px;border:0;border-radius:27px;background:{{ n.sideBg }};color:{{ n.sideFg }};font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(20,90,160,.08);transition:background .3s,color .3s,transform .2s" style-hover="transform:translateX(3px)" style-active="transform:scale(.96)">
+        <i class="{{ n.icon }}" style="font-size:22px"></i>
+        <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ false }}"><span style="padding-right:6px">{{ n.long }}</span></sc-if>
+      </button>
+    </sc-for>
+  </nav>
+  </sc-if>
+
+  <main style="flex:1;min-width:0;max-width:{{ mainMax }};padding-bottom:110px">
+    <header style="position:relative;z-index:25;display:flex;align-items:center;gap:10px;height:56px;margin-bottom:14px">
+      <sc-if value="{{ isPhone }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative;width:1em;height:1em;font-size:40px;flex:none">
+          <div style="position:absolute;left:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+          <div style="position:absolute;right:-.07em;top:.3em;width:.3em;height:.3em;border-radius:50%;background:#2A9DF4"></div>
+          <div style="position:absolute;inset:.04em;border-radius:50%;background:var(--ink)"></div>
+          <div style="position:absolute;left:.23em;top:.37em;width:.54em;height:.48em;border-radius:.24em .24em .27em .27em;background:var(--card)"></div>
+          <div style="position:absolute;left:.36em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+          <div style="position:absolute;left:.56em;top:.47em;width:.08em;height:.08em;border-radius:50%;background:var(--ink)"></div>
+          <div style="position:absolute;left:.44em;top:.66em;width:.12em;height:.03em;border-radius:.02em;background:var(--ink)"></div>
+          <div style="position:absolute;left:.5em;top:.76em;width:.36em;height:.17em;border-radius:.09em;background:#2A9DF4;transform:rotate(-30deg)"></div>
+        </div>
+        <div style="font:400 36px/1 'Yesteryear',cursive;margin-left:4px">Mandrix</div>
+      </sc-if>
+      <sc-if value="{{ notPhone }}" hint-placeholder-val="{{ false }}"><h1 style="margin:0;font-size:28px;font-weight:800;letter-spacing:-.03em">{{ title }}</h1></sc-if>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button onClick="{{ composer.show }}" aria-label="Créer un post" style="width:46px;height:46px;border:0;border-radius:50%;background:#0E76C6;color:#fff;cursor:pointer;display:grid;place-items:center;box-shadow:0 6px 18px rgba(14,118,198,.3);transition:transform .3s cubic-bezier(.3,1.5,.5,1)" style-hover="transform:rotate(90deg)" style-active="transform:scale(.9)"><i class="ph ph-plus" style="font-size:22px"></i></button>
+        <button onClick="{{ goMessages }}" aria-label="Messages" style="position:relative;width:46px;height:46px;border:0;border-radius:50%;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:0 6px 18px rgba(20,90,160,.1);transition:transform .2s" style-active="transform:scale(.94)"><i class="ph ph-chat-circle-dots" style="font-size:20px"></i><sc-if value="{{ dm.hasUnread }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;top:9px;right:9px;width:10px;height:10px;border-radius:50%;background:#E5484D;box-shadow:0 0 0 2px var(--card)"></span></sc-if></button>
+        <button onClick="{{ notif.toggle }}" aria-label="Notifications" style="display:flex;align-items:center;gap:6px;height:46px;padding:0 13px;border:0;border-radius:23px;background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(20,90,160,.1);transition:transform .2s" style-active="transform:scale(.94)"><i class="ph ph-bell" style="font-size:20px"></i><sc-if value="{{ notif.has }}" hint-placeholder-val="{{ true }}"><span>3</span></sc-if></button>
+        <sc-if value="{{ notPhone }}" hint-placeholder-val="{{ false }}"><button onClick="{{ toggleDark }}" aria-label="Mode sombre" style="width:46px;height:46px;border:0;border-radius:50%;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;box-shadow:0 6px 18px rgba(20,90,160,.1);transition:transform .2s" style-active="transform:scale(.94)"><i class="{{ darkIcon }}" style="font-size:20px"></i></button></sc-if>
+      </div>
+      <sc-if value="{{ notif.open }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ notif.toggle }}" style="position:fixed;inset:0"></div>
+        <div style="position:absolute;top:62px;right:0;width:min(390px,100%);background:var(--card);border-radius:28px;padding:10px;display:flex;flex-direction:column;gap:2px;box-shadow:0 20px 50px rgba(11,15,20,.25);transform-origin:top right;animation:mxDrop .35s cubic-bezier(.2,.9,.2,1) both">
+          <div style="font-weight:800;font-size:17px;padding:8px 10px">Notifications</div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:20px;transition:background .2s" style-hover="background:var(--soft)"><div style="width:40px;height:40px;border-radius:50%;background:var(--soft);color:#E5484D;display:grid;place-items:center;flex:none"><i class="ph-fill ph-heart" style="font-size:18px"></i></div><div style="flex:1;min-width:0;font-size:14px;line-height:1.35"><div><b>Léa</b> a aimé ta photo</div><div style="font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums">il y a 2 min</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:20px;transition:background .2s" style-hover="background:var(--soft)"><div style="width:40px;height:40px;border-radius:50%;background:var(--soft);color:var(--acc);display:grid;place-items:center;flex:none"><i class="ph-fill ph-game-controller" style="font-size:18px"></i></div><div style="flex:1;min-width:0;font-size:14px;line-height:1.35"><div><b>Sacha</b> t'invite dans un salon Make It Friends</div><div style="font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums">il y a 9 min</div></div><button onClick="{{ notif.join }}" style="flex:none;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:13px;cursor:pointer">Rejoindre</button></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:20px;transition:background .2s" style-hover="background:var(--soft)"><div style="width:40px;height:40px;border-radius:50%;background:var(--soft);color:var(--acc);display:grid;place-items:center;flex:none"><i class="ph-fill ph-lock-simple" style="font-size:18px"></i></div><div style="flex:1;min-width:0;font-size:14px;line-height:1.35"><div>Déballage de la semaine</div><div style="font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums">{{ cd.line }}</div></div><button onClick="{{ notif.unpack }}" style="flex:none;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:13px;cursor:pointer">Voir</button></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:20px;transition:background .2s" style-hover="background:var(--soft)"><div style="width:40px;height:40px;border-radius:50%;background:var(--soft);color:var(--ink);display:grid;place-items:center;flex:none"><i class="ph-fill ph-sticker" style="font-size:18px"></i></div><div style="flex:1;min-width:0;font-size:14px;line-height:1.35"><div>Ta photo a été tirée 12 fois dans le pool</div><div style="font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums">hier</div></div></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:20px;transition:background .2s" style-hover="background:var(--soft)"><div style="width:40px;height:40px;border-radius:50%;background:var(--soft);color:#E5484D;display:grid;place-items:center;flex:none"><i class="ph-fill ph-fire" style="font-size:18px"></i></div><div style="flex:1;min-width:0;font-size:14px;line-height:1.35"><div>Série de 5 semaines : pense à ta photo avant dimanche</div><div style="font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums">hier</div></div></div>
+        </div>
+      </sc-if>
+    </header>
+    <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+    <div aria-busy="true" aria-label="Chargement" style="position:relative;display:flex;flex-direction:column;gap:14px">
+      <div style="position:absolute;left:0;right:0;top:150px;z-index:1;text-align:center;font:400 clamp(60px,13vw,96px)/1 'Yesteryear',cursive;color:var(--ink);animation:mxBreath 1.4s ease-in-out infinite;pointer-events:none">Mandrix</div>
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:14px;gap:12px"><div style="display:flex;align-items:center;gap:10px"><div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="display:flex;flex-direction:column;gap:7px"><div style="width:130px;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:84px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div></div></div><div style="aspect-ratio:16/10;border-radius:24px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="display:flex;gap:8px"><div style="width:76px;height:44px;border-radius:22px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:76px;height:44px;border-radius:22px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:96px;height:44px;border-radius:22px;margin-left:auto;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div></div></div>
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:14px;gap:12px"><div style="display:flex;align-items:center;gap:10px"><div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="display:flex;flex-direction:column;gap:7px"><div style="width:130px;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:84px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div></div></div><div style="aspect-ratio:16/7;border-radius:24px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="display:flex;gap:8px"><div style="width:76px;height:44px;border-radius:22px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:76px;height:44px;border-radius:22px;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div><div style="width:96px;height:44px;border-radius:22px;margin-left:auto;background:linear-gradient(90deg,var(--skel) 25%,var(--soft) 50%,var(--skel) 75%);background-size:200% 100%;animation:mxShimmer 1.4s linear infinite"></div></div></div>
+    </div>
+    </sc-if>
+
+
+    <sc-if value="{{ isFeed }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Fil" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;gap:10px;overflow-x:auto;padding:4px 2px 6px;scrollbar-width:none">
+        <button onClick="{{ composer.show }}" style="flex:none;width:72px;border:0;background:none;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;color:var(--ink)">
+          <span style="width:68px;height:92px;border-radius:24px;background:var(--card);display:grid;place-items:center;box-shadow:0 6px 18px rgba(20,90,160,.1)"><span style="width:36px;height:36px;border-radius:50%;background:#0E76C6;color:#fff;display:grid;place-items:center"><i class="ph ph-plus" style="font-size:18px"></i></span></span>
+          <span style="font-size:12px;font-weight:600">Ta story</span>
+        </button>
+        <sc-for list="{{ stories }}" as="st" hint-placeholder-count="6">
+          <button onClick="{{ st.open }}" style="flex:none;width:72px;border:0;background:none;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;color:var(--ink);transition:transform .2s" style-active="transform:scale(.94)">
+            <span style="width:68px;height:92px;border-radius:24px;padding:3px;background:{{ st.ring }};transition:background .4s"><span style="display:grid;place-items:center;width:100%;height:100%;border-radius:21px;background:var(--ph);box-shadow:inset 0 0 0 2px var(--card);font-weight:800;font-size:15px;color:var(--phink)">{{ st.init }}</span></span>
+            <span style="font-size:12px;font-weight:600">{{ st.name }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ notDesktop }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ goCamera }}" style="display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 18px 8px 8px;border:0;border-radius:30px;background:#0E76C6;color:#fff;font:inherit;font-weight:700;font-size:15px;text-align:left;cursor:pointer;box-shadow:0 10px 26px rgba(14,118,198,.3);animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both;transition:transform .2s" style-active="transform:scale(.98)">
+          <span style="width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--acc);display:grid;place-items:center;flex:none"><i class="ph-fill ph-lock-simple" style="font-size:20px"></i></span>
+          <span style="flex:1;min-width:0;font-variant-numeric:tabular-nums">{{ cd.line }}</span>
+          <i class="ph ph-arrow-right" style="font-size:20px"></i>
+        </button>
+      </sc-if>
+
+      <sc-for list="{{ myPosts }}" as="mp" hint-placeholder-count="0">
+      <article style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:14px;gap:12px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:700;font-size:15px;flex:none">MD</div>
+          <div style="min-width:0"><div style="font-weight:700;font-size:15px">Mathis Durand</div><div style="font-size:13px;color:var(--mute)">à l'instant</div></div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">{{ mp.kind }}</span>
+        </div>
+        <sc-if value="{{ mp.isMedia }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ mp.isMeme }}" hint-placeholder-val="{{ false }}"><div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2;text-align:center;padding:4px 10px;text-wrap:balance">{{ mp.text }}</div></sc-if>
+          <div style="aspect-ratio:4/3;border-radius:24px;background:{{ mp.ph }};display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:{{ mp.phInk }}">{{ mp.desc }}</div>
+          <sc-if value="{{ mp.hasCaption }}" hint-placeholder-val="{{ false }}"><p style="margin:0 4px;font-size:15px;line-height:1.45">{{ mp.text }}</p></sc-if>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<button onClick="{{ mp.a.onLike }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.92)"><i class="{{ mp.a.likeIcon }}" style="font-size:20px;color:{{ mp.a.likeColor }};animation:{{ mp.a.likeAnim }}"></i><span>{{ mp.a.likes }}</span></button>
+<button onClick="{{ mp.a.onCom }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s"><i class="ph ph-chat-circle" style="font-size:20px"></i><span>{{ mp.a.coms }}</span></button>
+<button onClick="{{ mp.a.onRepost }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s;color:{{ mp.a.repColor }}" style-active="transform:scale(.92)"><i class="ph ph-repeat" style="font-size:20px"></i><span>{{ mp.a.reposts }}</span></button>
+<button onClick="{{ mp.a.onPool }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;border:0;border-radius:22px;background:{{ mp.a.poolBg }};color:{{ mp.a.poolFg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,transform .2s" style-active="transform:scale(.92)"><i class="{{ mp.a.poolIcon }}" style="font-size:20px"></i><span>{{ mp.a.poolLabel }}</span></button>
+</div>
+        </sc-if>
+        <sc-if value="{{ mp.isPoll }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">{{ mp.text }}</div>
+          <div style="display:flex;flex-direction:column;gap:8px"><sc-for list="{{ mp.q.opts }}" as="o" hint-placeholder-count="2">
+<button onClick="{{ o.pick }}" style="position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;height:52px;padding:0 18px;border:0;border-radius:26px;background:var(--soft);box-shadow:inset 0 0 0 2px {{ o.ring }};font:inherit;font-weight:600;font-size:15px;color:var(--ink);cursor:pointer;text-align:left;transition:box-shadow .3s,transform .2s" style-active="transform:scale(.98)"><span style="position:absolute;left:0;top:0;bottom:0;width:{{ o.w }};background:var(--tint);border-radius:26px;transition:width .8s cubic-bezier(.2,.8,.2,1)"></span><span style="position:relative">{{ o.label }}</span><span style="position:relative;font-weight:800;opacity:{{ o.op }};transition:opacity .4s .2s">{{ o.pct }}</span></button>
+</sc-for></div>
+          <div style="font-size:13px;color:var(--mute)">{{ mp.q.total }}</div>
+        </sc-if>
+      </article>
+      </sc-for>
+
+      <article style="background:var(--card);border-radius:32px;padding:14px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) .05s both">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:700;font-size:15px;flex:none">LM</div>
+          <div style="min-width:0"><div style="font-weight:700;font-size:15px">Léa Martin</div><div style="font-size:13px;color:var(--mute)">il y a 3 min · Lyon</div></div>
+          <button aria-label="Options" style="margin-left:auto;width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-dots-three" style="font-size:22px"></i></button>
+        </div>
+        <div style="aspect-ratio:4/5;border-radius:24px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">photo · chat perché sur le frigo</div>
+        <p style="margin:0 4px;font-size:15px;line-height:1.45">Il me juge depuis vingt minutes.</p>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button onClick="{{ p1.onLike }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.92)"><i class="{{ p1.likeIcon }}" style="font-size:20px;color:{{ p1.likeColor }};animation:{{ p1.likeAnim }}"></i><span>{{ p1.likes }}</span></button>
+          <button style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer" onClick="{{ p1.onCom }}"><i class="ph ph-chat-circle" style="font-size:20px"></i><span>{{ p1.coms }}</span></button>
+          <button onClick="{{ p1.onRepost }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:{{ p1.repColor }};font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s,color .2s" style-active="transform:scale(.92)"><i class="ph ph-repeat" style="font-size:20px"></i><span>{{ p1.reposts }}</span></button>
+          <button onClick="{{ p1.onPool }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;border:0;border-radius:22px;background:{{ p1.poolBg }};color:{{ p1.poolFg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,transform .2s" style-active="transform:scale(.92)"><i class="{{ p1.poolIcon }}" style="font-size:20px"></i><span>{{ p1.poolLabel }}</span></button>
+        </div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:16px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) .1s both">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--tint);color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none">TG</div>
+          <div style="font-weight:700;font-size:14px">Tom Garnier</div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Sondage</span>
+        </div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">Pizza à l'ananas : crime ou génie ?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ q1.opts }}" as="o" hint-placeholder-count="2">
+            <button onClick="{{ o.pick }}" style="position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;height:52px;padding:0 18px;border:0;border-radius:26px;background:var(--soft);box-shadow:inset 0 0 0 2px {{ o.ring }};font:inherit;font-weight:600;font-size:15px;color:var(--ink);cursor:pointer;text-align:left;transition:box-shadow .3s,transform .2s" style-active="transform:scale(.98)">
+              <span style="position:absolute;left:0;top:0;bottom:0;width:{{ o.w }};background:var(--tint);border-radius:26px;transition:width .8s cubic-bezier(.2,.8,.2,1)"></span>
+              <span style="position:relative">{{ o.label }}</span><span style="position:relative;font-weight:800;opacity:{{ o.op }};transition:opacity .4s .2s">{{ o.pct }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;color:var(--mute)">{{ q1.total }}</div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:14px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) .15s both">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:44px;height:44px;border-radius:50%;background:#1A8DE6;color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px;flex:none">NR</div>
+          <div style="min-width:0"><div style="font-weight:700;font-size:15px">Noah Robert</div><div style="font-size:13px;color:var(--mute)">il y a 1 h · Marseille</div></div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Vidéo</span>
+        </div>
+        <button onClick="{{ goReels }}" aria-label="Lire la vidéo" style="position:relative;aspect-ratio:4/5;border:0;border-radius:24px;background:repeating-linear-gradient(135deg,#101A24 0 12px,#15222F 12px 24px);display:grid;place-items:center;cursor:pointer;padding:0">
+          <span style="position:absolute;top:14px;left:14px;font:500 12px ui-monospace,Menlo,monospace;color:#9FB6CA">vidéo · chute en trottinette</span>
+          <span style="width:68px;height:68px;border-radius:50%;background:#FFFFFF;color:#0b0f14;display:grid;place-items:center;transition:transform .25s cubic-bezier(.3,1.6,.5,1)" style-hover="transform:scale(1.1)"><i class="ph-fill ph-play" style="font-size:26px"></i></span>
+          <span style="position:absolute;bottom:14px;right:14px;font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.16);padding:6px 12px;border-radius:14px">0:24</span>
+        </button>
+        <p style="margin:0 4px;font-size:15px;line-height:1.45">Première sortie en trottinette. Dernière aussi.</p>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button onClick="{{ p2.onLike }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.92)"><i class="{{ p2.likeIcon }}" style="font-size:20px;color:{{ p2.likeColor }};animation:{{ p2.likeAnim }}"></i><span>{{ p2.likes }}</span></button>
+          <button style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer" onClick="{{ p2.onCom }}"><i class="ph ph-chat-circle" style="font-size:20px"></i><span>{{ p2.coms }}</span></button>
+          <button onClick="{{ p2.onRepost }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:{{ p2.repColor }};font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s,color .2s" style-active="transform:scale(.92)"><i class="ph ph-repeat" style="font-size:20px"></i><span>{{ p2.reposts }}</span></button>
+          <button onClick="{{ p2.onPool }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;border:0;border-radius:22px;background:{{ p2.poolBg }};color:{{ p2.poolFg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,transform .2s" style-active="transform:scale(.92)"><i class="{{ p2.poolIcon }}" style="font-size:20px"></i><span>{{ p2.poolLabel }}</span></button>
+        </div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:16px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none">MB</div>
+          <div style="font-weight:700;font-size:14px">Maya Benali</div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Sondage</span>
+        </div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">Team plage ou team montagne ?</div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px">
+          <button onClick="{{ q3.o0.pick }}" style="position:relative;aspect-ratio:1;border:0;padding:0;border-radius:24px;overflow:hidden;background:var(--ph);box-shadow:inset 0 0 0 3px {{ q3.o0.ring }};opacity:{{ q3.o0.dim }};cursor:pointer;display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink);transition:opacity .4s,box-shadow .3s,transform .2s" style-active="transform:scale(.97)">
+            <span>photo · plage</span>
+            <span style="position:absolute;left:10px;bottom:10px;right:10px;display:flex;justify-content:space-between;align-items:center;height:40px;padding:0 14px;border-radius:20px;background:var(--card);font:700 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>Plage</span><span style="opacity:{{ q3.op }};transition:opacity .4s">{{ q3.o0.pct }}</span></span>
+          </button>
+          <button onClick="{{ q3.o1.pick }}" style="position:relative;aspect-ratio:1;border:0;padding:0;border-radius:24px;overflow:hidden;background:var(--ph2);box-shadow:inset 0 0 0 3px {{ q3.o1.ring }};opacity:{{ q3.o1.dim }};cursor:pointer;display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink);transition:opacity .4s,box-shadow .3s,transform .2s" style-active="transform:scale(.97)">
+            <span>photo · montagne</span>
+            <span style="position:absolute;left:10px;bottom:10px;right:10px;display:flex;justify-content:space-between;align-items:center;height:40px;padding:0 14px;border-radius:20px;background:var(--card);font:700 14px 'Plus Jakarta Sans',sans-serif;color:var(--ink)"><span>Montagne</span><span style="opacity:{{ q3.op }};transition:opacity .4s">{{ q3.o1.pct }}</span></span>
+          </button>
+        </div>
+        <div style="font-size:13px;color:var(--mute)">{{ q3.total }}</div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:14px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--tint);color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:15px;flex:none">IB</div>
+          <div style="min-width:0"><div style="font-weight:700;font-size:15px">Inès Bernard</div><div style="font-size:13px;color:var(--mute)">il y a 4 h · Aix-en-Provence</div></div>
+          <button aria-label="Options" style="margin-left:auto;width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-dots-three" style="font-size:22px"></i></button>
+        </div>
+        <div style="aspect-ratio:1;border-radius:24px;background:var(--ph2);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">photo · selfie de groupe flou</div>
+        <p style="margin:0 4px;font-size:15px;line-height:1.45">La seule photo de la soirée où tout le monde est dessus.</p>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button onClick="{{ p3.onLike }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.92)"><i class="{{ p3.likeIcon }}" style="font-size:20px;color:{{ p3.likeColor }};animation:{{ p3.likeAnim }}"></i><span>{{ p3.likes }}</span></button>
+          <button style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer" onClick="{{ p3.onCom }}"><i class="ph ph-chat-circle" style="font-size:20px"></i><span>{{ p3.coms }}</span></button>
+          <button onClick="{{ p3.onRepost }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:{{ p3.repColor }};font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s,color .2s" style-active="transform:scale(.92)"><i class="ph ph-repeat" style="font-size:20px"></i><span>{{ p3.reposts }}</span></button>
+          <button onClick="{{ p3.onPool }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 16px;border:0;border-radius:22px;background:{{ p3.poolBg }};color:{{ p3.poolFg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,transform .2s" style-active="transform:scale(.92)"><i class="{{ p3.poolIcon }}" style="font-size:20px"></i><span>{{ p3.poolLabel }}</span></button>
+        </div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:16px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:#1A8DE6;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none">JP</div>
+          <div style="font-weight:700;font-size:14px">Jules Perrin</div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Sondage</span>
+        </div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">On fait quoi samedi ?</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ q2.opts }}" as="o" hint-placeholder-count="4">
+            <button onClick="{{ o.pick }}" style="position:relative;overflow:hidden;display:flex;justify-content:space-between;align-items:center;height:52px;padding:0 18px;border:0;border-radius:26px;background:var(--soft);box-shadow:inset 0 0 0 2px {{ o.ring }};font:inherit;font-weight:600;font-size:15px;color:var(--ink);cursor:pointer;text-align:left;transition:box-shadow .3s,transform .2s" style-active="transform:scale(.98)">
+              <span style="position:absolute;left:0;top:0;bottom:0;width:{{ o.w }};background:var(--tint);border-radius:26px;transition:width .8s cubic-bezier(.2,.8,.2,1)"></span>
+              <span style="position:relative">{{ o.label }}</span><span style="position:relative;font-weight:800;opacity:{{ o.op }};transition:opacity .4s .2s">{{ o.pct }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;color:var(--mute)">{{ q2.total }}</div>
+      </article>
+
+      <article style="background:var(--card);border-radius:32px;padding:16px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--tint);color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none">SL</div>
+          <div style="font-weight:700;font-size:14px">Sacha Lefèvre</div>
+          <span style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Sondage</span>
+        </div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">Ton niveau de motivation ce lundi ?</div>
+        <div style="position:relative;height:64px;margin:0 22px">
+          <div style="position:absolute;left:-22px;right:-22px;top:26px;height:12px;border-radius:6px;background:var(--soft)"></div>
+          <div style="position:absolute;left:-22px;top:26px;height:12px;border-radius:6px;background:#2A9DF4;width:calc({{ sl.pct }} + 22px)"></div>
+          <div style="position:absolute;top:22px;left:{{ sl.avgPct }};width:4px;height:20px;margin-left:-2px;border-radius:2px;background:var(--ink);opacity:{{ sl.avgO }};transition:opacity .4s"></div>
+          <div style="position:absolute;top:32px;left:{{ sl.pct }};transform:translate(-50%,-50%);font-size:{{ sl.size }};line-height:1;transition:font-size .15s;pointer-events:none">{{ sl.emoji }}</div>
+          <input type="range" min="0" max="100" value="{{ sl.value }}" onChange="{{ sl.onChange }}" onPointerUp="{{ sl.onDone }}" aria-label="Motivation" style="position:absolute;left:-22px;top:0;width:calc(100% + 44px);height:64px;margin:0;opacity:0;cursor:pointer">
+        </div>
+        <div style="font-size:13px;color:var(--mute)">{{ sl.note }}</div>
+      </article>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isReels }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Reels" style="display:flex;justify-content:center;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <div onWheel="{{ reelWheel }}" onTouchStart="{{ reelTouchStart }}" onTouchEnd="{{ reelTouchEnd }}" style="position:relative;width:100%;max-width:440px;height:min(74vh,760px);border-radius:36px;overflow:hidden;background:#0b0f14;touch-action:none;box-shadow:0 20px 50px rgba(11,15,20,.3)">
+        <div style="height:100%;transform:{{ reelTf }};transition:transform .6s cubic-bezier(.3,.9,.2,1)">
+          <sc-for list="{{ reels }}" as="r" hint-placeholder-count="1">
+            <div style="position:relative;height:100%;background:repeating-linear-gradient(135deg,#101A24 0 12px,#15222F 12px 24px);display:grid;place-items:center">
+              <span style="font:500 12px ui-monospace,Menlo,monospace;color:#9FB6CA">{{ r.desc }}</span>
+              <div style="position:absolute;top:14px;left:18px;right:18px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);overflow:hidden"><div style="height:100%;background:#FFFFFF;border-radius:2px;animation:{{ r.prog }}"></div></div>
+              <div style="position:absolute;left:18px;right:84px;bottom:20px;color:#fff;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:10px"><div style="width:40px;height:40px;border-radius:50%;background:#FFFFFF;color:#0b0f14;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none">{{ r.init }}</div><div style="font-weight:700;font-size:15px">{{ r.user }}</div></div>
+                <div style="font-size:15px;line-height:1.4">{{ r.caption }}</div>
+              </div>
+              <div style="position:absolute;right:14px;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff;font-size:12px;font-weight:700">
+                <button onClick="{{ r.a.onLike }}" aria-label="Aimer" style="width:50px;height:50px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:grid;place-items:center;transition:transform .2s" style-active="transform:scale(.88)"><i class="{{ r.a.likeIcon }}" style="font-size:24px;color:{{ r.a.likeColorDark }};animation:{{ r.a.likeAnim }}"></i></button><span>{{ r.a.likes }}</span>
+                <button onClick="{{ r.a.onCom }}" aria-label="Commenter" style="width:50px;height:50px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:grid;place-items:center"><i class="ph ph-chat-circle" style="font-size:24px"></i></button><span>{{ r.a.coms }}</span>
+                <button onClick="{{ r.a.onRepost }}" aria-label="Republier" style="width:50px;height:50px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:{{ r.a.repColorDark }};cursor:pointer;display:grid;place-items:center;transition:transform .2s,color .2s" style-active="transform:scale(.88)"><i class="ph ph-repeat" style="font-size:24px"></i></button><span>{{ r.a.reposts }}</span>
+                <button onClick="{{ r.a.onPool }}" aria-label="Envoyer dans le pool" style="width:50px;height:50px;border:0;border-radius:50%;background:{{ r.a.poolBgDark }};color:{{ r.a.poolFgDark }};cursor:pointer;display:grid;place-items:center;transition:background .3s,color .3s,transform .2s" style-active="transform:scale(.88)"><i class="{{ r.a.poolIcon }}" style="font-size:24px"></i></button><span>Pool</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;justify-content:center;gap:10px">
+        <button onClick="{{ reelPrev }}" aria-label="Vidéo précédente" style="width:48px;height:48px;border:0;border-radius:50%;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;opacity:{{ reelPrevO }};box-shadow:0 6px 18px rgba(20,90,160,.12);transition:opacity .3s,transform .2s" style-active="transform:scale(.9)"><i class="ph ph-arrow-up" style="font-size:20px"></i></button>
+        <button onClick="{{ reelNext }}" aria-label="Vidéo suivante" style="width:48px;height:48px;border:0;border-radius:50%;background:var(--ink);color:var(--inv);cursor:pointer;display:grid;place-items:center;opacity:{{ reelNextO }};box-shadow:0 6px 18px rgba(20,90,160,.12);transition:opacity .3s,transform .2s" style-active="transform:scale(.9)"><i class="ph ph-arrow-down" style="font-size:20px"></i></button>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isGame }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Make It Friends">
+      <sc-if value="{{ g.isLobby }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+        <div style="background:var(--hero);color:#FFFFFF;border-radius:32px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 14px 34px rgba(11,15,20,.25)">
+          <div style="font-size:clamp(36px,8vw,56px);font-weight:800;letter-spacing:-.05em;line-height:1">Make It Friends</div>
+          <p style="margin:0;font-size:16px;line-height:1.45;color:#C6D3DF;max-width:420px">Une image tirée du pool, une légende à écrire, et tout le monde vote.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.14);font-size:14px;font-weight:700"><i class="ph ph-images" style="font-size:18px"></i><span>{{ g.poolCount }} dans le pool public</span></span>
+            <sc-if value="{{ g.hasMine }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;height:40px;padding:0 14px;border-radius:20px;background:#0E76C6;font-size:14px;font-weight:700;animation:mxPop .4s">+{{ g.mine }} de toi</span></sc-if>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:32px;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <div style="display:flex;align-items:center;gap:10px"><div style="font-weight:800;font-size:17px">Joueurs · 6/8</div><span style="margin-left:auto;font:600 13px ui-monospace,Menlo,monospace;padding:8px 12px;border-radius:14px;background:var(--soft)">MDRX-482</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px">
+            <sc-for list="{{ g.players }}" as="pl" hint-placeholder-count="6">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:60px"><div style="width:54px;height:54px;border-radius:50%;background:{{ pl.bg }};color:{{ pl.fg }};display:grid;place-items:center;font-weight:700;font-size:16px">{{ pl.init }}</div><span style="font-size:13px;font-weight:600">{{ pl.name }}</span></div>
+            </sc-for>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:60px"><button aria-label="Inviter" style="width:54px;height:54px;border-radius:50%;border:2px dashed #8FA3B5;background:none;color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-plus" style="font-size:20px"></i></button><span style="font-size:13px;font-weight:600">Inviter</span></div>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:32px;padding:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <div style="font-weight:800;font-size:17px;margin-right:auto">Manches</div>
+          <div style="display:flex;gap:4px;padding:4px;border-radius:26px;background:var(--soft)">
+            <sc-for list="{{ g.roundOpts }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.pick }}" style="width:56px;height:44px;border:0;border-radius:22px;background:{{ o.bg }};color:{{ o.fg }};font:inherit;font-weight:700;font-size:15px;cursor:pointer;transition:background .3s,color .3s">{{ o.n }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;flex-direction:row;padding:18px;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-weight:800;font-size:17px;margin-right:auto">Images tirées du</div>
+          <div style="display:flex;gap:4px;padding:4px;border-radius:26px;background:var(--soft)">
+            <sc-for list="{{ g.srcOpts }}" as="o" hint-placeholder-count="2">
+              <button onClick="{{ o.pick }}" style="height:44px;padding:0 16px;border:0;border-radius:22px;background:{{ o.bg }};color:{{ o.fg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,color .3s">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <button onClick="{{ goMemes }}" style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;flex-direction:row;align-items:center;gap:14px;padding:14px 18px 14px 14px;border:0;color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:transform .2s" style-hover="transform:translateY(-2px)" style-active="transform:scale(.98)">
+          <span style="width:52px;height:52px;border-radius:50%;background:var(--tint);display:grid;place-items:center;flex:none"><i class="ph-fill ph-trophy" style="font-size:24px"></i></span>
+          <span style="flex:1;min-width:0"><span style="display:block;font-weight:800;font-size:17px">Galerie des mèmes</span><span style="display:block;font-size:14px;color:var(--mute)">Le podium des plus aimés</span></span>
+          <i class="ph ph-arrow-right" style="font-size:20px"></i>
+        </button>
+        <button onClick="{{ g.start }}" style="height:60px;border:0;border-radius:30px;background:#0E76C6;color:#fff;font:inherit;font-weight:800;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 26px rgba(14,118,198,.3);transition:transform .2s" style-hover="transform:translateY(-2px)" style-active="transform:scale(.97)"><i class="ph-fill ph-play" style="font-size:20px"></i><span>Lancer la partie</span></button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ g.isCaption }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="height:40px;display:flex;align-items:center;padding:0 14px;border-radius:20px;background:var(--ink);color:var(--inv);font-weight:700;font-size:14px">Manche 1/{{ g.rounds }}</span>
+          <span style="margin-left:auto;height:40px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:20px;background:var(--card);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums"><i class="ph ph-timer" style="font-size:18px"></i><span>{{ g.left }} s</span></span>
+        </div>
+        <div style="height:8px;border-radius:4px;background:var(--glass);overflow:hidden"><div style="height:100%;width:{{ g.barW }};background:#0E76C6;border-radius:4px;transition:width 1s linear"></div></div>
+        <div style="background:var(--card);border-radius:32px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <div style="min-height:66px;display:grid;place-items:center;padding:6px 10px;font-size:clamp(20px,4.6vw,26px);font-weight:800;letter-spacing:-.02em;line-height:1.15;text-align:center;color:{{ g.capColor }};text-wrap:balance">{{ g.capShown }}</div>
+          <div style="position:relative;aspect-ratio:4/3;border-radius:24px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">
+            <span>{{ g.meme.desc }}</span>
+            <span style="position:absolute;left:10px;bottom:10px;height:36px;display:flex;align-items:center;padding:0 12px;border-radius:18px;background:var(--card);font:700 13px 'Plus Jakarta Sans',sans-serif;color:var(--ink)">du pool · {{ g.meme.by }}</span>
+            <button onClick="{{ g.report }}" aria-label="Signaler cette image" style="position:absolute;right:62px;bottom:10px;width:44px;height:44px;border:0;border-radius:50%;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;transition:transform .2s" style-active="transform:scale(.9)"><i class="ph ph-flag" style="font-size:20px"></i></button>
+            <button onClick="{{ g.shuffle }}" aria-label="Changer d'image" style="position:absolute;right:10px;bottom:10px;width:44px;height:44px;border:0;border-radius:50%;background:var(--ink);color:var(--inv);cursor:pointer;display:grid;place-items:center;transition:transform .4s cubic-bezier(.3,1.4,.5,1)" style-active="transform:rotate(180deg)"><i class="ph ph-shuffle" style="font-size:20px"></i></button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;background:var(--card);border-radius:32px;padding:8px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <input value="{{ g.caption }}" onChange="{{ g.onCaption }}" maxLength="90" placeholder="Écris ta légende…" style="flex:1;min-width:0;height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6">
+          <button onClick="{{ g.submit }}" style="height:48px;padding:0 20px;border:0;border-radius:24px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:15px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.95)">Valider</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ g.isVote }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-weight:800;font-size:17px">Mème {{ g.voteN }}/2 · note la légende</div>
+        <sc-if value="{{ g.v0 }}" hint-placeholder-val="{{ true }}">
+          <div style="background:var(--card);border-radius:32px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(20,90,160,.1);animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+            <div style="padding:8px 10px;font-size:clamp(20px,4.6vw,26px);font-weight:800;letter-spacing:-.02em;line-height:1.15;text-align:center;text-wrap:balance">Quand tu entends le frigo s'ouvrir à 3h du matin</div>
+            <div style="aspect-ratio:4/3;border-radius:24px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">photo · chat perché sur le frigo</div>
+            <div style="font-size:13px;color:var(--mute);padding:0 4px">Légende de Sacha</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ g.v1 }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--card);border-radius:32px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(20,90,160,.1);animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+            <div style="padding:8px 10px;font-size:clamp(20px,4.6vw,26px);font-weight:800;letter-spacing:-.02em;line-height:1.15;text-align:center;text-wrap:balance">Moi qui lis le groupe sans jamais répondre</div>
+            <div style="aspect-ratio:4/3;border-radius:24px;background:var(--ph2);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">photo · selfie de groupe flou</div>
+            <div style="font-size:13px;color:var(--mute);padding:0 4px">Légende de Maya</div>
+          </div>
+        </sc-if>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <button onClick="{{ g.rate }}" style="height:56px;border:0;border-radius:28px;background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(20,90,160,.1);transition:transform .2s" style-hover="transform:translateY(-2px)" style-active="transform:scale(.94)">Bof</button>
+          <button onClick="{{ g.rate }}" style="height:56px;border:0;border-radius:28px;background:#0E76C6;color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(14,118,198,.25);transition:transform .2s" style-hover="transform:translateY(-2px)" style-active="transform:scale(.94)">Drôle</button>
+          <button onClick="{{ g.rate }}" style="height:56px;border:0;border-radius:28px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(11,15,20,.2);transition:transform .2s" style-hover="transform:translateY(-2px)" style-active="transform:scale(.94)">Légendaire</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ g.isResults }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+        <div style="background:var(--card);border-radius:32px;padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <div style="font-weight:800;font-size:22px;letter-spacing:-.02em">Résultats de la manche</div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end;height:220px">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><div style="width:46px;height:46px;border-radius:50%;background:var(--tint);display:grid;place-items:center;font-weight:700">SL</div><div style="font-size:13px;font-weight:700">Sacha · 640</div><div style="width:100%;height:96px;border-radius:20px 20px 8px 8px;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:800;font-size:24px;transform-origin:bottom;animation:mxGrow .7s cubic-bezier(.2,.8,.2,1) .15s both">2</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><i class="ph-fill ph-crown" style="font-size:24px;color:var(--acc)"></i><div style="width:46px;height:46px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:700">MD</div><div style="font-size:13px;font-weight:700">Toi · 820</div><div style="width:100%;height:124px;border-radius:20px 20px 8px 8px;background:#0E76C6;color:#fff;display:grid;place-items:center;font-weight:800;font-size:30px;transform-origin:bottom;animation:mxGrow .7s cubic-bezier(.2,.8,.2,1) both">1</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><div style="width:46px;height:46px;border-radius:50%;background:#1A8DE6;color:#fff;display:grid;place-items:center;font-weight:700">MB</div><div style="font-size:13px;font-weight:700">Maya · 510</div><div style="width:100%;height:70px;border-radius:20px 20px 8px 8px;background:var(--tint);display:grid;place-items:center;font-weight:800;font-size:22px;transform-origin:bottom;animation:mxGrow .7s cubic-bezier(.2,.8,.2,1) .3s both">3</div></div>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:32px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+          <div style="font-size:13px;font-weight:700;color:var(--acc);padding:0 4px">Mème gagnant</div>
+          <div style="padding:4px 10px;font-size:clamp(20px,4.6vw,26px);font-weight:800;letter-spacing:-.02em;line-height:1.15;text-align:center;text-wrap:balance">{{ g.myCap }}</div>
+          <div style="aspect-ratio:4/3;border-radius:24px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">{{ g.meme.desc }}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onClick="{{ g.replay }}" style="flex:1 1 160px;height:56px;border:0;border-radius:28px;background:var(--card);color:var(--ink);font:inherit;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 18px rgba(20,90,160,.1);transition:transform .2s" style-active="transform:scale(.96)">Rejouer</button>
+          <button onClick="{{ g.publish }}" style="flex:1 1 160px;height:56px;border:0;border-radius:28px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:15px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.96)">Publier sur le fil</button>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isCamera }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Pellicule" style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <div style="position:relative;border-radius:36px;overflow:hidden;height:min(64vh,640px);background:repeating-linear-gradient(135deg,#101A24 0 12px,#15222F 12px 24px);display:grid;place-items:center;box-shadow:0 20px 50px rgba(11,15,20,.3)">
+        <span style="font:500 12px ui-monospace,Menlo,monospace;color:#9FB6CA">aperçu caméra</span>
+        <div style="position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums"><i class="ph-fill ph-lock-simple" style="font-size:16px"></i><span>{{ cd.line }}</span></div>
+        <div style="position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:6px;height:40px;padding:0 14px;border-radius:20px;background:rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:700"><i class="ph-fill ph-fire" style="font-size:16px;color:#FF8A5C"></i><span>5 sem.</span></div>
+        <div style="position:absolute;inset:0;background:#FFFFFF;opacity:{{ cam.flashO }};transition:opacity {{ cam.flashT }};pointer-events:none"></div>
+        <div style="position:absolute;left:0;right:0;bottom:20px;display:flex;justify-content:center;align-items:center;gap:30px">
+          <div style="position:relative;width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;animation:{{ cam.bump }}"><i class="ph-fill ph-lock-simple" style="font-size:22px"></i><span style="position:absolute;top:-8px;right:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#0E76C6;color:#fff;font-size:12px;font-weight:800;display:grid;place-items:center">{{ cam.total }}</span></div>
+          <button onClick="{{ cam.shoot }}" aria-label="Prendre une photo" style="width:80px;height:80px;border-radius:50%;border:5px solid #fff;background:none;padding:5px;cursor:pointer;transition:transform .15s" style-active="transform:scale(.88)"><span style="display:block;width:100%;height:100%;border-radius:50%;background:#FFFFFF"></span></button>
+          <button aria-label="Changer de caméra" style="width:56px;height:56px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:grid;place-items:center;transition:transform .5s cubic-bezier(.3,1.4,.5,1)" style-active="transform:rotate(180deg)"><i class="ph ph-camera-rotate" style="font-size:24px"></i></button>
+        </div>
+      </div>
+      <div style="background:var(--card);border-radius:32px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+        <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+          <div style="margin-right:auto"><div style="font-weight:800;font-size:22px;letter-spacing:-.02em">{{ cam.totalLine }}</div><div style="font-size:13px;color:var(--mute)">{{ weekLabel }}</div></div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:58px">
+            <sc-for list="{{ cam.days }}" as="d" hint-placeholder-count="7">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%"><div style="width:16px;height:{{ d.h }};border-radius:8px;background:{{ d.bg }};transition:height .5s cubic-bezier(.3,1.5,.5,1)"></div><span style="font-size:12px;font-weight:700;color:{{ d.fg }}">{{ d.l }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:var(--mute);text-wrap:pretty">Tes photos restent cachées, même pour toi, jusqu'à dimanche 20h. Elles rejoignent la pellicule publique de Mandrix.</p>
+      </div>
+      <button onClick="{{ goUnpack }}" style="height:56px;border:0;border-radius:28px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:transform .2s" style-active="transform:scale(.97)"><span>Aller au déballage</span><i class="ph ph-arrow-right" style="font-size:20px"></i></button>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isUnpack }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Déballage" style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <div style="background:var(--card);border-radius:32px;padding:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+        <div style="flex:1 1 220px;min-width:0"><div style="font-weight:800;font-size:22px;letter-spacing:-.02em">{{ weekLabel }}</div><div style="font-size:14px;color:var(--mute)">412 photos prises par 96 personnes · {{ cd.line }}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-if value="{{ un.locked }}" hint-placeholder-val="{{ false }}"><button onClick="{{ un.simulate }}" style="height:52px;padding:0 18px;border:0;border-radius:26px;background:var(--soft);color:var(--ink);font:inherit;font-weight:700;font-size:14px;cursor:pointer">Simuler dimanche 20h</button></sc-if>
+          <button onClick="{{ un.onBtn }}" style="height:52px;padding:0 22px;border:0;border-radius:26px;background:{{ un.btnBg }};color:{{ un.btnFg }};font:inherit;font-weight:700;font-size:15px;cursor:{{ un.cursor }};display:flex;align-items:center;gap:8px;transition:background .4s,color .4s,transform .2s" style-active="transform:scale(.96)"><i class="{{ un.btnIcon }}" style="font-size:18px"></i><span>{{ un.btnLabel }}</span></button>
+        </div>
+      </div>
+      <sc-if value="{{ un.showRecap }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:18px;gap:14px;animation:mxIn .6s cubic-bezier(.2,.8,.2,1) 1s both">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto">Récap du dimanche</div><span style="font-size:12px;font-weight:700;padding:6px 12px;border-radius:14px;background:var(--soft)">Jour le plus actif : samedi</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+          <sc-for list="{{ un.top }}" as="t" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:26px;background:var(--soft)">
+              <div style="width:44px;height:44px;border-radius:50%;background:{{ t.bg }};color:{{ t.fg }};display:grid;place-items:center;font-weight:800;font-size:18px;flex:none">{{ t.rank }}</div>
+              <div style="min-width:0"><div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.desc }}</div><div style="font-size:12px;color:var(--mute)">{{ t.by }} · {{ t.likes }} j'aime</div></div>
+            </div>
+          </sc-for>
+        </div>
+        <button onClick="{{ un.sendTop }}" style="height:52px;border:0;border-radius:26px;background:{{ un.topBg }};color:{{ un.topFg }};font:inherit;font-weight:700;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .4s,color .4s,transform .2s" style-active="transform:scale(.97)"><i class="{{ un.topIcon }}" style="font-size:20px"></i><span>{{ un.topLabel }}</span></button>
+      </div>
+      </sc-if>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+        <sc-for list="{{ un.photos }}" as="ph" hint-placeholder-count="12">
+          <div style="perspective:900px;aspect-ratio:3/4">
+            <div style="position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:{{ ph.tf }};transition:transform .8s cubic-bezier(.2,.8,.2,1) {{ ph.delay }}">
+              <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg);border-radius:24px;background:#0E76C6;color:#fff;display:grid;place-items:center;box-shadow:0 10px 26px rgba(14,118,198,.25)"><i class="ph-fill ph-lock-simple" style="font-size:28px"></i></div>
+              <div style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:24px;overflow:hidden;background:var(--ph);display:flex;flex-direction:column;justify-content:space-between;padding:10px;box-shadow:0 10px 26px rgba(20,90,160,.12)">
+                <span style="font:500 12px ui-monospace,Menlo,monospace;color:var(--phink);padding:4px">{{ ph.desc }}</span>
+                <div style="display:flex;align-items:center;gap:6px"><span style="flex:1;min-width:0;height:36px;display:flex;align-items:center;padding:0 12px;border-radius:18px;background:var(--card);font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ph.by }} · {{ ph.day }}</span><button onClick="{{ ph.onPool }}" aria-label="Envoyer dans le pool" style="width:44px;height:44px;flex:none;border:0;border-radius:50%;background:{{ ph.poolBg }};color:{{ ph.poolFg }};cursor:pointer;display:grid;place-items:center;transition:background .3s,transform .2s" style-active="transform:scale(.88)"><i class="{{ ph.poolIcon }}" style="font-size:20px"></i></button></div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Profil" style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <div style="background:var(--card);border-radius:32px;padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 10px 30px rgba(20,90,160,.1)">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div style="width:84px;height:84px;border-radius:50%;background:var(--ink);color:var(--inv);display:grid;place-items:center;font-weight:800;font-size:28px;flex:none;box-shadow:0 0 0 4px var(--card),0 0 0 7px #2A9DF4">MD</div>
+          <div style="flex:1 1 160px;min-width:0"><div style="font-weight:800;font-size:22px;letter-spacing:-.02em">Mathis Durand</div><div style="font-size:14px;color:var(--mute)">@mathis.d · Aix-en-Provence</div></div>
+          <button style="height:46px;padding:0 20px;border:0;border-radius:23px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.95)">Modifier</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <div style="background:var(--soft);border-radius:22px;padding:12px 14px"><div style="font-weight:800;font-size:22px">48</div><div style="font-size:13px;color:var(--mute)">Posts</div></div>
+          <div style="background:var(--soft);border-radius:22px;padding:12px 14px"><div style="font-weight:800;font-size:22px">312</div><div style="font-size:13px;color:var(--mute)">Amis</div></div>
+          <div style="background:var(--soft);border-radius:22px;padding:12px 14px"><div style="font-weight:800;font-size:22px">17</div><div style="font-size:13px;color:var(--mute)">Mèmes gagnés</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
+        <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:18px;gap:14px">
+          <div style="display:flex;align-items:center;gap:12px"><span style="width:48px;height:48px;border-radius:50%;background:#0E76C6;color:#fff;display:grid;place-items:center;flex:none"><i class="ph-fill ph-fire" style="font-size:22px"></i></span><div><div style="font-weight:800;font-size:18px">Série de 5 semaines</div><div style="font-size:13px;color:var(--mute)">Au moins une photo par semaine dans la Pellicule</div></div></div>
+          <div style="display:flex;gap:6px"><sc-for list="{{ streak }}" as="wk" hint-placeholder-count="8"><div style="flex:1;height:10px;border-radius:5px;background:{{ wk.bg }}"></div></sc-for></div>
+        </div>
+        <button onClick="{{ toggleDark }}" style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;flex-direction:row;align-items:center;gap:12px;padding:18px;border:0;color:var(--ink);font:inherit;text-align:left;cursor:pointer">
+          <span style="width:48px;height:48px;border-radius:50%;background:var(--soft);display:grid;place-items:center;flex:none"><i class="{{ darkIcon }}" style="font-size:22px"></i></span>
+          <span style="flex:1;font-weight:800;font-size:18px">Mode sombre</span>
+          <span style="position:relative;flex:none;width:52px;height:30px;border-radius:15px;background:{{ darkSwBg }};transition:background .3s"><span style="position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;transform:{{ darkSwTf }};transition:transform .35s cubic-bezier(.3,1.4,.5,1)"></span></span>
+        </button>
+      </div>
+      <div style="position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:4px;border-radius:28px;background:var(--glass)">
+        <div style="position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 3);border-radius:24px;background:var(--ink);transform:{{ pf.indTf }};transition:transform .45s cubic-bezier(.3,1.2,.4,1)"></div>
+        <sc-for list="{{ pf.tabs }}" as="t" hint-placeholder-count="3">
+          <button onClick="{{ t.pick }}" style="position:relative;height:46px;border:0;border-radius:24px;background:none;color:{{ t.fg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:color .3s">{{ t.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+        <sc-for list="{{ pf.grid }}" as="c" hint-placeholder-count="9">
+          <div style="aspect-ratio:{{ pf.ratio }};border-radius:20px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink);transition:aspect-ratio .4s">{{ c.desc }}</div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+  
+    <sc-if value="{{ isMemes }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Galerie des mèmes" style="display:flex;flex-direction:column;gap:14px;animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:20px;gap:16px">
+        <div style="display:flex;align-items:center;gap:12px"><button onClick="{{ goGame }}" aria-label="Retour" style="width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:none"><i class="ph ph-arrow-left" style="font-size:20px"></i></button><div style="font-weight:800;font-size:22px;letter-spacing:-.02em">Podium des plus aimés</div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end;height:260px">
+          <sc-for list="{{ mg.podium }}" as="p" hint-placeholder-count="3">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;min-width:0">
+              <div style="width:46px;height:46px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;flex:none">{{ p.init }}</div>
+              <div style="font-size:12px;font-weight:600;text-align:center;line-height:1.3;max-height:2.6em;overflow:hidden;color:var(--mute)">{{ p.caption }}</div>
+              <div style="font-size:13px;font-weight:800;display:flex;align-items:center;gap:4px"><i class="ph-fill ph-heart" style="color:#E5484D"></i><span>{{ p.likes }}</span></div>
+              <div style="width:100%;height:{{ p.h }};flex:none;border-radius:20px 20px 8px 8px;background:{{ p.bg }};color:{{ p.fg }};display:grid;place-items:center;font-weight:800;font-size:26px;transform-origin:bottom;animation:mxGrow .7s cubic-bezier(.2,.8,.2,1) both">{{ p.rank }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+        <sc-for list="{{ mg.items }}" as="m" hint-placeholder-count="6">
+          <article style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:12px;gap:10px">
+            <div style="min-height:44px;display:grid;place-items:center;font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.2;text-align:center;padding:2px 6px;text-wrap:balance">{{ m.caption }}</div>
+            <div style="aspect-ratio:4/3;border-radius:20px;background:var(--ph);display:grid;place-items:center;font:500 12px ui-monospace,Menlo,monospace;color:var(--phink)">{{ m.desc }}</div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;color:var(--mute);padding-left:4px">{{ m.by }}</span><button onClick="{{ m.a.onLike }}" style="margin-left:auto;display:flex;align-items:center;gap:6px;height:44px;padding:0 14px;border:0;border-radius:22px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.92)"><i class="{{ m.a.likeIcon }}" style="font-size:20px;color:{{ m.a.likeColor }};animation:{{ m.a.likeAnim }}"></i><span>{{ m.a.likes }}</span></button></div>
+          </article>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isMessages }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Messages" style="animation:mxIn .5s cubic-bezier(.2,.8,.2,1) both">
+      <sc-if value="{{ dm.isList }}" hint-placeholder-val="{{ true }}">
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:8px;gap:2px">
+        <sc-for list="{{ dm.convs }}" as="c" hint-placeholder-count="5">
+          <button onClick="{{ c.open }}" style="display:flex;align-items:center;gap:12px;padding:10px;border:0;border-radius:24px;background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:var(--soft)">
+            <span style="width:48px;height:48px;border-radius:50%;background:{{ c.bg }};color:{{ c.fg }};display:grid;place-items:center;font-weight:700;font-size:15px;flex:none">{{ c.init }}</span>
+            <span style="flex:1;min-width:0"><span style="display:block;font-weight:700;font-size:15px">{{ c.name }}</span><span style="display:block;font-size:14px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.last }}</span></span>
+            <span style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none"><span style="font-size:12px;color:var(--mute)">{{ c.time }}</span><span style="width:10px;height:10px;border-radius:50%;background:#0E76C6;opacity:{{ c.dotO }}"></span></span>
+          </button>
+        </sc-for>
+      </div>
+      </sc-if>
+      <sc-if value="{{ dm.isChat }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--card);border-radius:32px;box-shadow:0 10px 30px rgba(20,90,160,.1);display:flex;flex-direction:column;padding:12px;gap:12px;min-height:62vh;animation:mxIn .4s cubic-bezier(.2,.8,.2,1) both">
+        <div style="display:flex;align-items:center;gap:10px"><button onClick="{{ dm.back }}" aria-label="Retour" style="width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:none"><i class="ph ph-arrow-left" style="font-size:20px"></i></button><span style="width:40px;height:40px;border-radius:50%;background:var(--tint);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none">{{ dm.init }}</span><span style="font-weight:800;font-size:17px">{{ dm.name }}</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:6px">
+          <sc-for list="{{ dm.msgs }}" as="m" hint-placeholder-count="3">
+            <div style="align-self:{{ m.align }};max-width:80%;padding:10px 14px;border-radius:22px;background:{{ m.bg }};color:{{ m.fg }};font-size:15px;line-height:1.4;animation:mxIn .35s cubic-bezier(.2,.8,.2,1) both">
+              <span>{{ m.text }}</span>
+              <sc-if value="{{ m.invite }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goGame }}" style="display:block;margin-top:8px;height:44px;padding:0 16px;border:0;border-radius:22px;background:#0E76C6;color:#fff;font:inherit;font-weight:700;font-size:14px;cursor:pointer">Rejoindre le salon</button></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:8px"><input value="{{ dm.draft }}" onChange="{{ dm.onDraft }}" onKeyDown="{{ dm.onKey }}" placeholder="Écris un message…" style="flex:1;min-width:0;height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6"><button onClick="{{ dm.send }}" aria-label="Envoyer" style="flex:none;width:48px;height:48px;border:0;border-radius:50%;background:var(--ink);color:var(--inv);cursor:pointer;display:grid;place-items:center;transition:transform .2s" style-active="transform:scale(.9)"><i class="ph-fill ph-paper-plane-right" style="font-size:20px"></i></button></div>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ false }}">
+  <aside style="position:sticky;top:24px;align-self:flex-start;flex:none;width:300px;display:flex;flex-direction:column;gap:14px;padding-top:70px">
+    <div style="background:#0E76C6;color:#fff;border-radius:32px;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 14px 34px rgba(14,118,198,.3)">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px"><i class="ph-fill ph-lock-simple" style="font-size:20px"></i><span>La Pellicule</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;font-variant-numeric:tabular-nums">
+        <div style="background:var(--card);color:var(--ink);border-radius:18px;padding:10px 0;text-align:center"><div style="font-weight:800;font-size:22px">{{ cd.d }}</div><div style="font-size:12px;color:var(--mute)">jours</div></div>
+        <div style="background:var(--card);color:var(--ink);border-radius:18px;padding:10px 0;text-align:center"><div style="font-weight:800;font-size:22px">{{ cd.h }}</div><div style="font-size:12px;color:var(--mute)">h</div></div>
+        <div style="background:var(--card);color:var(--ink);border-radius:18px;padding:10px 0;text-align:center"><div style="font-weight:800;font-size:22px">{{ cd.m }}</div><div style="font-size:12px;color:var(--mute)">min</div></div>
+        <div style="background:var(--card);color:var(--ink);border-radius:18px;padding:10px 0;text-align:center"><div style="font-weight:800;font-size:22px">{{ cd.s }}</div><div style="font-size:12px;color:var(--mute)">s</div></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onClick="{{ goCamera }}" style="flex:1;height:46px;border:0;border-radius:23px;background:var(--ink);color:var(--inv);font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.95)">Prendre une photo</button>
+        <button onClick="{{ goUnpack }}" aria-label="Déballage" style="width:46px;height:46px;border:0;border-radius:50%;background:var(--card);color:var(--ink);cursor:pointer;display:grid;place-items:center;transition:transform .2s" style-active="transform:scale(.9)"><i class="ph ph-package" style="font-size:20px"></i></button>
+      </div>
+    </div>
+    <div style="background:var(--hero);color:#FFFFFF;border-radius:32px;padding:18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 14px 34px rgba(11,15,20,.25)">
+      <div style="font-weight:800;font-size:26px;letter-spacing:-.05em;line-height:1">Make It Friends</div>
+      <div style="font-size:14px;color:#C6D3DF">{{ g.poolCount }} photos et vidéos dans le pool public.</div>
+      <button onClick="{{ goGame }}" style="height:46px;border:0;border-radius:23px;background:#FFFFFF;color:#0b0f14;font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.95)">Jouer</button>
+      <button onClick="{{ goMemes }}" style="height:46px;border:0;border-radius:23px;background:rgba(255,255,255,.14);color:#fff;font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.95)">Galerie des mèmes</button>
+    </div>
+  </aside>
+  </sc-if>
+</div>
+
+<sc-if value="{{ isPhone }}" hint-placeholder-val="{{ false }}">
+<nav style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:20;display:flex;gap:8px;padding:8px;border-radius:40px;background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 14px 34px rgba(20,90,160,.22)">
+  <sc-for list="{{ nav }}" as="n" hint-placeholder-count="5">
+    <button onClick="{{ n.go }}" aria-label="{{ n.long }}" style="display:flex;align-items:center;justify-content:center;gap:{{ n.gap }};height:48px;min-width:48px;padding:0 14px;border:0;border-radius:24px;background:{{ n.barBg }};color:{{ n.barFg }};font:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:background .3s,gap .35s,transform .2s" style-active="transform:scale(.92)">
+      <i class="{{ n.icon }}" style="font-size:20px"></i>
+      <span style="max-width:{{ n.lw }};opacity:{{ n.lo }};overflow:hidden;white-space:nowrap;transition:max-width .4s cubic-bezier(.3,1,.4,1),opacity .3s">{{ n.label }}</span>
+    </button>
+  </sc-for>
+</nav>
+</sc-if>
+</sc-if>
+
+
+<sc-if value="{{ composer.open }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center">
+<div onClick="{{ composer.close }}" style="position:absolute;inset:0;background:rgba(8,12,17,.5);animation:mxFade .3s both"></div>
+<div style="position:relative;width:100%;max-width:560px;max-height:86vh;overflow:auto;display:flex;flex-direction:column;gap:12px;background:var(--card);color:var(--ink);border-radius:32px 32px 0 0;padding:10px 16px 18px;box-shadow:0 -10px 40px rgba(11,15,20,.2);animation:mxSheet .45s cubic-bezier(.2,.9,.2,1) both">
+<div style="align-self:center;width:44px;height:5px;border-radius:3px;background:var(--line)"></div>
+<div style="display:flex;align-items:center;gap:10px"><div style="font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto">Nouveau post</div><button onClick="{{ composer.close }}" aria-label="Fermer" style="width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-x" style="font-size:20px"></i></button></div>
+
+<div style="display:flex;gap:4px;padding:4px;border-radius:26px;background:var(--soft)"><sc-for list="{{ composer.kinds }}" as="k" hint-placeholder-count="3"><button onClick="{{ k.pick }}" style="flex:1;height:44px;border:0;border-radius:22px;background:{{ k.bg }};color:{{ k.fg }};font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .3s,color .3s">{{ k.label }}</button></sc-for></div>
+<sc-if value="{{ composer.isMedia }}" hint-placeholder-val="{{ true }}">
+<button onClick="{{ composer.pick }}" style="aspect-ratio:16/9;border:{{ composer.dzBorder }};border-radius:24px;background:{{ composer.dzBg }};color:{{ composer.dzFg }};font:500 12px ui-monospace,Menlo,monospace;cursor:pointer;display:grid;place-items:center;transition:background .3s">{{ composer.dzLabel }}</button>
+<input value="{{ composer.text }}" onChange="{{ composer.onText }}" maxLength="140" placeholder="Ajoute une légende…" style="height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6">
+<button onClick="{{ composer.togglePool }}" style="display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 14px;border:0;border-radius:28px;background:var(--soft);color:var(--ink);font:inherit;font-weight:600;font-size:14px;text-align:left;cursor:pointer"><i class="ph ph-sticker" style="font-size:22px"></i><span style="flex:1">Envoyer aussi dans le pool Make It Friends</span><span style="position:relative;flex:none;width:52px;height:30px;border-radius:15px;background:{{ composer.swBg }};transition:background .3s"><span style="position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;transform:{{ composer.swTf }};transition:transform .35s cubic-bezier(.3,1.4,.5,1)"></span></span></button>
+</sc-if>
+<sc-if value="{{ composer.isPoll }}" hint-placeholder-val="{{ false }}">
+<input value="{{ composer.q }}" onChange="{{ composer.onQ }}" maxLength="90" placeholder="Ta question" style="height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s;font-weight:700" style-focus="box-shadow:inset 0 0 0 2px #0E76C6">
+<sc-for list="{{ composer.opts }}" as="o" hint-placeholder-count="4"><input value="{{ o.value }}" onChange="{{ o.onChange }}" maxLength="30" placeholder="{{ o.ph }}" style="height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6"></sc-for>
+</sc-if>
+<button onClick="{{ composer.publish }}" style="flex:none;height:54px;border:0;border-radius:27px;background:{{ composer.pubBg }};color:{{ composer.pubFg }};font:inherit;font-weight:700;font-size:16px;cursor:{{ composer.pubCursor }};transition:background .3s,color .3s,transform .2s" style-active="transform:scale(.97)">Publier</button>
+</div></div>
+</sc-if>
+<sc-if value="{{ com.open }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center">
+<div onClick="{{ com.close }}" style="position:absolute;inset:0;background:rgba(8,12,17,.5);animation:mxFade .3s both"></div>
+<div style="position:relative;width:100%;max-width:560px;max-height:86vh;overflow:auto;display:flex;flex-direction:column;gap:12px;background:var(--card);color:var(--ink);border-radius:32px 32px 0 0;padding:10px 16px 18px;box-shadow:0 -10px 40px rgba(11,15,20,.2);animation:mxSheet .45s cubic-bezier(.2,.9,.2,1) both">
+<div style="align-self:center;width:44px;height:5px;border-radius:3px;background:var(--line)"></div>
+<div style="display:flex;align-items:center;gap:10px"><div style="font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto">Commentaires · {{ com.count }}</div><button onClick="{{ com.close }}" aria-label="Fermer" style="width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-x" style="font-size:20px"></i></button></div>
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ com.list }}" as="c" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:10px;animation:mxIn .35s cubic-bezier(.2,.8,.2,1) both">
+<span style="width:38px;height:38px;border-radius:50%;background:{{ c.bg }};color:{{ c.fg }};display:grid;place-items:center;font-weight:700;font-size:13px;flex:none">{{ c.init }}</span>
+<div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:baseline"><span style="font-weight:700;font-size:14px">{{ c.name }}</span><span style="font-size:12px;color:var(--mute)">{{ c.time }}</span></div><div style="font-size:15px;line-height:1.4">{{ c.text }}</div></div>
+<button onClick="{{ c.like }}" aria-label="Aimer le commentaire" style="width:44px;height:44px;border:0;border-radius:50%;background:none;cursor:pointer;display:grid;place-items:center;flex:none"><i class="{{ c.icon }}" style="font-size:20px;color:{{ c.color }};animation:{{ c.anim }}"></i></button>
+</div></sc-for>
+</div>
+<div style="display:flex;gap:8px;flex:none"><input value="{{ com.draft }}" onChange="{{ com.onDraft }}" onKeyDown="{{ com.onKey }}" maxLength="200" placeholder="Ajoute un commentaire…" style="flex:1;min-width:0;height:48px;border:0;border-radius:24px;background:var(--soft);padding:0 18px;font:inherit;font-size:16px;color:var(--ink);outline:none;transition:box-shadow .2s" style-focus="box-shadow:inset 0 0 0 2px #0E76C6"><button onClick="{{ com.send }}" aria-label="Envoyer" style="flex:none;width:48px;height:48px;border:0;border-radius:50%;background:var(--ink);color:var(--inv);cursor:pointer;display:grid;place-items:center;transition:transform .2s" style-active="transform:scale(.9)"><i class="ph-fill ph-paper-plane-right" style="font-size:20px"></i></button></div>
+</div></div>
+</sc-if>
+<sc-if value="{{ pool.open }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center">
+<div onClick="{{ pool.close }}" style="position:absolute;inset:0;background:rgba(8,12,17,.5);animation:mxFade .3s both"></div>
+<div style="position:relative;width:100%;max-width:560px;max-height:86vh;overflow:auto;display:flex;flex-direction:column;gap:12px;background:var(--card);color:var(--ink);border-radius:32px 32px 0 0;padding:10px 16px 18px;box-shadow:0 -10px 40px rgba(11,15,20,.2);animation:mxSheet .45s cubic-bezier(.2,.9,.2,1) both">
+<div style="align-self:center;width:44px;height:5px;border-radius:3px;background:var(--line)"></div>
+<div style="display:flex;align-items:center;gap:10px"><div style="font-weight:800;font-size:20px;letter-spacing:-.02em;margin-right:auto">Envoyer dans le pool</div><button onClick="{{ pool.close }}" aria-label="Fermer" style="width:44px;height:44px;border:0;border-radius:50%;background:var(--soft);color:var(--ink);cursor:pointer;display:grid;place-items:center"><i class="ph ph-x" style="font-size:20px"></i></button></div>
+
+<p style="margin:0;font-size:15px;line-height:1.45;color:var(--mute)">Ce contenu pourra être tiré au sort comme image à légender dans Make It Friends.</p>
+<sc-for list="{{ pool.opts }}" as="o" hint-placeholder-count="2"><button onClick="{{ o.pick }}" style="display:flex;align-items:center;gap:12px;padding:12px;border:0;border-radius:26px;background:var(--soft);box-shadow:inset 0 0 0 2px {{ o.ring }};color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:box-shadow .3s">
+<span style="width:46px;height:46px;border-radius:50%;background:var(--card);display:grid;place-items:center;flex:none"><i class="{{ o.icon }}" style="font-size:22px"></i></span>
+<span style="flex:1;min-width:0"><span style="display:block;font-weight:700;font-size:15px">{{ o.label }}</span><span style="display:block;font-size:13px;color:var(--mute)">{{ o.sub }}</span></span>
+</button></sc-for>
+<div style="display:flex;gap:10px;font-size:13px;line-height:1.45;color:var(--mute);padding:0 4px"><i class="ph ph-shield-check" style="font-size:18px;flex:none"></i><span>Tu peux retirer ton contenu du pool à tout moment. Chaque image peut être signalée par les joueurs et sera alors retirée en attendant vérification.</span></div>
+<button onClick="{{ pool.send }}" style="flex:none;height:54px;border:0;border-radius:27px;background:#0E76C6;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer;transition:transform .2s" style-active="transform:scale(.97)">Envoyer</button>
+</div></div>
+</sc-if>
+<sc-if value="{{ sv.open }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:45;display:grid;place-items:center;padding:12px;background:rgba(8,12,17,.92);animation:mxFade .3s both">
+<div style="position:relative;width:100%;max-width:420px;height:min(86vh,760px);border-radius:36px;overflow:hidden;background:repeating-linear-gradient(135deg,#101A24 0 12px,#15222F 12px 24px);display:grid;place-items:center;animation:mxDrop .4s cubic-bezier(.2,.9,.2,1) both">
+<span style="font:500 12px ui-monospace,Menlo,monospace;color:#9FB6CA">{{ sv.desc }}</span>
+<div style="position:absolute;top:14px;left:18px;right:18px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);overflow:hidden"><div style="height:100%;background:#fff;border-radius:2px;animation:{{ sv.prog }}"></div></div>
+<button onClick="{{ sv.prev }}" aria-label="Story précédente" style="position:absolute;left:0;top:90px;bottom:90px;width:35%;border:0;background:none;cursor:pointer"></button>
+<button onClick="{{ sv.next }}" aria-label="Story suivante" style="position:absolute;right:0;top:90px;bottom:90px;width:65%;border:0;background:none;cursor:pointer"></button>
+<div style="position:absolute;top:30px;left:18px;right:14px;display:flex;align-items:center;gap:10px;color:#fff"><span style="width:40px;height:40px;border-radius:50%;background:#FFFFFF;color:#0b0f14;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none">{{ sv.init }}</span><span style="font-weight:700;font-size:15px">{{ sv.name }}</span><span style="font-size:13px;color:#C6D3DF">{{ sv.time }}</span><button onClick="{{ sv.close }}" aria-label="Fermer" style="margin-left:auto;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:grid;place-items:center"><i class="ph ph-x" style="font-size:20px"></i></button></div>
+<div style="position:absolute;left:14px;right:14px;bottom:16px;display:flex;gap:8px"><input placeholder="{{ sv.replyPh }}" style="flex:1;min-width:0;height:48px;border:0;border-radius:24px;background:rgba(255,255,255,.16);color:#fff;padding:0 18px;font:inherit;font-size:16px;outline:none"><button onClick="{{ sv.reply }}" aria-label="Envoyer" style="flex:none;width:48px;height:48px;border:0;border-radius:50%;background:#FFFFFF;color:#0b0f14;cursor:pointer;display:grid;place-items:center"><i class="ph-fill ph-paper-plane-right" style="font-size:20px"></i></button></div>
+</div></div>
+</sc-if>
+
+<div role="status" style="position:fixed;left:50%;bottom:{{ toastB }};z-index:30;transform:translate(-50%,{{ toastY }});opacity:{{ toastO }};pointer-events:none;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);height:48px;padding:0 18px;border-radius:24px;background:var(--hero);color:#FFFFFF;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 14px 34px rgba(11,15,20,.3);transition:transform .4s cubic-bezier(.3,1.4,.5,1),opacity .3s"><i class="ph-fill ph-check-circle" style="font-size:20px;color:#6FC0FF"></i><span>{{ toast }}</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;landing&quot;,&quot;feed&quot;,&quot;reels&quot;,&quot;game&quot;,&quot;memes&quot;,&quot;camera&quot;,&quot;unpack&quot;,&quot;profile&quot;,&quot;messages&quot;],&quot;default&quot;:&quot;landing&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Démo&quot;},&quot;sundayMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Démo&quot;},&quot;darkMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Démo&quot;},&quot;roundSeconds&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:45,&quot;min&quot;:10,&quot;max&quot;:120,&quot;step&quot;:5,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Make It Friends&quot;}}">
+class Component extends DCLogic {
+  state = { w: 1200, now: Date.now(), screen: 'landing', loading: false, dark: null,
+    liked: {}, reposted: {}, pooled: {}, votes: {}, slider: 50, sliderDone: false, reel: 0,
+    stage: 'lobby', rounds: 3, src: 'public', caption: '', memeIdx: 0, capStart: 0, voteIdx: 0,
+    shots: 1, flash: false, bump: 0, simSunday: false, revealed: false, topSent: false, tab: 0,
+    toast: '', toastOn: false, notifOpen: false, notifSeen: false,
+    dmSeen: false, chat: -1, draft: '', sent: {}, readC: {},
+    comFor: null, comDraft: '', comAdded: {}, comLiked: {},
+    poolFor: null, poolScope: 'public', story: -1, seen: {},
+    compOpen: false, compKind: 0, compPicked: false, compText: '', compPool: false, compQ: '', compOpts: ['', '', '', ''],
+    myPosts: [], myMemes: [] };
+  SCREENS = ['landing', 'feed', 'reels', 'game', 'memes', 'camera', 'unpack', 'profile', 'messages'];
+  comBase = {};
+  componentDidMount() {
+    let scr = this.props.startScreen || 'landing', dark = null;
+    try {
+      scr = localStorage.getItem('mandrix.screen') || scr;
+      const d = localStorage.getItem('mandrix.dark');
+      if (d !== null) dark = d === '1';
+    } catch (e) {}
+    if (this.SCREENS.indexOf(scr) < 0) scr = 'landing';
+    this.setState({ w: window.innerWidth, screen: scr, now: Date.now(), dark, loading: scr !== 'landing' });
+    this.loadT = setTimeout(() => this.setState({ loading: false }), 1100);
+    this.onResize = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.timer = setInterval(() => this.tick(), 1000);
+    this.applyTheme();
+  }
+  componentDidUpdate(pp) {
+    if (pp.startScreen !== this.props.startScreen && this.props.startScreen) this.go(this.props.startScreen);
+    if (pp.darkMode !== this.props.darkMode) this.setDark(!!this.props.darkMode);
+    this.applyTheme();
+  }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.onResize);
+    clearInterval(this.timer); clearTimeout(this.toastT); clearTimeout(this.loadT); clearTimeout(this.storyT);
+  }
+  isDark() { return this.state.dark !== null ? this.state.dark : !!this.props.darkMode; }
+  applyTheme() { document.documentElement.setAttribute('data-theme', this.isDark() ? 'dark' : 'light'); }
+  setDark(v) { this.setState({ dark: v }); try { localStorage.setItem('mandrix.dark', v ? '1' : '0'); } catch (e) {} }
+  secs() { return Math.max(10, +this.props.roundSeconds || 45); }
+  left(now) { return Math.max(0, this.secs() - Math.floor((now - this.state.capStart) / 1000)); }
+  tick() {
+    const now = Date.now(), s = this.state;
+    if (s.screen === 'game' && s.stage === 'caption' && this.left(now) <= 0) this.setState({ now, stage: 'vote', voteIdx: 0 });
+    else this.setState({ now });
+  }
+  go(screen) {
+    const extra = screen === 'messages' ? { dmSeen: true } : {};
+    this.setState({ screen, loading: screen !== 'landing', notifOpen: false, chat: -1, ...extra });
+    clearTimeout(this.loadT);
+    this.loadT = setTimeout(() => this.setState({ loading: false }), 850);
+    try { localStorage.setItem('mandrix.screen', screen); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+  toast(msg) {
+    this.setState({ toast: msg, toastOn: true });
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(() => this.setState({ toastOn: false }), 2400);
+  }
+  toggle(key, id) { this.setState(s => ({ [key]: { ...s[key], [id]: !s[key][id] } })); }
+  setPool(id, v) { this.setState(s => ({ pooled: { ...s.pooled, [id]: v } })); }
+  togglePool(id) {
+    const on = !this.state.pooled[id];
+    this.setPool(id, on ? 'public' : false);
+    this.toast(on ? 'Envoyé dans le pool public' : 'Retiré du pool');
+  }
+  openStory(i) {
+    clearTimeout(this.storyT);
+    if (i < 0 || i > 5) { this.setState({ story: -1 }); return; }
+    this.setState(s => ({ story: i, seen: { ...s.seen, [i]: true } }));
+    this.storyT = setTimeout(() => this.openStory(this.state.story + 1), 4500);
+  }
+  fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace('.', ',') + ' k' : String(n); }
+  act(id, likes, reps, coms) {
+    const s = this.state, liked = !!s.liked[id], rep = !!s.reposted[id], pooled = !!s.pooled[id];
+    this.comBase[id] = coms || 0;
+    return {
+      likes: this.fmt(likes + (liked ? 1 : 0)), reposts: this.fmt(reps + (rep ? 1 : 0)),
+      coms: this.fmt((coms || 0) + (s.comAdded[id] || []).length),
+      likeIcon: liked ? 'ph-fill ph-heart' : 'ph ph-heart',
+      likeColor: liked ? '#E5484D' : 'var(--ink)', likeColorDark: liked ? '#FF6B70' : '#fff',
+      likeAnim: liked ? 'mxPop .45s cubic-bezier(.3,1.6,.5,1)' : 'none',
+      repColor: rep ? 'var(--acc)' : 'var(--ink)', repColorDark: rep ? '#6FC0FF' : '#fff',
+      poolBg: pooled ? '#0E76C6' : 'var(--ink)', poolFg: pooled ? '#fff' : 'var(--inv)',
+      poolBgDark: pooled ? '#0E76C6' : '#fff', poolFgDark: pooled ? '#fff' : '#0B0F14',
+      poolLabel: pooled ? 'Dans le pool' : 'Pool', poolIcon: pooled ? 'ph-fill ph-check-circle' : 'ph ph-sticker',
+      onLike: () => this.toggle('liked', id), onRepost: () => this.toggle('reposted', id),
+      onCom: () => this.setState({ comFor: id, comDraft: '' }),
+      onPool: () => { if (pooled) { this.setPool(id, false); this.toast('Retiré du pool'); } else this.setState({ poolFor: id, poolScope: 'public' }); }
+    };
+  }
+  poll(id, labels, base) {
+    const v = this.state.votes[id], voted = v !== undefined;
+    const counts = base.map((b, i) => b + (v === i ? 1 : 0)), tot = counts.reduce((a, b) => a + b, 0);
+    const opts = labels.map((label, i) => {
+      const pct = Math.round(counts[i] / (tot || 1) * 100);
+      return { label, pct: pct + ' %', op: voted ? 1 : 0, w: voted ? pct + '%' : '0%', ring: v === i ? '#0E76C6' : 'transparent', dim: voted && v !== i ? 0.55 : 1, pick: () => this.setState(s => ({ votes: { ...s.votes, [id]: i } })) };
+    });
+    return { op: voted ? 1 : 0, total: this.fmt(tot) + (tot > 1 ? ' votes' : ' vote'), opts, o0: opts[0], o1: opts[1] };
+  }
+  countdown(ready) {
+    const p = n => String(n).padStart(2, '0');
+    if (ready) return { d: '0', h: '00', m: '00', s: '00', line: 'Le déballage est ouvert' };
+    const d = new Date(this.state.now), t = new Date(d);
+    t.setHours(20, 0, 0, 0);
+    let add = (7 - d.getDay()) % 7;
+    if (add === 0 && d >= t) add = 7;
+    t.setDate(t.getDate() + add);
+    let r = Math.max(0, Math.floor((t - d) / 1000));
+    const dd = Math.floor(r / 86400); r -= dd * 86400;
+    const hh = Math.floor(r / 3600); r -= hh * 3600;
+    const mm = Math.floor(r / 60), ss = r - mm * 60;
+    return { d: String(dd), h: p(hh), m: p(mm), s: p(ss), line: 'Déballage dans ' + dd + ' j ' + p(hh) + ' h ' + p(mm) + ' min' };
+  }
+  reelStep(d) { this.setState(s => ({ reel: Math.max(0, Math.min(2, s.reel + d)) })); }
+  publishPost() {
+    const s = this.state, kind = s.compKind, id = 'my' + Date.now();
+    const labels = s.compOpts.map(o => o.trim()).filter(Boolean);
+    const valid = kind < 2 ? s.compPicked : (s.compQ.trim() && labels.length >= 2);
+    if (!valid) return;
+    const post = kind < 2 ? { id, type: 'media', video: kind === 1, text: s.compText.trim() } : { id, type: 'poll', text: s.compQ.trim(), labels };
+    this.setState(st => ({ myPosts: [post].concat(st.myPosts), compOpen: false, compPicked: false, compText: '', compQ: '', compOpts: ['', '', '', ''], compPool: false,
+      pooled: kind < 2 && s.compPool ? { ...st.pooled, [id]: 'public' } : st.pooled }));
+    if (s.screen !== 'feed') this.go('feed'); else window.scrollTo(0, 0);
+    this.toast('Post publié');
+  }
+  renderVals() {
+    const s = this.state, w = s.w, scr = s.screen, dark = this.isDark();
+    const isPhone = w < 720, isDesktop = w >= 1120, on = k => scr === k && !s.loading;
+    const ready = !!this.props.sundayMode || s.simSunday;
+    const AV = [['var(--tint)', 'var(--ink)'], ['var(--ink)', 'var(--inv)'], ['#1A8DE6', '#fff']];
+    const DARKPH = 'repeating-linear-gradient(135deg,#101A24 0 12px,#15222F 12px 24px)';
+    const navDefs = [
+      { id: 'feed', icon: 'ph-house', label: 'Fil', long: 'Pour toi' },
+      { id: 'reels', icon: 'ph-play', label: 'Reels', long: 'Reels' },
+      { id: 'camera', icon: 'ph-camera', label: 'Pellicule', long: 'La Pellicule' },
+      { id: 'game', icon: 'ph-game-controller', label: 'Jeu', long: 'Make It Friends' },
+      { id: 'profile', icon: 'ph-user', label: 'Profil', long: 'Profil' }
+    ];
+    const nav = navDefs.map(n => {
+      const active = scr === n.id || (n.id === 'camera' && scr === 'unpack') || (n.id === 'game' && scr === 'memes');
+      const blue = n.id === 'camera' && !active;
+      return { label: n.label, long: n.long, icon: (active ? 'ph-fill ' : 'ph ') + n.icon, go: () => this.go(n.id),
+        sideBg: active ? 'var(--ink)' : 'var(--glass)', sideFg: active ? 'var(--inv)' : 'var(--ink)',
+        barBg: blue ? '#1A8DE6' : 'var(--ink)', barFg: blue ? '#fff' : 'var(--inv)', gap: active ? '6px' : '0px', lw: active ? '90px' : '0px', lo: active ? 1 : 0 };
+    });
+    const titles = { feed: 'Pour toi', reels: 'Reels', game: 'Make It Friends', memes: 'Galerie des mèmes', camera: 'La Pellicule', unpack: 'Déballage', profile: 'Profil', messages: 'Messages' };
+
+    const STORIES = [['LM', 'Léa', 'story · terrasse au soleil', '12 min'], ['NR', 'Noah', 'story · genou écorché', '1 h'], ['MB', 'Maya', 'story · crêpes, deuxième essai', '2 h'], ['JP', 'Jules', 'story · salle de sport vide', '3 h'], ['IB', 'Inès', 'story · concert', '5 h'], ['TG', 'Tom', 'story · révisions', '7 h']];
+    const stories = STORIES.map((st, i) => ({ init: st[0], name: st[1], ring: s.seen[i] ? 'var(--line)' : '#1A8DE6', open: () => this.openStory(i) }));
+    const cur = STORIES[s.story] || STORIES[0];
+    const sv = { open: s.story >= 0, init: cur[0], name: cur[1], desc: cur[2], time: cur[3], replyPh: 'Répondre à ' + cur[1] + '…',
+      prog: (s.story % 2 ? 'mxProgB' : 'mxProg') + ' 4.5s linear both',
+      prev: () => this.openStory(Math.max(0, s.story - 1)), next: () => this.openStory(s.story + 1), close: () => this.openStory(-1),
+      reply: () => { this.openStory(-1); this.toast('Réponse envoyée à ' + cur[1]); } };
+
+    const reelDefs = [
+      { id: 'p2', user: 'Noah Robert', init: 'NR', caption: 'Première sortie en trottinette. Dernière aussi.', desc: 'vidéo · chute en trottinette', likes: 2140, reps: 96, coms: 214 },
+      { id: 'r2', user: 'Maya Benali', init: 'MB', caption: 'La crêpe a fini au plafond.', desc: 'vidéo · crêpe ratée', likes: 884, reps: 41, coms: 67 },
+      { id: 'r3', user: 'Jules Perrin', init: 'JP', caption: 'Mon imitation du prof de maths.', desc: 'vidéo · imitation du prof', likes: 5312, reps: 230, coms: 402 }
+    ];
+    const reels = reelDefs.map((r, i) => ({ ...r, a: this.act(r.id, r.likes, r.reps, r.coms), prog: i === s.reel && on('reels') ? 'mxProg 9s linear infinite' : 'none' }));
+
+    const POOL = [
+      { desc: 'photo · chat perché sur le frigo', by: '@lea.m' },
+      { desc: 'vidéo · chute en trottinette', by: '@noah.rbt' },
+      { desc: 'photo · selfie de groupe flou', by: '@ines.b' }
+    ];
+    const mine = Object.keys(s.pooled).filter(k => s.pooled[k]).length;
+    const left = this.left(s.now), secs = this.secs();
+    const players = [['MD', 'Toi', 1], ['SL', 'Sacha', 0], ['MB', 'Maya', 2], ['JP', 'Jules', 0], ['IB', 'Inès', 1], ['TG', 'Tom', 2]]
+      .map(p => ({ init: p[0], name: p[1], bg: AV[p[2]][0], fg: AV[p[2]][1] }));
+    const seg = sel => ({ bg: sel ? 'var(--ink)' : 'transparent', fg: sel ? 'var(--inv)' : 'var(--ink)' });
+    const g = {
+      isLobby: s.stage === 'lobby', isCaption: s.stage === 'caption', isVote: s.stage === 'vote', isResults: s.stage === 'results',
+      rounds: s.rounds, poolCount: (1284 + mine).toLocaleString('fr-FR'), mine, hasMine: mine > 0, players,
+      roundOpts: [3, 5, 7].map(n => ({ n, ...seg(n === s.rounds), pick: () => this.setState({ rounds: n }) })),
+      srcOpts: [['public', 'Pool public'], ['amis', 'Pool amis']].map(o => ({ label: o[1], ...seg(o[0] === s.src), pick: () => this.setState({ src: o[0] }) })),
+      start: () => this.setState({ stage: 'caption', capStart: Date.now(), now: Date.now(), caption: '' }),
+      left, barW: (left / secs * 100) + '%', meme: POOL[s.memeIdx],
+      shuffle: () => this.setState(st => ({ memeIdx: (st.memeIdx + 1) % POOL.length })),
+      report: () => { this.setState(st => ({ memeIdx: (st.memeIdx + 1) % POOL.length })); this.toast('Signalement envoyé, image retirée'); },
+      caption: s.caption, onCaption: e => this.setState({ caption: e.target.value }),
+      capShown: s.caption || 'Ta légende apparaît ici', capColor: s.caption ? 'var(--ink)' : 'var(--mute)',
+      submit: () => this.setState({ stage: 'vote', voteIdx: 0 }),
+      v0: s.voteIdx === 0, v1: s.voteIdx === 1, voteN: s.voteIdx + 1,
+      rate: () => this.setState(st => st.voteIdx < 1 ? { voteIdx: st.voteIdx + 1 } : { stage: 'results' }),
+      myCap: s.caption || 'Sans légende',
+      replay: () => this.setState({ stage: 'lobby', caption: '' }),
+      publish: () => {
+        const m = { id: 'mm' + Date.now(), type: 'media', meme: true, text: s.caption || 'Sans légende', desc: POOL[s.memeIdx].desc };
+        this.setState(st => ({ stage: 'lobby', caption: '', myPosts: [m].concat(st.myPosts), myMemes: [m].concat(st.myMemes) }));
+        this.go('feed'); this.toast('Mème publié sur le fil et dans la galerie');
+      }
+    };
+
+    const MEMES = [
+      ['SL', 'Sacha', 'Quand tu entends le frigo s’ouvrir à 3h du matin', 'photo · chat perché sur le frigo', 1842],
+      ['MB', 'Maya', 'Moi qui lis le groupe sans jamais répondre', 'photo · selfie de groupe flou', 1510],
+      ['TG', 'Tom', 'Le lundi, vu de l’intérieur', 'vidéo · chute en trottinette', 1204],
+      ['JP', 'Jules', 'Quand le prof dit « par groupes de deux »', 'photo · amphi vide', 968],
+      ['IB', 'Inès', 'Mon compte en banque le 28 du mois', 'photo · café renversé', 731],
+      ['LM', 'Léa', 'Le chat après avoir fait tomber le verre', 'photo · chat du voisin', 655]
+    ];
+    const allMemes = s.myMemes.map(m => ['MD', 'Toi', m.text, m.desc, 0, m.id]).concat(MEMES.map((m, i) => m.concat('m' + i)));
+    const mItems = allMemes.map(m => ({ init: m[0], by: m[1] === 'Toi' ? 'Ta légende' : 'Légende de ' + m[1], caption: m[2], desc: m[3], n: m[4] + (s.liked[m[5]] ? 1 : 0), a: this.act(m[5], m[4], 0, 0) }));
+    const top3 = mItems.slice().sort((a, b) => b.n - a.n).slice(0, 3);
+    const mg = { items: mItems, podium: [1, 0, 2].map(k => ({ init: top3[k].init, caption: top3[k].caption, likes: this.fmt(top3[k].n), rank: k + 1,
+      h: ['130px', '96px', '70px'][k], bg: ['#0E76C6', 'var(--ink)', 'var(--tint)'][k], fg: ['#fff', 'var(--inv)', 'var(--ink)'][k] })) };
+
+    const now = new Date(s.now), todayIdx = (now.getDay() + 6) % 7;
+    const past = [2, 1, 3, 0, 2, 1, 0];
+    let total = 0;
+    const days = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((l, i) => {
+      const c = i < todayIdx ? past[i] : i === todayIdx ? s.shots : 0;
+      total += c;
+      return { l, h: Math.min(36, 6 + c * 6) + 'px', bg: i === todayIdx ? '#0E76C6' : c ? 'var(--ink)' : 'var(--line)', fg: i === todayIdx ? 'var(--acc)' : 'var(--mute)' };
+    });
+    const cam = {
+      days, total, totalLine: total + (total > 1 ? ' photos scellées' : ' photo scellée'),
+      flashO: s.flash ? 0.9 : 0, flashT: s.flash ? '0s' : '.6s ease-out',
+      bump: s.bump === 0 ? 'none' : (s.bump % 2 ? 'mxPop' : 'mxPop2') + ' .4s cubic-bezier(.3,1.6,.5,1)',
+      shoot: () => { this.setState(st => ({ shots: st.shots + 1, flash: true, bump: st.bump + 1 })); setTimeout(() => this.setState({ flash: false }), 90); }
+    };
+    const mon = new Date(now); mon.setDate(now.getDate() - todayIdx);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const weekLabel = 'Semaine du ' + mon.getDate() + ' au ' + sun.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+
+    const shots = [['@lea.m', 'Lun', 'café renversé'], ['@noah.rbt', 'Lun', 'bus raté'], ['@ines.b', 'Mar', 'amphi vide'], ['@tom.g', 'Mar', 'kebab de minuit'], ['@maya.b', 'Mer', 'chat du voisin'], ['@jules.p', 'Mer', 'coucher de soleil'], ['@sacha.l', 'Jeu', 'partiel surprise'], ['@lea.m', 'Jeu', 'vélo crevé'], ['@mathis.d', 'Ven', 'apéro sur le toit'], ['@ines.b', 'Sam', 'marché du matin'], ['@tom.g', 'Sam', 'karaoké'], ['@maya.b', 'Dim', 'brunch']];
+    const TOP = [[8, 214], [4, 187], [10, 151]];
+    const un = {
+      locked: !ready, showRecap: ready && s.revealed,
+      btnLabel: !ready ? 'Ouverture dimanche à 20h' : s.revealed ? 'Refermer' : 'Déballer la semaine',
+      btnIcon: !ready ? 'ph-fill ph-lock-simple' : s.revealed ? 'ph ph-arrow-counter-clockwise' : 'ph-fill ph-package',
+      btnBg: !ready ? 'var(--line)' : s.revealed ? 'var(--ink)' : '#0E76C6', btnFg: !ready ? 'var(--mute)' : s.revealed ? 'var(--inv)' : '#fff', cursor: ready ? 'pointer' : 'not-allowed',
+      onBtn: () => { if (ready) this.setState(st => ({ revealed: !st.revealed })); },
+      simulate: () => this.setState({ simSunday: true }),
+      top: TOP.map((t, k) => ({ rank: k + 1, desc: shots[t[0]][2], by: shots[t[0]][0], likes: t[1], bg: k === 0 ? '#0E76C6' : 'var(--ink)', fg: k === 0 ? '#fff' : 'var(--inv)' })),
+      topLabel: s.topSent ? 'Top 3 envoyé dans le pool' : 'Envoyer le top 3 dans le pool', topIcon: s.topSent ? 'ph-fill ph-check-circle' : 'ph ph-sticker',
+      topBg: s.topSent ? '#0E76C6' : 'var(--ink)', topFg: s.topSent ? '#fff' : 'var(--inv)',
+      sendTop: () => { if (s.topSent) return; this.setState(st => ({ topSent: true, pooled: { ...st.pooled, u8: 'public', u4: 'public', u10: 'public' } })); this.toast('3 photos envoyées dans le pool public'); },
+      photos: shots.map((p, i) => {
+        const id = 'u' + i, pooled = !!s.pooled[id];
+        return { by: p[0], day: p[1], desc: 'photo · ' + p[2], tf: s.revealed && ready ? 'rotateY(0deg)' : 'rotateY(180deg)', delay: s.revealed ? (i * 0.07) + 's' : '0s',
+          poolBg: pooled ? '#0E76C6' : 'var(--ink)', poolFg: pooled ? '#fff' : 'var(--inv)', poolIcon: pooled ? 'ph-fill ph-check-circle' : 'ph ph-sticker', onPool: () => this.togglePool(id) };
+      })
+    };
+
+    const kinds = ['photo', 'vidéo', 'mème'];
+    const pf = {
+      indTf: 'translateX(' + (s.tab * 100) + '%)', ratio: s.tab === 1 ? '9/14' : '1',
+      tabs: ['Posts', 'Reels', 'Mèmes'].map((label, i) => ({ label, fg: i === s.tab ? 'var(--inv)' : 'var(--ink)', pick: () => this.setState({ tab: i }) })),
+      grid: Array.from({ length: 9 }, (_, i) => ({ desc: kinds[s.tab] + ' ' + (i + 1) }))
+    };
+    const streak = Array.from({ length: 8 }, (_, i) => ({ bg: i < 3 ? 'var(--line)' : '#0E76C6' }));
+
+    const v = s.slider, emojis = ['😴', '🥱', '😐', '🙂', '😄', '🔥'];
+    const sl = {
+      value: v, pct: v + '%', avgPct: '62%', avgO: s.sliderDone ? 1 : 0, emoji: emojis[Math.min(5, Math.floor(v / 100 * 6))], size: (28 + v * 0.14) + 'px',
+      note: s.sliderDone ? 'Moyenne des amis : 62 % · 318 réponses' : 'Fais glisser pour répondre',
+      onChange: e => this.setState({ slider: +e.target.value }), onDone: () => this.setState({ sliderDone: true })
+    };
+
+    const CHATS = [
+      { init: 'SL', name: 'Sacha Lefèvre', time: '2 min', unread: true, msgs: [[0, 'Tu as vu le mème de Maya ?'], [1, 'Oui, elle mérite le podium.'], [0, 'Rejoins mon salon, code MDRX-482.', 1]] },
+      { init: 'LM', name: 'Léa Martin', time: '18 min', unread: true, msgs: [[0, 'Mon chat est dans le pool maintenant.'], [1, 'Il va devenir célèbre.'], [0, 'C’est tout ce qu’il mérite.']] },
+      { init: 'MB', name: 'Maya Benali', time: '1 h', msgs: [[1, 'Raclette samedi ?'], [0, 'J’ai voté raclette trois fois dans ma tête.']] },
+      { init: 'JP', name: 'Jules Perrin', time: 'hier', msgs: [[0, 'Tu as pris ta photo de la semaine ?'], [1, 'Pas encore, je garde ça pour vendredi.']] },
+      { init: 'IB', name: 'Inès Bernard', time: 'lun.', msgs: [[1, 'La photo floue est ma préférée.'], [0, 'Elle part au déballage dimanche.']] }
+    ];
+    const full = i => CHATS[i].msgs.concat((s.sent[i] || []).map(t => [1, t]));
+    const ci = Math.max(0, s.chat);
+    const sendDm = () => { const t = s.draft.trim(); if (!t) return; this.setState(st => ({ draft: '', sent: { ...st.sent, [ci]: (st.sent[ci] || []).concat(t) } })); };
+    const dm = {
+      hasUnread: !s.dmSeen, isList: s.chat < 0, isChat: s.chat >= 0,
+      convs: CHATS.map((c, i) => { const all = full(i); return { init: c.init, name: c.name, time: c.time, last: all[all.length - 1][1], dotO: c.unread && !s.readC[i] ? 1 : 0, bg: AV[i % 3][0], fg: AV[i % 3][1],
+        open: () => this.setState(st => ({ chat: i, draft: '', readC: { ...st.readC, [i]: true } })) }; }),
+      init: CHATS[ci].init, name: CHATS[ci].name,
+      msgs: full(ci).map(m => ({ text: m[1], invite: !!m[2], align: m[0] ? 'flex-end' : 'flex-start', bg: m[0] ? '#0E76C6' : 'var(--soft)', fg: m[0] ? '#fff' : 'var(--ink)' })),
+      back: () => this.setState({ chat: -1 }), draft: s.draft, onDraft: e => this.setState({ draft: e.target.value }),
+      onKey: e => { if (e.key === 'Enter') sendDm(); }, send: sendDm
+    };
+
+    const SEED = [['SL', 'Sacha', 'Je valide totalement.', '2 min'], ['MB', 'Maya', 'Envoie ça dans le pool tout de suite.', '8 min'], ['TG', 'Tom', 'J’ai ri plus que prévu.', '21 min'], ['JP', 'Jules', 'Contexte ?', '1 h']];
+    const cid = s.comFor, added = s.comAdded[cid] || [];
+    const sendCom = () => { const t = s.comDraft.trim(); if (!t) return; this.setState(st => ({ comDraft: '', comAdded: { ...st.comAdded, [cid]: (st.comAdded[cid] || []).concat(t) } })); };
+    const com = {
+      open: cid !== null, count: this.fmt((this.comBase[cid] || 0) + added.length), close: () => this.setState({ comFor: null }),
+      list: SEED.concat(added.map(t => ['MD', 'Toi', t, 'à l’instant'])).map((c, i) => {
+        const key = cid + ':' + i, liked = !!s.comLiked[key];
+        return { init: c[0], name: c[1], text: c[2], time: c[3], bg: AV[i % 3][0], fg: AV[i % 3][1], icon: liked ? 'ph-fill ph-heart' : 'ph ph-heart', color: liked ? '#E5484D' : 'var(--mute)',
+          anim: liked ? 'mxPop .45s cubic-bezier(.3,1.6,.5,1)' : 'none', like: () => this.toggle('comLiked', key) };
+      }),
+      draft: s.comDraft, onDraft: e => this.setState({ comDraft: e.target.value }), onKey: e => { if (e.key === 'Enter') sendCom(); }, send: sendCom
+    };
+
+    const pool = {
+      open: s.poolFor !== null, close: () => this.setState({ poolFor: null }),
+      opts: [['public', 'ph ph-globe-hemisphere-west', 'Pool public', 'Tous les joueurs de Mandrix peuvent tomber dessus.'], ['amis', 'ph ph-users-three', 'Amis seulement', 'Uniquement dans les salons de tes amis.']]
+        .map(o => ({ icon: o[1], label: o[2], sub: o[3], ring: s.poolScope === o[0] ? '#0E76C6' : 'transparent', pick: () => this.setState({ poolScope: o[0] }) })),
+      send: () => { const id = s.poolFor, sc = s.poolScope; this.setState(st => ({ poolFor: null, pooled: { ...st.pooled, [id]: sc } })); this.toast(sc === 'public' ? 'Envoyé dans le pool public' : 'Envoyé dans le pool de tes amis'); }
+    };
+
+    const ck = s.compKind, labels = s.compOpts.map(o => o.trim()).filter(Boolean);
+    const valid = ck < 2 ? s.compPicked : !!(s.compQ.trim() && labels.length >= 2);
+    const composer = {
+      open: s.compOpen, show: () => this.setState({ compOpen: true, notifOpen: false }), close: () => this.setState({ compOpen: false }),
+      kinds: ['Photo', 'Vidéo', 'Sondage'].map((label, i) => ({ label, ...seg(i === ck), pick: () => this.setState({ compKind: i, compPicked: false }) })),
+      isMedia: ck < 2, isPoll: ck === 2, pick: () => this.setState(st => ({ compPicked: !st.compPicked })),
+      dzBorder: s.compPicked ? '0' : '2px dashed var(--line)', dzBg: !s.compPicked ? 'var(--soft)' : ck === 1 ? DARKPH : 'var(--ph)',
+      dzFg: s.compPicked && ck === 1 ? '#9FB6CA' : 'var(--phink)',
+      dzLabel: s.compPicked ? (ck === 1 ? 'vidéo sélectionnée' : 'photo sélectionnée') : (ck === 1 ? 'Touche pour ajouter une vidéo' : 'Touche pour ajouter une photo'),
+      text: s.compText, onText: e => this.setState({ compText: e.target.value }),
+      swBg: s.compPool ? '#0E76C6' : 'var(--line)', swTf: s.compPool ? 'translateX(22px)' : 'translateX(0px)', togglePool: () => this.setState(st => ({ compPool: !st.compPool })),
+      q: s.compQ, onQ: e => this.setState({ compQ: e.target.value }),
+      opts: s.compOpts.map((val, i) => ({ value: val, ph: 'Option ' + (i + 1) + (i > 1 ? ' (facultatif)' : ''), onChange: e => { const t = e.target.value; this.setState(st => ({ compOpts: st.compOpts.map((o, j) => j === i ? t : o) })); } })),
+      pubBg: valid ? 'var(--ink)' : 'var(--line)', pubFg: valid ? 'var(--inv)' : 'var(--mute)', pubCursor: valid ? 'pointer' : 'not-allowed', publish: () => this.publishPost()
+    };
+    const noQ = { opts: [], total: '' };
+    const myPosts = s.myPosts.map(p => {
+      const media = p.type === 'media';
+      return { kind: p.meme ? 'Mème' : !media ? 'Sondage' : p.video ? 'Vidéo' : 'Photo', isMedia: media, isPoll: !media, isMeme: !!p.meme, hasCaption: media && !p.meme && !!p.text, text: p.text,
+        desc: p.meme ? p.desc : p.video ? 'vidéo · ta vidéo' : 'photo · ta photo', ph: p.video ? DARKPH : 'var(--ph)', phInk: p.video ? '#9FB6CA' : 'var(--phink)',
+        a: this.act(p.id, 0, 0, 0), q: media ? noQ : this.poll(p.id, p.labels, p.labels.map(() => 0)) };
+    });
+
+    return {
+      isLanding: scr === 'landing', isApp: scr !== 'landing', loading: s.loading && scr !== 'landing',
+      isPhone, notPhone: !isPhone, isDesktop, notDesktop: !isDesktop,
+      isFeed: on('feed'), isReels: on('reels'), isGame: on('game'), isMemes: on('memes'), isCamera: on('camera'), isUnpack: on('unpack'), isProfile: on('profile'), isMessages: on('messages'),
+      title: titles[scr] || '', mainMax: scr === 'unpack' || scr === 'memes' ? '860px' : '620px', nav,
+      enter: () => this.go('feed'), goCamera: () => this.go('camera'), goUnpack: () => this.go('unpack'), goGame: () => this.go('game'), goReels: () => this.go('reels'),
+      goMemes: () => this.go('memes'), goMessages: () => this.go('messages'),
+      toggleDark: () => this.setDark(!dark), darkIcon: dark ? 'ph ph-sun' : 'ph ph-moon', darkSwBg: dark ? '#0E76C6' : 'var(--line)', darkSwTf: dark ? 'translateX(22px)' : 'translateX(0px)',
+      notif: { open: s.notifOpen, has: !s.notifSeen, toggle: () => this.setState(st => ({ notifOpen: !st.notifOpen, notifSeen: true })), join: () => this.go('game'), unpack: () => this.go('unpack') },
+      cd: this.countdown(ready), weekLabel, stories, sv, streak, myPosts,
+      p1: this.act('p1', 1284, 37, 48), p2: this.act('p2', 2140, 96, 214), p3: this.act('p3', 356, 12, 31),
+      q1: this.poll('q1', ['Crime', 'Génie'], [412, 268]),
+      q2: this.poll('q2', ['Ciné', 'Bowling', 'Raclette', 'Rien du tout'], [84, 51, 139, 62]),
+      q3: this.poll('q3', ['Plage', 'Montagne'], [530, 471]),
+      sl, reels, reelTf: 'translateY(-' + (s.reel * 100) + '%)',
+      reelPrev: () => this.reelStep(-1), reelNext: () => this.reelStep(1), reelPrevO: s.reel === 0 ? 0.4 : 1, reelNextO: s.reel === 2 ? 0.4 : 1,
+      reelWheel: e => { if (Math.abs(e.deltaY) < 24 || this.wLock) return; this.wLock = true; setTimeout(() => { this.wLock = false; }, 650); this.reelStep(e.deltaY > 0 ? 1 : -1); },
+      reelTouchStart: e => { this.ty = e.touches[0].clientY; },
+      reelTouchEnd: e => { const d = this.ty - e.changedTouches[0].clientY; if (Math.abs(d) > 50) this.reelStep(d > 0 ? 1 : -1); },
+      g, mg, cam, un, pf, dm, com, pool, composer,
+      toast: s.toast, toastY: s.toastOn ? '0px' : '20px', toastO: s.toastOn ? 1 : 0, toastB: isPhone ? '88px' : '28px'
+    };
+  }
+}
+</script>
+</body>
+</html>
