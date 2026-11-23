@@ -13,6 +13,7 @@ import { emitBadges, notify } from '../lib/notify.js';
 import { notBlocked, selectPosts } from '../lib/posts.js';
 import { streakFor } from '../lib/streak.js';
 import { areFriends, friendIds, friendshipMap, toLite, toMe, usersByIds } from '../lib/users.js';
+import { perMinute } from '../lib/limits.js';
 
 const { users, friendships } = schema;
 
@@ -151,7 +152,7 @@ export default async function userRoutes(app: FastifyInstance) {
   });
 
   /** Envoie une demande, ou accepte celle reçue. */
-  app.post('/api/friends/:id', async (req) => {
+  app.post('/api/friends/:id', perMinute(30), async (req) => {
     const me = requireUser(req);
     const otherId = uuidParam(req.params);
     if (otherId === me.id) fail(400, 'Tu ne peux pas t’ajouter toi-même');

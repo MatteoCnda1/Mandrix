@@ -1,14 +1,14 @@
 import path from 'node:path';
 import type { Multipart, MultipartFile } from '@fastify/multipart';
-import { DAY_SHORT, type PelliculeState, type Shot, type UnpackState } from '@mandrix/shared';
+import { DAY_SHORT, SHOT_UNDO_MINUTES, type PelliculeState, type Shot, type UnpackState } from '@mandrix/shared';
 import archiver from 'archiver';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { requireUser } from '../lib/auth.js';
 import { fail, uuidParam } from '../lib/http.js';
-import { mediaRef, saveUpload } from '../lib/media.js';
+import { deleteMediaFile, mediaRef, saveUpload, variantPath } from '../lib/media.js';
 import { activeMoment, isOnTime } from '../lib/moment.js';
 import { notify } from '../lib/notify.js';
 import { streakFor } from '../lib/streak.js';
@@ -32,6 +32,14 @@ async function pelliculeState(userId: string): Promise<PelliculeState> {
     .where(and(eq(shots.userId, userId), eq(shots.revealAt, next)));
   const days = [0, 0, 0, 0, 0, 0, 0];
   for (const s of mine) days[mondayIndex(s.takenAt)]++;
+  // Dernière photo encore annulable (prise il y a moins de quelques minutes, pas encore déballée).
+  const [last] = await db
+    .select({ id: shots.id, at: schema.media.createdAt })
+    .from(shots)
+    .innerJoin(schema.media, eq(schema.media.id, shots.mediaId))
+    .where(and(eq(shots.userId, userId), eq(shots.revealAt, next), gt(schema.media.createdAt, new Date(Date.now() - SHOT_UNDO_MINUTES * 60_000))))
+    .orderBy(desc(schema.media.createdAt))
+    .limit(1);
   return {
     nextRevealAt: next.toISOString(),
     weekLabel: weekLabel(next),
@@ -39,6 +47,7 @@ async function pelliculeState(userId: string): Promise<PelliculeState> {
     mine: { total: mine.length, days },
     current: await batchCounts(next),
     streak: await streakFor(userId),
+    undo: last ? { shotId: last.id, until: new Date(last.at.getTime() + SHOT_UNDO_MINUTES * 60_000).toISOString() } : null,
   };
 }
 
@@ -172,6 +181,25 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
         top: [...photos].sort((a, b) => b.likes - a.likes || a.takenAt.localeCompare(b.takenAt)).slice(0, 3),
       },
     };
+  });
+
+  /** Annuler une photo prise par erreur, dans les minutes qui suivent. */
+  app.delete('/api/pellicule/shots/:id', async (req) => {
+    const me = requireUser(req);
+    const id = uuidParam(req.params);
+    const [row] = await db
+      .select({ shot: shots, media: schema.media })
+      .from(shots)
+      .innerJoin(schema.media, eq(schema.media.id, shots.mediaId))
+      .where(and(eq(shots.id, id), eq(shots.userId, me.id)))
+      .limit(1);
+    if (!row) return fail(404, 'Photo introuvable');
+    if (row.media.createdAt.getTime() < Date.now() - SHOT_UNDO_MINUTES * 60_000 || row.shot.revealAt <= new Date()) {
+      fail(409, `Une photo ne s’annule que dans les ${SHOT_UNDO_MINUTES} minutes qui suivent`);
+    }
+    await db.delete(schema.media).where(eq(schema.media.id, row.media.id)); // la photo part avec (cascade)
+    for (const rel of [row.media.path, ...(row.media.variants ?? []).map((w) => variantPath(row.media.path, w))]) await deleteMediaFile(rel).catch(() => {});
+    return pelliculeState(me.id);
   });
 
   app.put('/api/pellicule/shots/:id/like', async (req) => {

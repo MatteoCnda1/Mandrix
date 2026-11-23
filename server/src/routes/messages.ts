@@ -21,6 +21,8 @@ import { sendPush } from '../lib/push.js';
 import { isBlockedBetween } from '../lib/blocks.js';
 import { areFriends, friendIds, usersByIds } from '../lib/users.js';
 import { emitToUser } from '../realtime/io.js';
+import { presenceOf } from '../realtime/presence.js';
+import { perMinute } from '../lib/limits.js';
 
 const { conversations, conversationMembers, messages, conversationReads, messageReactions } = schema;
 
@@ -198,6 +200,8 @@ async function detail(conv: typeof conversations.$inferSelect, meId: string): Pr
     .select({ userId: conversationReads.userId, at: conversationReads.lastReadAt })
     .from(conversationReads)
     .where(and(eq(conversationReads.conversationId, conv.id), ne(conversationReads.userId, meId)));
+  const [viewer] = await db.select({ id: schema.users.id, showPresence: schema.users.showPresence }).from(schema.users).where(eq(schema.users.id, meId)).limit(1);
+  const presence = other && viewer ? ((await presenceOf(viewer, [other.id])).get(other.id) ?? null) : null;
   const [mine] = await db
     .select({ muted: conversationMembers.muted })
     .from(conversationMembers)
@@ -212,6 +216,7 @@ async function detail(conv: typeof conversations.$inferSelect, meId: string): Pr
     createdBy: conv.createdBy,
     reads: reads.map((r) => ({ userId: r.userId, at: r.at.toISOString() })),
     muted: !!mine?.muted,
+    presence,
   };
 }
 
@@ -264,6 +269,7 @@ export default async function messageRoutes(app: FastifyInstance) {
       order by c.last_message_at desc limit 100`);
     const list = [...rows];
     const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]));
+    const presence = await presenceOf(me, list.filter((r) => !r.isGroup && r.members[0]).map((r) => r.members[0]));
     return list
       .filter((r) => r.isGroup || r.members.length > 0)
       .map((r) => {
@@ -286,12 +292,13 @@ export default async function messageRoutes(app: FastifyInstance) {
             : null,
           unread: r.unread,
           muted: r.muted,
+          presence: r.isGroup ? null : (presence.get(r.members[0]) ?? null),
         };
       });
   });
 
   /** Conversation à deux (`userId`) ou groupe (`userIds` + `title`). */
-  app.post('/api/conversations', async (req) => {
+  app.post('/api/conversations', perMinute(20), async (req) => {
     const me = requireUser(req);
     const body = parse(
       z.object({
@@ -351,6 +358,26 @@ export default async function messageRoutes(app: FastifyInstance) {
     return detail(conv, me.id);
   });
 
+  /** Le créateur d'un groupe retire un membre. */
+  app.delete('/api/conversations/:id/members/:userId', async (req): Promise<ConversationDetail> => {
+    const me = requireUser(req);
+    const { id, userId } = req.params as { id: string; userId: string };
+    const conv = await ownConversation(uuidParam({ id }), me.id);
+    if (!conv.isGroup) fail(400, 'Seuls les groupes ont des membres à retirer');
+    if (conv.createdBy !== me.id) fail(403, 'Seul le créateur du groupe peut retirer quelqu’un');
+    const target = uuidParam({ id: userId });
+    if (target === me.id) fail(400, 'Utilise « Quitter le groupe »');
+    if (!(await memberIds(conv.id)).includes(target)) fail(404, 'Cette personne n’est pas dans le groupe');
+    const who = (await usersByIds([target])).get(target);
+    // Le message part avant le retrait : la personne voit qu'elle a été retirée.
+    await postMessage(conv, me, `${me.displayName} a retiré ${who?.displayName ?? 'un membre'}`, { type: 'system' });
+    await db.delete(conversationMembers).where(and(eq(conversationMembers.conversationId, conv.id), eq(conversationMembers.userId, target)));
+    await db.delete(conversationReads).where(and(eq(conversationReads.conversationId, conv.id), eq(conversationReads.userId, target)));
+    membersCache.delete(conv.id);
+    await emitBadges(target);
+    return detail(conv, me.id);
+  });
+
   app.post('/api/conversations/:id/leave', async (req) => {
     const me = requireUser(req);
     const conv = await ownConversation(uuidParam(req.params), me.id);
@@ -392,7 +419,7 @@ export default async function messageRoutes(app: FastifyInstance) {
     return toMessages(rows.reverse());
   });
 
-  app.post('/api/conversations/:id/messages', async (req) => {
+  app.post('/api/conversations/:id/messages', perMinute(30), async (req) => {
     const me = requireUser(req);
     const c = await ownConversation(uuidParam(req.params), me.id);
     const body = parse(
@@ -468,7 +495,7 @@ export default async function messageRoutes(app: FastifyInstance) {
   });
 
   /** Réaction emoji à un message (une par personne, modifiable). */
-  app.put('/api/messages/:id/reaction', async (req) => {
+  app.put('/api/messages/:id/reaction', perMinute(60), async (req) => {
     const me = requireUser(req);
     const { emoji } = parse(z.object({ emoji: z.enum(MESSAGE_REACTIONS) }), req.body);
     const m = await reactable(uuidParam(req.params), me.id);
@@ -495,7 +522,7 @@ export default async function messageRoutes(app: FastifyInstance) {
   });
 
   /** Réponse à une story : ouvre (ou crée) la conversation avec l'auteur. */
-  app.post('/api/messages/to/:id', async (req) => {
+  app.post('/api/messages/to/:id', perMinute(20), async (req) => {
     const me = requireUser(req);
     const to = uuidParam(req.params);
     const body = parse(textSchema.extend({ storyId: z.string().uuid().optional() }), req.body);
@@ -514,7 +541,7 @@ export default async function messageRoutes(app: FastifyInstance) {
   });
 
   /** Invitation à un salon Make It Friends. */
-  app.post('/api/game/invite', async (req) => {
+  app.post('/api/game/invite', perMinute(10), async (req) => {
     const me = requireUser(req);
     const body = parse(z.object({ code: z.string().regex(/^MDRX-\d{3}$/), userIds: z.array(z.string().uuid()).min(1).max(8) }), req.body);
     let sent = 0;

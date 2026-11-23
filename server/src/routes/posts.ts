@@ -11,7 +11,9 @@ import { notifyMentions } from '../lib/mentions.js';
 import { getPost, loadPolls, notBlocked, selectPosts, visiblePost, visibleTo } from '../lib/posts.js';
 import { extractMentions } from '@mandrix/shared';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
+import { emitToUser } from '../realtime/io.js';
 import { upsertPoolItem } from './pool.js';
+import { perMinute } from '../lib/limits.js';
 
 const { posts, likes, reposts, comments, commentLikes, pollOptions, pollVotes, media, postReactions } = schema;
 const PAGE = 15;
@@ -50,10 +52,15 @@ async function reactionsOf(postId: string, viewerId: string) {
   return { reactions: post?.reactions ?? [], myReaction: post?.myReaction ?? null };
 }
 
+/** Prévient l'auteur et ses amis qu'un post vient d'arriver (pastille « Nouveaux posts »). */
+async function announcePost(authorId: string, postId: string) {
+  for (const id of [authorId, ...(await friendIds(authorId))]) emitToUser(id, 'feed:new', { postId, authorId });
+}
+
 const KIND_LABEL: Record<string, string> = { photo: 'ta photo', video: 'ta vidéo', poll: 'ton sondage', meme: 'ton mème' };
 
 export default async function postRoutes(app: FastifyInstance) {
-  app.post('/api/media', async (req) => {
+  app.post('/api/media', perMinute(30), async (req) => {
     const me = requireUser(req);
     const file = await req.file();
     if (!file) return fail(400, 'Aucun fichier reçu');
@@ -110,7 +117,7 @@ export default async function postRoutes(app: FastifyInstance) {
     return { podium, items, next: items.length === 24 ? page + 1 : null };
   });
 
-  app.post('/api/posts', async (req) => {
+  app.post('/api/posts', perMinute(10), async (req) => {
     const me = requireUser(req);
     const body = parse(createSchema, req.body);
 
@@ -124,6 +131,7 @@ export default async function postRoutes(app: FastifyInstance) {
         .returning();
       if (body.pool) await upsertPoolItem({ mediaId: body.mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
       await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id });
+      await announcePost(me.id, p.id);
       return getPost(me.id, p.id);
     }
 
@@ -152,6 +160,7 @@ export default async function postRoutes(app: FastifyInstance) {
         options.map((o, i) => ({ postId: p.id, label: o.label || `Option ${i + 1}`, mediaId: o.mediaId ?? null, position: i })),
       );
     }
+    await announcePost(me.id, p.id);
     return getPost(me.id, p.id);
   });
 
@@ -190,7 +199,7 @@ export default async function postRoutes(app: FastifyInstance) {
 
   // ——— Réactions ———
 
-  app.put('/api/posts/:id/like', async (req) => {
+  app.put('/api/posts/:id/like', perMinute(60), async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const p = await visiblePost(me.id, id);
@@ -202,7 +211,7 @@ export default async function postRoutes(app: FastifyInstance) {
   });
 
   /** Réaction emoji (appui long sur le cœur) : une par personne, modifiable. */
-  app.put('/api/posts/:id/reaction', async (req) => {
+  app.put('/api/posts/:id/reaction', perMinute(60), async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const { emoji } = parse(z.object({ emoji: z.enum(REACTIONS) }), req.body);
@@ -241,7 +250,7 @@ export default async function postRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.put('/api/posts/:id/repost', async (req) => {
+  app.put('/api/posts/:id/repost', perMinute(30), async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const p = await visiblePost(me.id, id);
@@ -260,7 +269,7 @@ export default async function postRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.post('/api/posts/:id/vote', async (req) => {
+  app.post('/api/posts/:id/vote', perMinute(60), async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const body = parse(z.object({ optionId: z.string().uuid().optional(), value: z.number().int().min(0).max(100).optional() }), req.body);
@@ -312,7 +321,7 @@ export default async function postRoutes(app: FastifyInstance) {
     }));
   });
 
-  app.post('/api/posts/:id/comments', async (req): Promise<Comment> => {
+  app.post('/api/posts/:id/comments', perMinute(20), async (req): Promise<Comment> => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const { text } = parse(z.object({ text: z.string().trim().min(1, 'Commentaire vide').max(200) }), req.body);

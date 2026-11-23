@@ -10,6 +10,7 @@ import { destroySession, hashPassword, requireUser, SESSION_COOKIE, sha256, veri
 import { fail, parse } from '../lib/http.js';
 import { deleteMediaFile, variantPath } from '../lib/media.js';
 import { toMe } from '../lib/users.js';
+import { presenceChanged } from '../realtime/presence.js';
 
 const { users, sessions } = schema;
 
@@ -104,6 +105,15 @@ export default async function accountRoutes(app: FastifyInstance) {
       await db.delete(sessions).where(and(eq(sessions.userId, me.id), like(sessions.id, `${id}%`)));
     }
     return { ok: true };
+  });
+
+  /** Montrer ou masquer sa présence (« en ligne », « actif il y a … »). */
+  app.patch('/api/me/presence', async (req) => {
+    const me = requireUser(req);
+    const { show } = parse(z.object({ show: z.boolean() }), req.body);
+    const [u] = await db.update(users).set({ showPresence: show }).where(eq(users.id, me.id)).returning();
+    await presenceChanged(me.id, show);
+    return toMe(u);
   });
 
   app.patch('/api/me/notifications', async (req) => {

@@ -21,6 +21,13 @@ export interface Me extends UserLite {
   isAdmin: boolean;
   createdAt: string;
   notificationPrefs: NotificationPrefs;
+  showPresence: boolean;
+}
+
+/** Présence d'un ami : en ligne, ou dernière activité. */
+export interface Presence {
+  online: boolean;
+  lastSeenAt: string | null;
 }
 
 export type Friendship = 'self' | 'none' | 'pending_out' | 'pending_in' | 'friends';
@@ -255,7 +262,12 @@ export interface PelliculeState {
   mine: { total: number; days: number[] };
   current: { count: number; people: number };
   streak: StreakInfo;
+  /** Dernière photo encore annulable (quelques minutes après la prise). */
+  undo: { shotId: ID; until: string } | null;
 }
+
+/** Délai pour annuler une photo de la Pellicule prise par erreur. */
+export const SHOT_UNDO_MINUTES = 5;
 
 export interface Shot {
   id: ID;
@@ -342,6 +354,8 @@ export interface Conversation {
   unread: boolean;
   /** En sourdine : pas de notification push. */
   muted: boolean;
+  /** Conversation à deux : présence de l'autre (null si masquée). */
+  presence: Presence | null;
 }
 
 export interface ConversationDetail {
@@ -355,6 +369,7 @@ export interface ConversationDetail {
   /** Dernière lecture de chaque autre membre (accusés « Vu »). */
   reads: ReadMark[];
   muted: boolean;
+  presence: Presence | null;
 }
 
 export interface ReadMark {
@@ -621,6 +636,9 @@ export interface ServerToClientEvents {
   'game:state': (room: GameRoom | null) => void;
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
+  presence: (e: Presence & { userId: ID }) => void;
+  /** Un ami vient de publier : pastille « Nouveaux posts » sur le fil. */
+  'feed:new': (e: { postId: ID; authorId: ID }) => void;
   /** Message modifié (supprimé pour tout le monde…). */
   'dm:update': (m: Message) => void;
   'dm:typing': (e: TypingEvent) => void;

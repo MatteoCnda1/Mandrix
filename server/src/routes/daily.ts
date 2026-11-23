@@ -7,6 +7,7 @@ import { requireUser } from '../lib/auth.js';
 import { dailyView, parisDay, phaseOf, shiftDay } from '../lib/daily.js';
 import { fail, parse } from '../lib/http.js';
 import { usersByIds } from '../lib/users.js';
+import { perMinute } from '../lib/limits.js';
 
 const { dailyMemes, dailyCaptions, dailyVotes } = schema;
 
@@ -23,7 +24,7 @@ export default async function dailyRoutes(app: FastifyInstance) {
   });
 
   /** Ma légende du jour : une par personne, modifiable jusqu'à l'ouverture des votes. */
-  app.put('/api/daily/caption', async (req) => {
+  app.put('/api/daily/caption', perMinute(20), async (req) => {
     const me = requireUser(req);
     const { text } = parse(z.object({ text: z.string().trim().min(1, 'Écris ta légende').max(120) }), req.body);
     const day = parisDay();

@@ -7,6 +7,7 @@ import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from '../lib/media.js';
 import { areFriends, friendIds, usersByIds, uuidArray } from '../lib/users.js';
+import { perMinute } from '../lib/limits.js';
 
 const { stories, storyViews, media } = schema;
 
@@ -49,7 +50,7 @@ export default async function storyRoutes(app: FastifyInstance) {
     });
   });
 
-  app.post('/api/stories', async (req) => {
+  app.post('/api/stories', perMinute(10), async (req) => {
     const me = requireUser(req);
     const { mediaId } = parse(z.object({ mediaId: z.string().uuid('Média invalide') }), req.body);
     const [m] = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);

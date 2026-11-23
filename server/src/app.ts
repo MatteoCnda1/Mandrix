@@ -57,7 +57,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     const err = error as Error & { statusCode?: number };
     const status = err.statusCode ?? 500;
     if (status === 413) return reply.code(413).send({ error: `Fichier trop volumineux (max ${env.maxUploadMb} Mo)` });
-    if (status === 429) return reply.code(429).send({ error: 'Trop de tentatives, réessaie dans une minute' });
+    if (status === 429) {
+      const custom = err.message && !err.message.startsWith('Rate limit');
+      return reply.code(429).send({ error: custom ? err.message : 'Trop de tentatives, réessaie dans une minute' });
+    }
     if (status >= 500) app.log.error(err);
     return reply.code(status).send({ error: status >= 500 ? 'Erreur serveur' : err.message });
   });

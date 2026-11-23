@@ -6,6 +6,7 @@ import { parseCookieHeader, SESSION_COOKIE, userFromToken } from '../lib/auth.js
 import { HttpError } from '../lib/http.js';
 import { relayTyping } from '../routes/messages.js';
 import * as game from './game.js';
+import { socketConnected, socketDisconnected } from './presence.js';
 import { setIO, type IO } from './io.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +53,7 @@ export function attachSocket(app: FastifyInstance) {
     const userId = socket.data.userId;
     socket.join(`u:${userId}`);
     game.onConnect(userId, socket.id);
+    socketConnected(userId).catch(() => {});
 
     socket.on('game:create', (ack) => wrap(ack, () => game.createRoom(userId)));
     socket.on('game:join', (code, ack) => wrap(ack, () => game.joinRoom(userId, code)));
@@ -70,7 +72,10 @@ export function attachSocket(app: FastifyInstance) {
       relayTyping(userId, conversationId, typing).catch(() => {});
     });
 
-    socket.on('disconnect', () => game.onDisconnect(userId, socket.id));
+    socket.on('disconnect', () => {
+      game.onDisconnect(userId, socket.id);
+      socketDisconnected(userId).catch(() => {});
+    });
   });
 
   return io;
