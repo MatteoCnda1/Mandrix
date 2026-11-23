@@ -24,6 +24,10 @@ export const users = pgTable('users', {
   city: text('city'),
   bio: text('bio'),
   isAdmin: boolean('is_admin').default(false).notNull(),
+  /** Code de parrainage personnel, à partager pour inviter des amis. */
+  inviteCode: text('invite_code').unique(),
+  /** Parrain : membre dont le code a servi à l'inscription. */
+  invitedBy: uuid('invited_by'),
   createdAt: created(),
 });
 

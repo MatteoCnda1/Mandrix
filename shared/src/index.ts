@@ -202,7 +202,8 @@ export type NotificationType =
   | 'pool_added'
   | 'pool_drawn'
   | 'streak'
-  | 'shot_like';
+  | 'shot_like'
+  | 'invite_joined';
 
 export interface AppNotification {
   id: ID;
@@ -226,6 +227,12 @@ export interface AppConfig {
   revealHour: number;
   roundSeconds: number;
   maxUploadMb: number;
+}
+
+export interface InviteInfo {
+  code: string;
+  link: string;
+  invited: number;
 }
 
 export interface ReportedItem {

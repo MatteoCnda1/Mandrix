@@ -14,7 +14,7 @@ PWA sociale auto-hébergée (homelab Proxmox + NAS), installable sur téléphone
 | **Déballage** | Ouverture des photos de la semaine (cartes qui se retournent), récap du top 3, envoi dans le pool |
 | **Make It Friends** | Jeu multijoueur temps réel (2 à 8) : une image tirée du pool, une légende, tout le monde vote |
 | **Galerie des mèmes** | Podium des mèmes les plus aimés |
-| **Profil** | Statistiques, série, amis, mode sombre, notifications push, installation, modération (admin) |
+| **Profil** | Statistiques, série, amis, code de parrainage, mode sombre, notifications push, installation, modération (admin) |
 | **Messages** | Discussions privées entre amis, réponses aux stories, invitations aux salons |
 
 ## Stack
@@ -50,7 +50,10 @@ npm run db:up      # PostgreSQL de dev sur le port 5433
 npm run dev        # API sur :3000 + PWA sur http://localhost:5173
 ```
 
-Le premier compte créé est administrateur. Autres commandes :
+Le premier compte créé est administrateur. Ensuite, l'inscription se fait sur parrainage : chaque membre
+trouve son code dans son profil (lien de partage `/?parrain=CODE`), et parrain et filleul deviennent amis.
+
+Autres commandes :
 
 ```bash
 npm run typecheck                       # vérification TypeScript (serveur + PWA)

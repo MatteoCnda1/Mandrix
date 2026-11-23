@@ -1,10 +1,12 @@
-import { USERNAME_RE, type FriendsList, type UserProfile, type UserSearchResult } from '@mandrix/shared';
+import { USERNAME_RE, type FriendsList, type InviteInfo, type UserProfile, type UserSearchResult } from '@mandrix/shared';
 import { and, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
+import { ensureInviteCode } from '../lib/invite.js';
+import { env } from '../env.js';
 import { saveUpload } from '../lib/media.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { selectPosts } from '../lib/posts.js';
@@ -44,6 +46,13 @@ export default async function userRoutes(app: FastifyInstance) {
       .where(eq(users.id, me.id))
       .returning();
     return toMe(u);
+  });
+
+  app.get('/api/me/invite', async (req): Promise<InviteInfo> => {
+    const me = requireUser(req);
+    const code = await ensureInviteCode(me.id, me.username);
+    const [r] = await db.execute<{ n: number }>(sql`select count(*)::int as n from users where invited_by = ${me.id}`);
+    return { code, link: `${env.appUrl}/?parrain=${encodeURIComponent(code)}`, invited: r?.n ?? 0 };
   });
 
   app.post('/api/me/avatar', async (req) => {

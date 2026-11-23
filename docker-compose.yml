@@ -43,6 +43,8 @@ services:
   backup:
     image: postgres:17
     restart: unless-stopped
+    # Même propriétaire que les médias pour pouvoir écrire sur le partage du NAS.
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}

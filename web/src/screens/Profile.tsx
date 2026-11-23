@@ -4,11 +4,14 @@ import {
   CaretRight,
   ChatCircleDots,
   ChartBar,
+  Copy,
   DownloadSimple,
+  Gift,
   Fire,
   LockSimple,
   Moon,
   Play,
+  ShareNetwork,
   ShieldCheck,
   SignOut,
   Sun,
@@ -18,7 +21,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Avatar, ScreenLoader, Switch, cx } from '../components/ui';
 import { errMsg } from '../lib/api';
-import { logout, useConfig, useFriends, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
+import { logout, useConfig, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
 import { currentSubscription, disablePush, enablePush, isStandalone, pushSupported } from '../lib/push';
 import { disconnectSocket } from '../lib/socket';
 import { openSheet, toast, useUI } from '../lib/store';
@@ -72,6 +75,48 @@ function Row({ icon, label, onClick, right, danger }: { icon: ReactNode; label: 
       <span className="flex-1">{label}</span>
       {right ?? <CaretRight size={18} className="text-mute" />}
     </button>
+  );
+}
+
+function InviteCard() {
+  const { data } = useInvite();
+  if (!data) return null;
+  const copy = () => navigator.clipboard?.writeText(data.code).then(() => toast('Code copié'));
+  const share = async () => {
+    const text = `Rejoins-moi sur Mandrix ! Mon code de parrainage : ${data.code}`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Mandrix', text, url: data.link });
+      else {
+        await navigator.clipboard.writeText(`${text}\n${data.link}`);
+        toast('Lien d’invitation copié');
+      }
+    } catch {
+      /* partage annulé */
+    }
+  };
+  return (
+    <div className="flex flex-col gap-3 rounded-[32px] bg-brand p-[18px] text-white shadow-blue">
+      <div className="flex items-center gap-3">
+        <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-card text-acc">
+          <Gift size={22} weight="fill" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-lg font-extrabold">Parraine tes amis</div>
+          <div className="text-[13px] text-white/80">
+            {data.invited > 0 ? `${data.invited} ami${data.invited > 1 ? 's' : ''} parrainé${data.invited > 1 ? 's' : ''}` : 'Ils deviennent tes amis dès leur inscription'}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 rounded-[26px] bg-card p-2 pl-4 text-ink">
+        <span className="min-w-0 flex-1 truncate font-mono text-[17px] font-bold tracking-wider">{data.code}</span>
+        <button type="button" aria-label="Copier le code" onClick={copy} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
+          <Copy size={18} />
+        </button>
+        <button type="button" aria-label="Partager l’invitation" onClick={share} className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-ink px-3.5 text-[13px] font-bold text-inv active:scale-95">
+          <ShareNetwork size={18} /> Inviter
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -233,6 +278,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
         )}
       </div>
 
+      {isMe && <InviteCard />}
       {isMe && <Settings />}
 
       <div className="relative grid grid-cols-3 rounded-[28px] bg-glass p-1">

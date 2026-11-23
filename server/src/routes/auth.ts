@@ -1,12 +1,14 @@
 import { USERNAME_RE, type AppConfig } from '@mandrix/shared';
-import { and, eq, gt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { env } from '../env.js';
 import { createSession, destroySession, hashPassword, randomToken, requireUser, sha256, verifyPassword } from '../lib/auth.js';
 import { fail, parse } from '../lib/http.js';
+import { ensureInviteCode, findSponsor, normalizeCode, userCount } from '../lib/invite.js';
 import { mailEnabled, sendMail } from '../lib/mail.js';
+import { notify } from '../lib/notify.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { toMe } from '../lib/users.js';
 
@@ -33,7 +35,8 @@ export default async function authRoutes(app: FastifyInstance) {
   const limited = { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } };
 
   app.get('/api/config', async (): Promise<AppConfig> => ({
-    inviteRequired: !!env.inviteCode,
+    // Le tout premier compte (l'admin) s'inscrit sans code ; ensuite il faut être parrainé.
+    inviteRequired: !!env.inviteCode || (await userCount()) > 0,
     mailEnabled: mailEnabled(),
     vapidPublicKey: vapidPublicKey(),
     revealDay: env.revealDay,
@@ -44,7 +47,13 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/api/auth/register', limited, async (req, reply) => {
     const body = parse(registerSchema, req.body);
-    if (env.inviteCode && body.inviteCode !== env.inviteCode) fail(403, "Code d'invitation incorrect");
+    const count = await userCount();
+    const code = normalizeCode(body.inviteCode ?? '');
+    const sponsor = code ? await findSponsor(code) : null;
+    const masterOk = !!env.inviteCode && code === normalizeCode(env.inviteCode);
+    if (count > 0 && !sponsor && !masterOk) {
+      fail(403, code ? 'Code de parrainage inconnu' : 'Il faut le code de parrainage d’un membre pour s’inscrire');
+    }
     const existing = await db
       .select({ username: schema.users.username, email: schema.users.email })
       .from(schema.users)
@@ -52,7 +61,6 @@ export default async function authRoutes(app: FastifyInstance) {
       .limit(1);
     if (existing[0]) fail(409, existing[0].email === body.email ? 'Cette adresse e-mail a déjà un compte' : 'Ce pseudo est déjà pris');
 
-    const [{ count }] = await db.execute<{ count: number }>(sql`select count(*)::int as count from users`);
     const isAdmin = count === 0 || env.adminEmails.includes(body.email);
     const [user] = await db
       .insert(schema.users)
@@ -62,8 +70,20 @@ export default async function authRoutes(app: FastifyInstance) {
         email: body.email,
         passwordHash: await hashPassword(body.password),
         isAdmin,
+        invitedBy: sponsor?.id ?? null,
       })
       .returning();
+    await ensureInviteCode(user.id, user.username);
+    if (sponsor) {
+      // Parrain et filleul deviennent amis d'office : le fil du nouveau venu n'est pas vide.
+      await db.insert(schema.friendships).values({ requesterId: sponsor.id, addresseeId: user.id, status: 'accepted' }).onConflictDoNothing();
+      await notify({
+        userId: sponsor.id,
+        type: 'invite_joined',
+        actorId: user.id,
+        push: { title: 'Nouveau filleul 🎉', body: `${user.displayName} a rejoint Mandrix avec ton code`, url: `/u/${user.username}`, tag: 'invite' },
+      });
+    }
     await createSession(reply, user.id);
     return toMe(user);
   });

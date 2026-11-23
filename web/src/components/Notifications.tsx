@@ -69,6 +69,12 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         text: <>Ta série est en jeu : pense à ta photo avant dimanche</>,
         action: { label: 'Photo', run: () => nav('/pellicule') },
       };
+    case 'invite_joined':
+      return {
+        icon: <UserPlus size={18} weight="fill" className="text-acc" />,
+        text: <>{who} a rejoint Mandrix grâce à ton code</>,
+        to: n.actor ? `/u/${n.actor.username}` : undefined,
+      };
     case 'shot_like':
       return { icon: <Heart size={18} weight="fill" className="text-heart" />, text: <>{who} a aimé ta photo de la Pellicule</>, to: '/deballage' };
     default:

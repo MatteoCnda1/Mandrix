@@ -88,9 +88,11 @@ Le plan gratuit limite chaque envoi à 100 Mo, d'où `MAX_UPLOAD_MB=100`.
 
 ## 5. Premier compte et administration
 
-- Le **premier compte créé** sur l'instance devient administrateur (modération du pool).
-  Les e-mails listés dans `ADMIN_EMAILS` le deviennent aussi à l'inscription.
-- Avec `INVITE_CODE` défini, il faut ce code pour s'inscrire : donne-le seulement à tes amis.
+- Le **premier compte créé** sur l'instance devient administrateur (modération du pool) et s'inscrit sans code.
+  Les e-mails listés dans `ADMIN_EMAILS` deviennent aussi administrateurs à l'inscription.
+- Ensuite, **l'inscription se fait par parrainage** : chaque membre a un code dans son profil
+  (bouton « Inviter » = lien `https://…/?parrain=CODE`). Le filleul devient automatiquement ami avec son parrain.
+- `INVITE_CODE` (optionnel) est un code « maître » accepté en plus des codes de parrainage.
 
 Commandes utiles :
 

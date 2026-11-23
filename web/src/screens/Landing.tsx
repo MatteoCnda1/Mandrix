@@ -7,13 +7,21 @@ import { qc, useConfig } from '../lib/data';
 
 type Mode = 'signup' | 'login' | 'forgot';
 
+const sponsorFromUrl = () => {
+  try {
+    return new URLSearchParams(location.search).get('parrain')?.trim().toUpperCase() ?? '';
+  } catch {
+    return '';
+  }
+};
+
 export function Landing() {
   const { data: config } = useConfig();
   const [mode, setMode] = useState<Mode>('signup');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [invite, setInvite] = useState('');
+  const [invite, setInvite] = useState(sponsorFromUrl);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,7 +105,17 @@ export function Landing() {
               />
             )}
             {mode === 'signup' && config?.inviteRequired && (
-              <input className={field} placeholder="Code d’invitation" value={invite} onChange={(e) => setInvite(e.target.value)} required />
+              <input
+                className={field}
+                placeholder="Code de parrainage (ex. LEA-7K2F)"
+                value={invite}
+                onChange={(e) => setInvite(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
+                required
+              />
+            )}
+            {mode === 'signup' && config?.inviteRequired && !invite && (
+              <div className="px-3 text-[13px] leading-snug text-mute">Mandrix se rejoint sur invitation : demande son code de parrainage à un ami déjà inscrit.</div>
             )}
             {error && <div className="px-3 text-sm font-semibold text-heart" role="alert">{error}</div>}
             {info && <div className="px-3 text-sm font-semibold text-acc">{info}</div>}
