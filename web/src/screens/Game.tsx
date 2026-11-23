@@ -472,12 +472,17 @@ export function Game() {
   const room = useGame((s) => s.room);
   const synced = useGame((s) => s.synced);
   const [params, setParams] = useSearchParams();
-  const joined = useRef(false);
+  // Dernier code rejoint : une nouvelle invitation (autre code) fonctionne même sans quitter l'écran.
+  const joined = useRef<string | null>(null);
   const code = params.get('code');
 
   useEffect(() => {
-    if (!code || !synced || joined.current) return;
-    joined.current = true;
+    if (!code) {
+      joined.current = null;
+      return;
+    }
+    if (!synced || joined.current === code) return;
+    joined.current = code;
     if (room?.code !== code.toUpperCase()) void enterRoom('game:join', code);
     setParams({}, { replace: true });
   }, [code, synced]); // eslint-disable-line react-hooks/exhaustive-deps

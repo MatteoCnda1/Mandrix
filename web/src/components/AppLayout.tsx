@@ -1,6 +1,7 @@
 import { Bell, CaretLeft, Camera, ChatCircleDots, GameController, House, LockSimple, Moon, Package, Play, Plus, Sun, User } from '@phosphor-icons/react';
-import { useEffect, useState, type ComponentType } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { useEffect, useLayoutEffect, useState, type ComponentType } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router';
+import { closeReport } from './Report';
 import { api } from '../lib/api';
 import { qc, useBadges, usePellicule, usePoolStats } from '../lib/data';
 import { countdown } from '../lib/format';
@@ -255,6 +256,9 @@ function Aside() {
   );
 }
 
+/** Position de défilement de chaque page visitée (clé de l'entrée d'historique). */
+const scrollPositions = new Map<string, number>();
+
 export function AppLayout() {
   const { isPhone, isDesktop } = useViewport();
   const { pathname } = useLocation();
@@ -266,9 +270,23 @@ export function AppLayout() {
   const info = routeInfo(pathname);
   const swipe = useEdgeSwipeBack(info.back ? () => back(info.back!) : null);
 
+  // Changement d'écran : on ferme les feuilles restées ouvertes, et on remonte en haut,
+  // sauf au retour arrière où l'on retrouve la position quittée (fil, profil…).
+  const navType = useNavigationType();
+  const { key } = useLocation();
+  useLayoutEffect(() => {
+    useUI.getState().closeAll();
+    closeReport();
+    if (navType === 'POP') {
+      const y = scrollPositions.get(key);
+      if (y) requestAnimationFrame(() => window.scrollTo(0, y));
+    } else window.scrollTo(0, 0);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
+    const save = () => scrollPositions.set(key, window.scrollY);
+    window.addEventListener('scroll', save, { passive: true });
+    return () => window.removeEventListener('scroll', save);
+  }, [key]);
 
   return (
     <div className="min-h-dvh font-sans text-ink" style={{ ['--toast-bottom' as string]: isPhone ? '92px' : '28px' }}>

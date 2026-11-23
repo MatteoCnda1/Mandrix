@@ -64,7 +64,8 @@ const infinite = <T>(key: unknown[], url: (page: number) => string) => ({
 export const useFeed = () => useInfiniteQuery(infinite<Post>(['feed'], (p) => `/api/feed?page=${p}`));
 export const useReels = () => useInfiniteQuery(infinite<Post>(['reels'], (p) => `/api/reels?page=${p}`));
 export const useStories = () => useQuery({ queryKey: ['stories'], queryFn: () => api<StoryGroup[]>('/api/stories') });
-export const usePost = (id: string) => useQuery({ queryKey: ['post', id], queryFn: () => api<Post>(`/api/posts/${id}`) });
+export const usePost = (id: string, enabled = true) =>
+  useQuery({ queryKey: ['post', id], queryFn: () => api<Post>(`/api/posts/${id}`), enabled: enabled && !!id });
 export const useComments = (id: string | null) =>
   useQuery({ queryKey: ['comments', id], queryFn: () => api<Comment[]>(`/api/posts/${id}/comments`), enabled: !!id });
 export const useMemes = () =>

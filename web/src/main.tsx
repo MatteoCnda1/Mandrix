@@ -51,7 +51,7 @@ function Splash() {
 /** Garde d'authentification : landing si déconnecté, application sinon. */
 function Root() {
   const { data: me, isLoading } = useMe();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   useKeyboardViewport();
 
   useEffect(() => {
@@ -81,7 +81,7 @@ function Root() {
 
   let screen;
   if (isLoading) screen = <Splash />;
-  else if (!me) screen = pathname === '/' ? <Landing /> : <Navigate to={`/?next=${encodeURIComponent(pathname)}`} replace />;
+  else if (!me) screen = pathname === '/' ? <Landing /> : <Navigate to={`/?next=${encodeURIComponent(pathname + search)}`} replace />;
   else screen = <AppLayout />;
   return (
     <>
@@ -92,6 +92,12 @@ function Root() {
     </>
   );
 }
+
+// Notification touchée alors que l'app est ouverte : le service worker demande d'aller à la page.
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  const data = e.data as { type?: string; path?: string } | null;
+  if (data?.type === 'navigate' && data.path?.startsWith('/') && !data.path.startsWith('//')) void router.navigate(data.path);
+});
 
 function RedirectAfterLogin() {
   const params = new URLSearchParams(location.search);

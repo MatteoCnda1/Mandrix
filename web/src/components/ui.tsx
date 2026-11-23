@@ -2,6 +2,7 @@ import type { MediaRef, UserLite } from '@mandrix/shared';
 import { ArrowClockwise, CircleNotch, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { lockScroll } from '../lib/scrollLock';
 import { twMerge } from 'tailwind-merge';
 import logoSymbol from '../assets/logo/mandrix-symbol.svg';
 import { useUI } from '../lib/store';
@@ -76,7 +77,22 @@ export function Switch({ on }: { on: boolean }) {
 }
 
 /** Feuille du bas (HIG) : poignée, fermeture par glissement vers le bas, Échap ou tap sur le fond. */
-export function Sheet({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  wide,
+  locked,
+  onLockedClose,
+}: {
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+  /** Fermeture impossible (envoi en cours…) : `onLockedClose` explique pourquoi. */
+  locked?: boolean;
+  onLockedClose?: () => void;
+}) {
   const [dragY, setDragY] = useState(0);
   const [closing, setClosing] = useState(false);
   const drag = useRef<{ y: number; t: number } | null>(null);
@@ -109,17 +125,26 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (lockedRef.current) onLockedClose?.();
+      else onClose();
+    };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const release = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      release();
     };
   }, [onClose]);
 
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
   const dismiss = () => {
+    if (lockedRef.current) {
+      setDragY(0);
+      return onLockedClose?.();
+    }
     setClosing(true);
     setTimeout(onClose, 220);
   };
@@ -142,7 +167,7 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
 
   return createPortal(
     <div
-      className="fixed inset-x-0 z-40 flex items-end justify-center"
+      className="fixed inset-x-0 z-[62] flex items-end justify-center"
       style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
       role="dialog"
       aria-modal="true"
@@ -238,7 +263,7 @@ export function ConfirmHost() {
   };
   const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[1.0625rem] transition-colors active:bg-soft';
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
       <div onClick={() => answer(false)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
       <div className="relative flex w-full max-w-[420px] animate-sheet flex-col gap-2">
         <div className="overflow-hidden rounded-[24px] bg-card text-center">
@@ -288,7 +313,7 @@ export function Toast() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed left-1/2 z-50 flex h-12 max-w-[calc(100vw-32px)] items-center gap-2 rounded-3xl bg-hero px-[18px] text-sm font-bold whitespace-nowrap text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
+      className="pointer-events-none fixed left-1/2 z-[85] flex h-12 max-w-[calc(100vw-32px)] items-center gap-2 rounded-3xl bg-hero px-[18px] text-sm font-bold whitespace-nowrap text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
       style={{
         bottom: 'calc(var(--toast-bottom, 28px) + env(safe-area-inset-bottom))',
         transform: `translate(-50%, ${t ? '0px' : '20px'})`,

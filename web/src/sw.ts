@@ -74,7 +74,9 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of all) {
         if (new URL(client.url).origin === self.location.origin) {
           await client.focus();
-          await client.navigate(url).catch(() => {});
+          // L'app ouverte navigue elle-même (pas de rechargement : brouillons et partie en cours sont gardés).
+          const u = new URL(url);
+          client.postMessage({ type: 'navigate', path: u.pathname + u.search + u.hash });
           return;
         }
       }

@@ -2,6 +2,7 @@ import type { MediaRef } from '@mandrix/shared';
 import { Pause, Play, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useSwipeDown } from '../lib/gestures';
+import { useScrollLock } from '../lib/scrollLock';
 import { cx, fmtDuration, MediaView, Portal, VideoProcessing } from './ui';
 
 /** Barres de « forme d'onde » stables pour un vocal (dérivées de son identifiant). */
@@ -137,6 +138,7 @@ export function MessagePhotoVideo({ media, onOpen }: { media: MediaRef; onOpen: 
 /** Affichage plein écran d'une photo ou d'une vidéo de conversation. */
 export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: () => void }) {
   const swipe = useSwipeDown(onClose);
+  useScrollLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);

@@ -322,8 +322,13 @@ function TypingDots() {
   );
 }
 
+/** Une conversation par instance : passer d'une conversation à l'autre repart d'un état vide. */
 export function Chat() {
   const { id = '' } = useParams();
+  return <ChatView key={id} id={id} />;
+}
+
+function ChatView({ id }: { id: string }) {
   const nav = useNavigate();
   const goBack = useGoBack();
   const { isPhone } = useViewport();

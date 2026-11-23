@@ -5,12 +5,19 @@ import { api, errMsg } from '../lib/api';
 import { qc, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
 import { useMediaGestures } from '../lib/gestures';
+import { useScrollLock } from '../lib/scrollLock';
 import { toast, useUI } from '../lib/store';
 
 const IMAGE_MS = 4500;
 
 export function StoryViewer({ start }: { start: { group: number; index: number } }) {
-  const { data: groups } = useStories();
+  // Liste figée à l'ouverture : une story vue repasse en fin de liste côté serveur, et un
+  // rafraîchissement (retour dans l'app, tirer pour rafraîchir) ne doit pas changer de personne en cours de route.
+  const { data: live } = useStories();
+  const snapshot = useRef(live);
+  if (!snapshot.current && live) snapshot.current = live;
+  const groups = snapshot.current;
+  useScrollLock();
   const { data: me } = useMe();
   const [pos, setPos] = useState(start);
   const [reply, setReply] = useState('');
@@ -90,7 +97,12 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
     const v = videoRef.current;
     if (!v) return;
     if (paused) v.pause();
-    else v.play().catch(() => {});
+    else
+      v.play().catch(() => {
+        // iOS refuse parfois le son sans geste : on relance sans le son plutôt que de rester bloqué.
+        v.muted = true;
+        v.play().catch(() => {});
+      });
   }, [paused, story?.id]);
 
   useEffect(() => {
@@ -104,7 +116,10 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (!group || !story) return null;
+  if (!group || !story) {
+    if (groups) queueMicrotask(close);
+    return null;
+  }
 
   const sendReply = async () => {
     const text = reply.trim();

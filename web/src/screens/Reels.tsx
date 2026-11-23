@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, ChatCircle, CheckCircle, Heart, Play, Repeat, Speak
 import { useEffect, useRef, useState, type TouchEvent, type WheelEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
-import { removeFromPool, toggleLike, toggleRepost, useMe, useReels } from '../lib/data';
+import { removeFromPool, toggleLike, toggleRepost, useMe, useReels, usePost } from '../lib/data';
 import { fmtCount } from '../lib/format';
 import { openPool, useUI } from '../lib/store';
 import { useViewport } from '../lib/theme';
@@ -92,17 +92,27 @@ export function Reels() {
   const { isPhone } = useViewport();
   const [params] = useSearchParams();
   const reels = useReels();
-  const items = reels.data?.pages.flatMap((p) => p.items) ?? [];
+  const wanted = params.get('v');
+  // Vidéo ouverte depuis le fil : elle peut ne pas être dans les reels (republication, post ancien) ;
+  // on la charge seule et on la place en tête.
+  const target = usePost(wanted ?? '', !!wanted);
+  const loaded = reels.data?.pages.flatMap((p) => p.items) ?? [];
+  const extra = target.data && target.data.media?.kind === 'video' && !loaded.some((p) => p.id === wanted) ? [target.data] : [];
+  const items = [...extra, ...loaded];
   const [idx, setIdx] = useState(0);
   const [muted, setMuted] = useState(true);
   const lock = useRef(false);
   const touchY = useRef(0);
-  const wanted = params.get('v');
+  const applied = useRef<string | null>(null);
 
+  // Une seule fois par vidéo demandée : le chargement des pages suivantes ne ramène plus au début.
   useEffect(() => {
-    if (!wanted || items.length === 0) return;
+    if (!wanted || applied.current === wanted || items.length === 0) return;
     const i = items.findIndex((p) => p.id === wanted);
-    if (i >= 0) setIdx(i);
+    if (i >= 0) {
+      applied.current = wanted;
+      setIdx(i);
+    }
   }, [wanted, items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

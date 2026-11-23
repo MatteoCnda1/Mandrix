@@ -103,7 +103,8 @@ export function Feed() {
   const { data: pel } = usePellicule();
   const now = useNow(1000);
   const cd = countdown(pel?.nextRevealAt, now);
-  const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
+  // Pagination par décalage : un post publié pendant le défilement peut réapparaître sur la page suivante.
+  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []).filter((p, i, all) => all.findIndex((x) => x.id === p.id) === i);
   const sentinel = useSentinel(() => feed.hasNextPage && !feed.isFetchingNextPage && feed.fetchNextPage(), !!feed.hasNextPage);
   const { pull, refreshing } = usePullToRefresh(() =>
     Promise.all([feed.refetch(), qc.invalidateQueries({ queryKey: ['stories'] }), qc.invalidateQueries({ queryKey: ['pellicule'] })]),

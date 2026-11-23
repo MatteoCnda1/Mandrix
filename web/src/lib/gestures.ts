@@ -59,7 +59,8 @@ export function useSwipeX(onSwipe: (dir: 1 | -1) => void, { threshold = 64, max 
     dx,
     handlers: {
       onPointerDown: (e: React.PointerEvent) => {
-        if (e.pointerType === 'mouse') return;
+        // Les 24 premiers pixels sont réservés au retour par le bord gauche (iPhone).
+        if (e.pointerType === 'mouse' || e.clientX <= 24) return;
         start.current = { x: e.clientX, y: e.clientY };
         locked.current = null;
       },

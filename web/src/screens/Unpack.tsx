@@ -19,6 +19,7 @@ import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
 import { useMediaGestures } from '../lib/gestures';
+import { lockScroll, useScrollLock } from '../lib/scrollLock';
 import { useNow } from '../lib/hooks';
 import { openPool } from '../lib/store';
 
@@ -38,6 +39,7 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [photos.length, onClose]);
+  useScrollLock();
   const gestures = useMediaGestures({
     onSwipeDown: onClose,
     onSwipeX: (dir) => setI((x) => Math.max(0, Math.min(photos.length - 1, x - dir))),
@@ -124,11 +126,10 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
       if (e.key === ' ') setPaused((p) => !p);
     };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const release = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      release();
     };
   }, [onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
