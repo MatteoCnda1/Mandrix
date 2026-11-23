@@ -8,6 +8,8 @@ import {
   Heart,
   Lock,
   Play,
+  PaperPlaneTilt,
+  PushPin,
   Repeat,
   Sticker,
   Trash,
@@ -16,7 +18,7 @@ import {
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { api, errMsg } from '../lib/api';
-import { deletePost, patchPost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
+import { deletePost, patchPost, pinPost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
 import { fmtCount, plural, timeAgo } from '../lib/format';
 import { useLongPress, useNow, type Point } from '../lib/hooks';
 import { useDoubleTap } from '../lib/gestures';
@@ -25,7 +27,7 @@ import { useHeartBurst } from './HeartBurst';
 import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
 import { MentionSuggestions, RichText } from './RichText';
-import { openPool, toast, useUI } from '../lib/store';
+import { openPool, openShare, toast, useUI } from '../lib/store';
 import { Avatar, confirmAction, cx, fmtDuration, MediaView, PrimaryBtn, ratioOf, Sheet, VideoProcessing } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
@@ -92,6 +94,9 @@ export function ActionBar({ post }: { post: Post }) {
       >
         <Repeat size={20} />
         <span>{fmtCount(post.reposts)}</span>
+      </button>
+      <button type="button" className={pill} onClick={() => openShare(post)} aria-label="Envoyer en message">
+        <PaperPlaneTilt size={20} />
       </button>
       {canPool && (
         <button
@@ -369,6 +374,18 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
             }}
           >
             <PencilSimple size={20} /> Modifier la légende
+          </button>
+        )}
+        {me && post.author.id === me.id && post.kind !== 'meme' && (
+          <button
+            type="button"
+            className={item}
+            onClick={() => {
+              onClose();
+              void pinPost(me.pinnedPostId === post.id ? null : post.id);
+            }}
+          >
+            <PushPin size={20} weight={me.pinnedPostId === post.id ? 'fill' : 'regular'} /> {me.pinnedPostId === post.id ? 'Désépingler du profil' : 'Épingler sur mon profil'}
           </button>
         )}
         {me && post.author.id !== me.id && (

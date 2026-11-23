@@ -2,6 +2,7 @@ import type { Post, UserProfile } from '@mandrix/shared';
 import {
   CaretRight,
   DotsThree,
+  PushPin,
   Flag,
   GearSix,
   Prohibit,
@@ -45,7 +46,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'memes', label: 'Mèmes' },
 ];
 
-function Tile({ post, ratio }: { post: Post; ratio: string }) {
+function Tile({ post, ratio, pinned = false }: { post: Post; ratio: string; pinned?: boolean }) {
   const nav = useNavigate();
   return (
     <button
@@ -55,6 +56,11 @@ function Tile({ post, ratio }: { post: Post; ratio: string }) {
       style={{ aspectRatio: ratio }}
     >
       {post.media?.kind === 'image' && <img src={post.media.url} srcSet={post.media.srcSet ?? undefined} sizes="(max-width: 700px) 34vw, 220px" alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+      {pinned && (
+        <span className="absolute top-2 left-2 z-[1] grid h-7 w-7 place-items-center rounded-full bg-black/45 text-white" aria-label="Post épinglé">
+          <PushPin size={15} weight="fill" />
+        </span>
+      )}
       {post.gallery && (
         <span className="absolute top-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/45 text-white" aria-label={`${post.gallery.length} photos`}>
           <Stack size={15} weight="fill" />
@@ -435,10 +441,11 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
               <div key={i} className="skel rounded-[20px]" style={{ aspectRatio: ratio }} />
             ))}
           </div>
-        ) : posts?.items.length === 0 ? (
+        ) : posts?.items.length === 0 && !posts.pinned ? (
           <div className="card p-8 text-center text-sm text-mute">{tab === 'memes' ? 'Aucun mème publié.' : tab === 'reels' ? 'Aucune vidéo.' : 'Aucun post pour l’instant.'}</div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
+            {posts?.pinned && <Tile key={posts.pinned.id} post={posts.pinned} ratio={ratio} pinned />}
             {posts?.items.map((p) => <Tile key={p.id} post={p} ratio={ratio} />)}
           </div>
         )}

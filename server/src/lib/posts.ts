@@ -76,6 +76,16 @@ export async function visiblePost(viewerId: string, postId: string) {
   return p!;
 }
 
+/** Le lecteur peut-il voir ce post ? (même règle que `visiblePost`, sans erreur). */
+export async function canSeePost(viewerId: string, postId: string) {
+  try {
+    await visiblePost(viewerId, postId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<Post[]> {
   const circle = opts.circle ? uuidArray(opts.circle) : null;
   const repostedBy = circle
@@ -114,7 +124,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
   `);
 
   const list = [...rows];
-  const usersMap = await usersByIds(list.flatMap((r) => [r.authorId, r.repostedById]));
+  const usersMap = await usersByIds(list.flatMap((r) => [r.authorId, r.repostedById]), viewerId);
   const galleries = await loadGalleries(list.filter((r) => r.kind === 'photo').map((r) => r.id));
   const polls = await loadPolls(
     viewerId,

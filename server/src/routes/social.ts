@@ -141,7 +141,7 @@ export default async function socialRoutes(app: FastifyInstance) {
           and ${notBlocked(me.id, sql`u.id`)}
         order by (u.id = any(${circle})) desc, u.display_name
         limit 8`);
-      found = [...rows].map(toLite);
+      found = [...rows].map((u) => toLite(u));
     }
     return { posts, users: found };
   });

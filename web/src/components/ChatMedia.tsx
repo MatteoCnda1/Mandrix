@@ -21,9 +21,23 @@ function bars(id: string, n = 30) {
 let playingAudio: HTMLAudioElement | null = null;
 
 /** Lecteur de message vocal : lecture/pause, progression sur la forme d'onde, durée. */
+/** Vitesses de lecture des vocaux (#75), mémorisées sur l'appareil pour tous les vocaux. */
+const RATES = [1, 1.5, 2] as const;
+const RATE_KEY = 'mandrix.voiceRate';
+function readRate(): number {
+  try {
+    const r = Number(localStorage.getItem(RATE_KEY));
+    return (RATES as readonly number[]).includes(r) ? r : 1;
+  } catch {
+    return 1;
+  }
+}
+const rateLabel = (r: number) => `${String(r).replace('.', ',')}×`;
+
 export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean }) {
   const ref = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [rate, setRate] = useState(readRate);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(media.duration ?? 0);
   const shape = bars(media.id);
@@ -40,6 +54,17 @@ export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean })
       playingAudio = a;
       void a.play();
     } else a.pause();
+  };
+
+  const nextRate = () => {
+    const r = RATES[(RATES.indexOf(rate as (typeof RATES)[number]) + 1) % RATES.length];
+    setRate(r);
+    if (ref.current) ref.current.playbackRate = r;
+    try {
+      localStorage.setItem(RATE_KEY, String(r));
+    } catch {
+      /* stockage indisponible */
+    }
   };
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -78,11 +103,30 @@ export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean })
       <span className={cx('w-9 flex-none text-right text-xs font-bold tabular-nums', mine ? 'text-white/90' : 'text-mute')}>
         {fmtDuration(playing || time ? time : duration) ?? '0:00'}
       </span>
+      {(playing || time > 0) && (
+        <button
+          type="button"
+          onClick={nextRate}
+          aria-label={`Vitesse de lecture ${rateLabel(rate)}, toucher pour changer`}
+          className={cx(
+            'tap h-6 flex-none rounded-full border-0 px-2 text-[0.6875rem] font-extrabold tabular-nums',
+            mine ? 'bg-white/25 text-white' : 'bg-ink/10 text-ink',
+          )}
+        >
+          {rateLabel(rate)}
+        </button>
+      )}
       <audio
         ref={ref}
         src={media.url}
         preload="metadata"
-        onPlay={() => setPlaying(true)}
+        onPlay={(e) => {
+          // Vitesse choisie sur un autre vocal entre-temps : on la reprend.
+          const r = readRate();
+          e.currentTarget.playbackRate = r;
+          setRate(r);
+          setPlaying(true);
+        }}
         onPause={() => setPlaying(false)}
         onEnded={() => {
           setPlaying(false);

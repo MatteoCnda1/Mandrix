@@ -1,5 +1,5 @@
 import { POLL_MAX_OPTIONS, REACTIONS, type Comment, type Page, type Post, type PostSearch } from '@mandrix/shared';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
@@ -145,7 +145,8 @@ export default async function postRoutes(app: FastifyInstance) {
         .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null })
         .returning();
       if (extra.length) await db.insert(schema.postMedia).values(extra.map((mediaId, i) => ({ postId: p.id, mediaId, position: i + 1 })));
-      if (body.pool) await upsertPoolItem({ mediaId: body.mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
+      // Pool du jeu : toutes les photos du carrousel, pas seulement la première.
+      if (body.pool) for (const mediaId of [body.mediaId, ...extra]) await upsertPoolItem({ mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
       await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id });
       await announcePost(me.id, p.id);
       return getPost(me.id, p.id);
@@ -210,6 +211,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const p = await postAuthor(id);
     if (p.authorId !== me.id && !me.isAdmin) fail(403, 'Tu ne peux supprimer que tes posts');
     await db.delete(posts).where(eq(posts.id, id));
+    await db.update(schema.users).set({ pinnedPostId: null }).where(eq(schema.users.pinnedPostId, id));
     return { ok: true };
   });
 
@@ -317,8 +319,8 @@ export default async function postRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     await visiblePost(me.id, id);
-    const rows = await db.execute<{ id: string; authorId: string; text: string; createdAt: Date; likes: number; liked: boolean }>(sql`
-      select c.id, c.author_id as "authorId", c.text, c.created_at as "createdAt",
+    const rows = await db.execute<{ id: string; authorId: string; text: string; createdAt: Date; likes: number; liked: boolean; parentId: string | null }>(sql`
+      select c.id, c.author_id as "authorId", c.text, c.created_at as "createdAt", c.parent_id as "parentId",
         (select count(*)::int from comment_likes cl where cl.comment_id = c.id) as likes,
         exists(select 1 from comment_likes cl where cl.comment_id = c.id and cl.user_id = ${me.id}) as liked
       from comments c where c.post_id = ${id}
@@ -326,7 +328,7 @@ export default async function postRoutes(app: FastifyInstance) {
         and ${notBlocked(me.id, sql`c.author_id`)}
       order by c.created_at asc limit 300`);
     const list = [...rows];
-    const authors = await usersByIds(list.map((r) => r.authorId));
+    const authors = await usersByIds(list.map((r) => r.authorId), me.id);
     return list.map((r) => ({
       id: r.id,
       postId: id,
@@ -335,15 +337,35 @@ export default async function postRoutes(app: FastifyInstance) {
       createdAt: new Date(r.createdAt).toISOString(),
       likes: r.likes,
       liked: r.liked,
+      parentId: r.parentId,
     }));
   });
 
   app.post('/api/posts/:id/comments', perMinute(20), async (req): Promise<Comment> => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
-    const { text } = parse(z.object({ text: z.string().trim().min(1, 'Commentaire vide').max(200) }), req.body);
+    const body = parse(z.object({ text: z.string().trim().min(1, 'Commentaire vide').max(200), parentId: z.string().uuid().optional() }), req.body);
+    const { text } = body;
     const p = await visiblePost(me.id, id);
-    const [c] = await db.insert(comments).values({ postId: id, authorId: me.id, text }).returning();
+    // Réponse : un seul niveau, une réponse à une réponse se range sous le même commentaire.
+    let parent: { id: string; authorId: string } | null = null;
+    if (body.parentId) {
+      const [c0] = await db.select().from(comments).where(and(eq(comments.id, body.parentId), eq(comments.postId, id))).limit(1);
+      if (!c0 || c0.hiddenAt) return fail(400, 'Commentaire introuvable');
+      parent = c0.parentId ? ((await db.select().from(comments).where(eq(comments.id, c0.parentId)).limit(1))[0] ?? null) : c0;
+      if (!parent) return fail(400, 'Commentaire introuvable');
+      // On notifie la personne à qui l'on répond (celle du commentaire touché).
+      if (c0.authorId !== me.id && c0.authorId !== p.authorId) {
+        await notify({
+          userId: c0.authorId,
+          type: 'comment',
+          actorId: me.id,
+          data: { postId: id, kind: p.kind, text: text.slice(0, 80), reply: true },
+          push: { title: me.displayName, body: `t’a répondu : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `reply:${c0.id}` },
+        });
+      }
+    }
+    const [c] = await db.insert(comments).values({ postId: id, authorId: me.id, text, parentId: parent?.id ?? null }).returning();
     await notify({
       userId: p.authorId,
       type: 'comment',
@@ -352,8 +374,17 @@ export default async function postRoutes(app: FastifyInstance) {
       push: { title: me.displayName, body: `a commenté ${KIND_LABEL[p.kind] ?? 'ton post'} : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `comment:${id}` },
     });
     await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id, postAuthorId: p.authorId });
-    const authors = await usersByIds([me.id]);
-    return { id: c.id, postId: id, author: authors.get(me.id)!, text: c.text, createdAt: c.createdAt.toISOString(), likes: 0, liked: false };
+    const authors = await usersByIds([me.id], me.id);
+    return {
+      id: c.id,
+      postId: id,
+      author: authors.get(me.id)!,
+      text: c.text,
+      createdAt: c.createdAt.toISOString(),
+      likes: 0,
+      liked: false,
+      parentId: c.parentId,
+    };
   });
 
   app.delete('/api/comments/:id', async (req) => {
@@ -362,7 +393,8 @@ export default async function postRoutes(app: FastifyInstance) {
     const [c] = await db.select().from(comments).where(eq(comments.id, id)).limit(1);
     if (!c) return fail(404, 'Commentaire introuvable');
     if (c.authorId !== me.id && !me.isAdmin) fail(403, 'Action impossible');
-    await db.delete(comments).where(eq(comments.id, id));
+    // Ses réponses partent avec lui.
+    await db.delete(comments).where(or(eq(comments.id, id), eq(comments.parentId, id)));
     return { ok: true };
   });
 

@@ -41,6 +41,8 @@ export const users = pgTable('users', {
   showPresence: boolean('show_presence').notNull().default(true),
   /** Anniversaire « MM-JJ » (l'année n'est pas demandée). */
   birthday: text('birthday'),
+  /** Post épinglé en tête du profil. */
+  pinnedPostId: uuid('pinned_post_id'),
   createdAt: created(),
 });
 
@@ -197,6 +199,8 @@ export const comments = pgTable(
     postId: uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
     authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     text: text('text').notNull(),
+    /** Réponse à un commentaire (un seul niveau). */
+    parentId: uuid('parent_id'),
     hiddenAt: ts('hidden_at'),
     createdAt: created(),
   },
@@ -315,6 +319,8 @@ export const conversations = pgTable(
     userB: uuid('user_b').references(() => users.id, { onDelete: 'cascade' }),
     isGroup: boolean('is_group').notNull().default(false),
     title: text('title'),
+    /** Photo du groupe (média de l'API). */
+    photoMediaId: uuid('photo_media_id'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     lastMessageAt: ts('last_message_at').defaultNow().notNull(),
     createdAt: created(),

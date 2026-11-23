@@ -3,8 +3,7 @@ import { ChatCircleDots, MagnifyingGlass } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Avatar, Sheet, confirmAction, cx } from '../components/ui';
-import { api, errMsg } from '../lib/api';
-import { friendAction, useFriends, useUserSearch } from '../lib/data';
+import { friendAction, openConversation, useFriends, useUserSearch } from '../lib/data';
 import { useDebounced } from '../lib/hooks';
 import { closeSheet, toast } from '../lib/store';
 import { Suggestions } from '../screens/Search';
@@ -43,15 +42,7 @@ export function FriendButton({ user, status, className }: { user: UserLite; stat
   );
 }
 
-export async function openConversation(userId: string, nav: (to: string) => void) {
-  try {
-    const { id } = await api<{ id: string }>('/api/conversations', { body: { userId } });
-    closeSheet();
-    nav(`/messages/${id}`);
-  } catch (e) {
-    toast(errMsg(e), 'error');
-  }
-}
+export { openConversation } from '../lib/data';
 
 function Row({ user, children }: { user: UserLite; children?: React.ReactNode }) {
   const nav = useNavigate();

@@ -18,6 +18,8 @@ const iconVersion = iconHash.digest('hex').slice(0, 10);
 const icon = (p: string) => `${p}?v=${iconVersion}`;
 
 export default defineConfig({
+  // Version compilée : le cache de données gardé sur l'appareil ne sert qu'à la même version.
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   plugins: [
     {
       name: 'mandrix-icon-version',

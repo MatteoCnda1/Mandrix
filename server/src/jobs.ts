@@ -5,7 +5,7 @@ import { env } from './env.js';
 import { DAILY } from '@mandrix/shared';
 import { announceBirthdays } from './lib/birthdays.js';
 import { announceVote, closeDaily, drawDaily, parisDay, shiftDay } from './lib/daily.js';
-import { deleteMediaFile, variantPath } from './lib/media.js';
+import { deleteMediaFile, mediaReferenced, variantPath } from './lib/media.js';
 import { scheduleTodayMoment } from './lib/moment.js';
 import { notifyMany } from './lib/notify.js';
 import { parisHour } from './lib/push.js';
@@ -71,18 +71,7 @@ export function startJobs() {
   new Cron('30 4 * * *', { protect: true }, async () => {
     const orphans = await db.execute<{ id: string; path: string; posterPath: string | null; sourcePath: string | null; variants: number[] | null }>(sql`
       select m.id, m.path, m.poster_path as "posterPath", m.source_path as "sourcePath", m.variants from media m
-      where m.created_at < now() - interval '1 day'
-        and not exists (select 1 from posts p where p.media_id = m.id)
-        and not exists (select 1 from post_media pm where pm.media_id = m.id)
-        and not exists (select 1 from poll_options o where o.media_id = m.id)
-        and not exists (select 1 from stories s where s.media_id = m.id and s.expires_at > now() - interval '2 days')
-        and not exists (select 1 from shots s where s.media_id = m.id)
-        and not exists (select 1 from pool_items pi where pi.media_id = m.id)
-        and not exists (select 1 from memes mm where mm.media_id = m.id)
-        and not exists (select 1 from users u where u.avatar_media_id = m.id)
-        and not exists (select 1 from messages msg where msg.meta->'media'->>'id' = m.id::text)
-        and not exists (select 1 from messages msg where msg.media_id = m.id)
-        and not exists (select 1 from daily_memes d where d.media_id = m.id)
+      where m.created_at < now() - interval '1 day' and not ${mediaReferenced(sql`m.id`)}
       limit 500`);
     for (const o of orphans) {
       await db.execute(sql`delete from media where id = ${o.id}`);

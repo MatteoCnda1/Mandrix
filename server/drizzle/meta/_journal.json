@@ -71,6 +71,13 @@
       "when": 1795453991512,
       "tag": "0009_message_client_id",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795454866640,
+      "tag": "0010_share_replies_group_photo",
+      "breakpoints": true
     }
   ]
 }

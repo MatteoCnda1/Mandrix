@@ -145,7 +145,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const [photos, setPhotos] = useState<File[]>([]);
   // Brouillon gardé si l'on ferme la feuille par erreur (texte et sondage ; les fichiers ne sont pas gardés).
   // La légende n'est restaurée que pour une publication ouverte « à vide » (pas depuis le jeu ou les Reels).
-  const caption = mode === 'post' && initialKind === undefined ? load<string>(CAPTION_KEY) : null;
+  const keepsCaption = mode === 'post' && initialKind === undefined;
+  const caption = keepsCaption ? load<string>(CAPTION_KEY) : null;
   const poll = mode === 'post' ? load<PollDraft>(POLL_KEY) : null;
   const [text, setText] = useState(caption ?? '');
   const [pool, setPool] = useState(!!initialPool);
@@ -155,8 +156,9 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const [duration, setDuration] = useState<number | null>(poll ? poll.duration : 24);
   const [isPublic, setIsPublic] = useState(poll?.isPublic ?? false);
   useEffect(() => {
-    if (mode === 'post') save(CAPTION_KEY, text.trim() ? text : null);
-  }, [mode, text]);
+    // Ouverte depuis le jeu ou les Reels : on ne touche pas au brouillon gardé.
+    if (keepsCaption) save(CAPTION_KEY, text.trim() ? text : null);
+  }, [keepsCaption, text]);
   useEffect(() => {
     if (mode !== 'post') return;
     const empty = !q.trim() && opts.every((o) => !o.trim());
@@ -230,7 +232,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         // On reste sur l'écran d'où l'on publiait (jeu, profil…) ; sur le fil, on remonte voir le post.
         if (window.location.pathname === '/') window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      if (mode === 'post') save(kind === 2 ? POLL_KEY : CAPTION_KEY, null);
+      if (kind === 2) save(POLL_KEY, null);
+      else if (keepsCaption) save(CAPTION_KEY, null);
       close();
     } catch (e) {
       toast(errMsg(e), 'error');

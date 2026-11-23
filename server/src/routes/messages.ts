@@ -2,12 +2,16 @@ import {
   attachmentLabel,
   GROUP_MAX_MEMBERS,
   MESSAGE_REACTIONS,
+  SHARED_POST_LABEL,
   type Conversation,
   type ConversationDetail,
   type MediaRef,
   type Message,
   type MessageMeta,
   type MessageReaction,
+  type PostKind,
+  type SharedPost,
+  type ShareResult,
 } from '@mandrix/shared';
 import { and, asc, desc, eq, inArray, lt, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -15,7 +19,8 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser, type AuthUser } from '../lib/auth.js';
 import { fail, isUuid, parse, uuidParam } from '../lib/http.js';
-import { deleteMediaFile, mediaRef, variantPath } from '../lib/media.js';
+import { deleteMediaFile, mediaReferenced, mediaRef, saveUpload, variantPath } from '../lib/media.js';
+import { canSeePost } from '../lib/posts.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { sendPush } from '../lib/push.js';
 import { isBlockedBetween } from '../lib/blocks.js';
@@ -53,17 +58,41 @@ async function reactionsOf(ids: string[]) {
   return map;
 }
 
+/** Aperçus à jour des posts partagés (absents s'ils ont été supprimés ou masqués). */
+async function sharedPosts(ids: string[]) {
+  const map = new Map<string, SharedPost>();
+  if (ids.length === 0) return map;
+  const list = await db
+    .select({ p: schema.posts, m: schema.media })
+    .from(schema.posts)
+    .leftJoin(schema.media, eq(schema.media.id, schema.posts.mediaId))
+    .where(and(inArray(schema.posts.id, [...new Set(ids)]), sql`${schema.posts.hiddenAt} is null`));
+  const authors = await usersByIds(list.map((x) => x.p.authorId));
+  for (const { p, m } of list) {
+    const author = authors.get(p.authorId);
+    if (author) map.set(p.id, { id: p.id, kind: p.kind as PostKind, author, text: p.text, media: mediaRef(m) });
+  }
+  return map;
+}
+
+const sharedId = (meta: unknown) => {
+  const m = meta as MessageMeta;
+  return m?.type === 'post_share' ? m.postId : null;
+};
+
 async function toMessages(rows: MessageRow[]): Promise<Message[]> {
   const media = await attachments(rows);
   const reactions = await reactionsOf(rows.map((r) => r.id));
+  const shared = await sharedPosts(rows.map((r) => sharedId(r.meta)).filter((x): x is string => !!x));
   return rows.map((m) => {
     const deleted = !!m.deletedAt;
+    const postId = sharedId(m.meta);
     return {
       id: m.id,
       conversationId: m.conversationId,
       senderId: m.senderId,
       text: deleted ? '' : m.text,
-      meta: deleted ? null : ((m.meta as MessageMeta) ?? null),
+      meta: deleted ? null : postId ? { type: 'post_share', postId, post: shared.get(postId) ?? null } : ((m.meta as MessageMeta) ?? null),
       media: !deleted && m.mediaId ? (media.get(m.mediaId) ?? null) : null,
       reactions: deleted ? [] : (reactions.get(m.id) ?? []),
       deleted,
@@ -132,12 +161,26 @@ export async function relayTyping(userId: string, conversationId: string, typing
 
 /** Publie un message dans une conversation et prévient tous ses membres. */
 async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null, mediaId: string | null = null, clientId: string | null = null) {
+  // Renvoi d'un message déjà reçu (file hors ligne, réseau coupé au mauvais moment) : pas de doublon.
+  const existing = async () => {
+    const [dup] = await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.senderId, from.id), eq(messages.clientId, clientId!), eq(messages.conversationId, conv.id)))
+      .limit(1);
+    return dup;
+  };
   if (clientId) {
-    // Renvoi d'un message déjà reçu (file hors ligne, réseau coupé au mauvais moment) : pas de doublon.
-    const [dup] = await db.select().from(messages).where(and(eq(messages.senderId, from.id), eq(messages.clientId, clientId))).limit(1);
+    const dup = await existing();
     if (dup) return (await toMessages([dup]))[0];
   }
-  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId, clientId }).returning();
+  // Deux envois simultanés du même message : le second retrouve le premier au lieu d'échouer.
+  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId, clientId }).onConflictDoNothing().returning();
+  if (!m) {
+    const dup = clientId ? await existing() : undefined;
+    if (!dup) fail(409, 'Identifiant d’envoi déjà utilisé');
+    return (await toMessages([dup!]))[0];
+  }
   await db.update(conversations).set({ lastMessageAt: m.createdAt }).where(eq(conversations.id, conv.id));
   await markRead(conv.id, from.id, false);
   const [msg] = await toMessages([m]);
@@ -156,7 +199,7 @@ async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUs
   const audible = others.filter((id) => !muted.has(id));
   if (meta?.type !== 'system' && audible.length) {
     const title = conv.isGroup ? (conv.title ?? 'Groupe') : from.displayName;
-    const content = text || attachmentLabel(msg.media?.kind, msg.media?.duration);
+    const content = text || attachmentLabel(msg.media?.kind, msg.media?.duration) || (meta?.type === 'post_share' ? SHARED_POST_LABEL : '');
     const body = conv.isGroup ? `${from.displayName} : ${content}` : content;
     sendPush(audible, { title, body: body.slice(0, 140), url: `/messages/${conv.id}`, tag: `dm:${conv.id}` }, 'message').catch(() => {});
   }
@@ -179,14 +222,10 @@ async function reactable(messageId: string, userId: string) {
 
 /** Efface le fichier d'un message supprimé, s'il ne sert nulle part ailleurs (post, story, pool…). */
 async function dropAttachment(mediaId: string) {
-  const [used] = await db.execute<{ n: number }>(sql`
-    select (
-      (select count(*) from posts where media_id = ${mediaId}) + (select count(*) from post_media where media_id = ${mediaId})
-      + (select count(*) from stories where media_id = ${mediaId}) + (select count(*) from shots where media_id = ${mediaId})
-      + (select count(*) from pool_items where media_id = ${mediaId}) + (select count(*) from messages where media_id = ${mediaId})
-      + (select count(*) from users where avatar_media_id = ${mediaId})
-    )::int as n`);
-  if (used?.n) return;
+  const [used] = await db.execute<{ used: boolean; processing: boolean }>(sql`
+    select ${mediaReferenced(sql`m.id`)} as used, m.status = 'processing' as processing from media m where m.id = ${mediaId}`);
+  // Encore utilisé ailleurs, ou vidéo en cours de conversion (le ménage nocturne s'en chargera).
+  if (!used || used.used || used.processing) return;
   const [row] = await db.delete(schema.media).where(eq(schema.media.id, mediaId)).returning();
   if (!row) return;
   for (const rel of [row.path, row.posterPath, row.sourcePath, ...(row.variants ?? []).map((w) => variantPath(row.path, w))]) {
@@ -215,7 +254,7 @@ async function ownConversation(id: string, userId: string) {
 
 async function detail(conv: typeof conversations.$inferSelect, meId: string): Promise<ConversationDetail> {
   const ids = await memberIds(conv.id);
-  const users = await usersByIds(ids);
+  const users = await usersByIds(ids, meId);
   const members = ids.map((id) => users.get(id)!).filter(Boolean);
   members.sort((a, b) => (a.id === meId ? -1 : b.id === meId ? 1 : a.displayName.localeCompare(b.displayName, 'fr')));
   const other = conv.isGroup ? null : (members.find((m) => m.id !== meId) ?? null);
@@ -240,8 +279,22 @@ async function detail(conv: typeof conversations.$inferSelect, meId: string): Pr
     reads: reads.map((r) => ({ userId: r.userId, at: r.at.toISOString() })),
     muted: !!mine?.muted,
     presence,
+    photo: (await groupPhotos([conv.photoMediaId])).get(conv.photoMediaId ?? '') ?? null,
   };
 }
+
+async function groupPhotos(ids: (string | null)[]) {
+  const list = ids.filter((x): x is string => !!x);
+  const map = new Map<string, MediaRef>();
+  if (list.length === 0) return map;
+  for (const m of await db.select().from(schema.media).where(inArray(schema.media.id, list))) map.set(m.id, mediaRef(m)!);
+  return map;
+}
+
+/** Recherche sans accents ni casse (« cafe » trouve « Café »). */
+const FOLD_FROM = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ';
+const FOLD_TO = 'aaaaaaceeeeiiiinooooouuuuyy';
+const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 /** Vérifie que tous les utilisateurs sont amis avec `me`. */
 async function onlyFriends(meId: string, ids: string[]) {
@@ -264,6 +317,7 @@ export default async function messageRoutes(app: FastifyInstance) {
       id: string;
       isGroup: boolean;
       title: string | null;
+      photoId: string | null;
       members: string[];
       text: string | null;
       at: Date | null;
@@ -276,7 +330,7 @@ export default async function messageRoutes(app: FastifyInstance) {
       pinned: boolean;
       unread: boolean;
     }>(sql`
-      select c.id, c.is_group as "isGroup", c.title,
+      select c.id, c.is_group as "isGroup", c.title, c.photo_media_id as "photoId",
         array(select cm.user_id from conversation_members cm where cm.conversation_id = c.id and cm.user_id <> ${me.id} order by cm.created_at) as members,
         lm.text, lm.created_at as at, lm.sender_id as "senderId", lm.meta,
         lmm.kind as "mediaKind", lmm.duration as "mediaDuration", (lm.deleted_at is not null) as deleted, mine.muted, (mine.pinned_at is not null) as pinned,
@@ -292,8 +346,9 @@ export default async function messageRoutes(app: FastifyInstance) {
       left join media lmm on lmm.id = lm.media_id
       order by mine.pinned_at desc nulls last, c.last_message_at desc limit 100`);
     const list = [...rows];
-    const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]));
+    const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]), me.id);
     const presence = await presenceOf(me, list.filter((r) => !r.isGroup && r.members[0]).map((r) => r.members[0]));
+    const photos = await groupPhotos(list.map((r) => r.photoId));
     return list
       .filter((r) => r.isGroup || r.members.length > 0)
       .map((r) => {
@@ -307,7 +362,9 @@ export default async function messageRoutes(app: FastifyInstance) {
           members,
           last: r.at
             ? {
-                text: r.deleted ? 'Message supprimé' : r.text || attachmentLabel(r.mediaKind, r.mediaDuration),
+                text: r.deleted
+                  ? 'Message supprimé'
+                  : r.text || attachmentLabel(r.mediaKind, r.mediaDuration) || (r.meta?.type === 'post_share' ? SHARED_POST_LABEL : ''),
                 at: new Date(r.at).toISOString(),
                 mine: r.senderId === me.id,
                 sender: r.isGroup && sender && r.senderId !== me.id ? firstName(sender.displayName) : null,
@@ -318,6 +375,7 @@ export default async function messageRoutes(app: FastifyInstance) {
           muted: r.muted,
           presence: r.isGroup ? null : (presence.get(r.members[0]) ?? null),
           pinned: r.pinned,
+          photo: r.photoId ? (photos.get(r.photoId) ?? null) : null,
         };
       });
   });
@@ -361,6 +419,53 @@ export default async function messageRoutes(app: FastifyInstance) {
     const [updated] = await db.update(conversations).set({ title: title || null }).where(eq(conversations.id, conv.id)).returning();
     await postMessage(updated, me, title ? `${me.displayName} a renommé le groupe « ${title} »` : `${me.displayName} a retiré le nom du groupe`, { type: 'system' });
     return detail(updated, me.id);
+  });
+
+  /** Photo du groupe : tout membre peut la changer, comme le nom. */
+  app.post('/api/conversations/:id/photo', perMinute(10), async (req): Promise<ConversationDetail> => {
+    const me = requireUser(req);
+    const conv = await ownConversation(uuidParam(req.params), me.id);
+    if (!conv.isGroup) fail(400, 'Seuls les groupes ont une photo');
+    const file = await req.file();
+    if (!file) return fail(400, 'Aucune image reçue');
+    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512 });
+    const [updated] = await db.update(conversations).set({ photoMediaId: m.id }).where(eq(conversations.id, conv.id)).returning();
+    if (conv.photoMediaId) await dropAttachment(conv.photoMediaId);
+    await postMessage(updated, me, `${me.displayName} a changé la photo du groupe`, { type: 'system' });
+    return detail(updated, me.id);
+  });
+
+  app.delete('/api/conversations/:id/photo', async (req): Promise<ConversationDetail> => {
+    const me = requireUser(req);
+    const conv = await ownConversation(uuidParam(req.params), me.id);
+    if (!conv.isGroup || !conv.photoMediaId) return detail(conv, me.id);
+    const [updated] = await db.update(conversations).set({ photoMediaId: null }).where(eq(conversations.id, conv.id)).returning();
+    await dropAttachment(conv.photoMediaId);
+    await postMessage(updated, me, `${me.displayName} a retiré la photo du groupe`, { type: 'system' });
+    return detail(updated, me.id);
+  });
+
+  /** Chercher dans une conversation (texte des messages, sans accents ni casse). */
+  app.get('/api/conversations/:id/search', perMinute(30), async (req): Promise<Message[]> => {
+    const me = requireUser(req);
+    const c = await ownConversation(uuidParam(req.params), me.id);
+    const q = fold(String((req.query as { q?: string }).q ?? '').trim()).slice(0, 100);
+    if (q.length < 2) return [];
+    const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    const rows = await db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.conversationId, c.id),
+          sql`${messages.deletedAt} is null`,
+          sql`coalesce(${messages.meta}->>'type', '') <> 'system'`,
+          sql`translate(lower(${messages.text}), ${FOLD_FROM}, ${FOLD_TO}) like ${like}`,
+        ),
+      )
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(50);
+    return toMessages(rows);
   });
 
   app.post('/api/conversations/:id/members', async (req): Promise<ConversationDetail> => {
@@ -599,6 +704,59 @@ export default async function messageRoutes(app: FastifyInstance) {
       meta = { type: 'story_reply', storyId: body.storyId, media: story && story.authorId === to ? mediaRef(story.media) : null };
     }
     return sendDm(me, to, body.text, meta);
+  });
+
+  /**
+   * Partager un post en message, à des amis ou dans des conversations.
+   * Une conversation n'est servie que si tous ses membres peuvent voir le post (sinon : `refused`).
+   */
+  app.post('/api/posts/:id/share', perMinute(20), async (req): Promise<ShareResult> => {
+    const me = requireUser(req);
+    const postId = uuidParam(req.params);
+    const body = parse(
+      z
+        .object({
+          userIds: z.array(z.string().uuid()).max(20).default([]),
+          conversationIds: z.array(z.string().uuid()).max(20).default([]),
+          text: z.string().trim().max(1000).default(''),
+        })
+        .refine((b) => b.userIds.length + b.conversationIds.length > 0, { message: 'Choisis au moins une conversation' }),
+      req.body,
+    );
+    if (!(await canSeePost(me.id, postId))) fail(404, 'Post introuvable');
+    const post = (await sharedPosts([postId])).get(postId);
+    if (!post) return fail(404, 'Post introuvable');
+    const targets = new Map<string, typeof conversations.$inferSelect>();
+    const refused = new Set<string>();
+    const people = await usersByIds(body.userIds);
+    for (const uid of new Set(body.userIds)) {
+      if (uid === me.id) continue;
+      if (!(await areFriends(me.id, uid)) || (await isBlockedBetween(me.id, uid))) {
+        refused.add(people.get(uid)?.displayName ?? 'Quelqu’un');
+        continue;
+      }
+      const conv = await getOrCreateConversation(me.id, uid);
+      targets.set(conv.id, conv);
+    }
+    for (const cid of new Set(body.conversationIds)) {
+      const conv = await ownConversation(cid, me.id);
+      targets.set(conv.id, conv);
+    }
+    const sent: string[] = [];
+    for (const conv of targets.values()) {
+      const others = (await memberIds(conv.id)).filter((id) => id !== me.id);
+      if (!conv.isGroup && others[0] && (await isBlockedBetween(me.id, others[0]))) continue;
+      const blind: string[] = [];
+      for (const uid of others) if (!(await canSeePost(uid, postId))) blind.push(uid);
+      if (blind.length) {
+        const names = await usersByIds(blind);
+        for (const uid of blind) refused.add(names.get(uid)?.displayName ?? 'Quelqu’un');
+        continue;
+      }
+      await postMessage(conv, me, body.text, { type: 'post_share', postId, post });
+      sent.push(conv.id);
+    }
+    return { sent, refused: [...refused] };
   });
 
   /** Invitation à un salon Make It Friends. */
