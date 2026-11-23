@@ -63,6 +63,8 @@ export function connectSocket() {
     qc.invalidateQueries({ queryKey: ['badges'] });
     // Pendant la coupure, des amis ont pu se connecter ou partir : on recharge la présence.
     resetPresence();
+    // Conversations fermées : un message a pu être supprimé pendant la coupure, on repartira de zéro.
+    qc.removeQueries({ queryKey: ['messages'], type: 'inactive' });
     qc.invalidateQueries({ queryKey: ['conversations'] });
     qc.invalidateQueries({ queryKey: ['conversation'] });
     void flushOutbox();

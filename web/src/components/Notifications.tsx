@@ -17,8 +17,9 @@ import {
 } from '@phosphor-icons/react';
 import { Fragment, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { api } from '../lib/api';
-import { friendAction, qc, useNotifications, usePellicule } from '../lib/data';
+import { api, errMsg } from '../lib/api';
+import { toast } from '../lib/store';
+import { friendAction, openConversation, qc, useNotifications, usePellicule } from '../lib/data';
 import { countdown, timeAgo } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { cx } from './ui';
@@ -40,7 +41,11 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
     case 'like':
       return { icon: <Heart size={18} weight="fill" className="text-heart" />, text: <>{who} a aimé {what}</>, to: `/p/${d.postId}` };
     case 'comment':
-      return { icon: <ChatCircle size={18} weight="fill" className="text-acc" />, text: <>{who} a commenté : « {String(d.text ?? '')} »</>, to: `/p/${d.postId}` };
+      return {
+        icon: <ChatCircle size={18} weight="fill" className="text-acc" />,
+        text: d.reply ? <>{who} t’a répondu : « {String(d.text ?? '')} »</> : <>{who} a commenté : « {String(d.text ?? '')} »</>,
+        to: `/p/${d.postId}`,
+      };
     case 'repost':
       return { icon: <Repeat size={18} weight="bold" className="text-acc" />, text: <>{who} a republié {what}</>, to: `/p/${d.postId}` };
     case 'friend_request':
@@ -126,7 +131,7 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         icon: <span className="text-[17px] leading-none">🎂</span>,
         text: <>C’est l’anniversaire de {who} aujourd’hui !</>,
         to: n.actor ? `/u/${n.actor.username}` : undefined,
-        action: n.actor ? { label: 'Écrire', run: () => nav(`/u/${n.actor!.username}`) } : undefined,
+        action: n.actor ? { label: 'Écrire', run: () => void openConversation(n.actor!.id, nav) } : undefined,
       };
     case 'alert':
       return {
@@ -168,7 +173,11 @@ function periodOf(iso: string, now: number) {
 
 /** Marque toutes les notifications comme lues (cloche). */
 export async function markAllRead() {
-  await api('/api/notifications/read', { method: 'POST' });
+  try {
+    await api('/api/notifications/read', { method: 'POST' });
+  } catch (e) {
+    return toast(errMsg(e), 'error');
+  }
   qc.setQueryData<AppNotification[]>(['notifications'], (old) => old?.map((n) => ({ ...n, read: true })));
   qc.setQueryData<Badges>(['badges'], (old) => (old ? { ...old, notifications: 0 } : old));
 }

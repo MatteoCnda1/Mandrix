@@ -3,7 +3,7 @@ import { ArrowRight, ChartBar, ShieldCheck } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { ScreenLoader, cx } from '../components/ui';
-import { api } from '../lib/api';
+import { api, errMsg } from '../lib/api';
 import { useMe } from '../lib/data';
 import { fmtCount } from '../lib/format';
 
@@ -32,8 +32,17 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 export function Admin() {
   const nav = useNavigate();
   const { data: me } = useMe();
-  const { data, isLoading } = useQuery({ queryKey: ['admin-stats'], queryFn: () => api<AdminStats>('/api/admin/stats'), enabled: !!me?.isAdmin, refetchInterval: 60_000 });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['admin-stats'], queryFn: () => api<AdminStats>('/api/admin/stats'), enabled: !!me?.isAdmin, refetchInterval: 60_000 });
   if (!me?.isAdmin) return <div className="card p-8 text-center text-mute">Réservé aux administrateurs.</div>;
+  if (error && !data)
+    return (
+      <div className="card flex flex-col items-center gap-3 p-8 text-center text-mute">
+        <span>Impossible de charger le tableau de bord : {errMsg(error)}</span>
+        <button type="button" className="tap rounded-full border-0 bg-soft px-4 py-2 font-bold text-ink" onClick={() => void refetch()}>
+          Réessayer
+        </button>
+      </div>
+    );
   if (isLoading || !data) return <ScreenLoader />;
   const used = data.disk ? data.disk.totalBytes - data.disk.freeBytes : 0;
   const pct = data.disk ? Math.round((used / Math.max(1, data.disk.totalBytes)) * 100) : 0;

@@ -14,6 +14,7 @@ import type {
   Poll,
   PoolScope,
   PoolStats,
+  ProfilePosts,
   Post,
   ReportedItem,
   Shot,
@@ -25,7 +26,8 @@ import type {
 } from '@mandrix/shared';
 import { QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { api, ApiError, errMsg } from './api';
-import { toast } from './store';
+import { closeSheet, toast } from './store';
+import { useOutbox } from './outbox';
 
 export const qc = new QueryClient({
   defaultOptions: {
@@ -79,7 +81,7 @@ export const useProfile = (username: string) =>
 export const useUserPosts = (username: string, tab: 'posts' | 'reels' | 'memes') =>
   useQuery({
     queryKey: ['user-posts', username, tab],
-    queryFn: () => api<{ items: Post[]; next: number | null; locked: boolean }>(`/api/users/${encodeURIComponent(username)}/posts?tab=${tab}`),
+    queryFn: () => api<ProfilePosts>(`/api/users/${encodeURIComponent(username)}/posts?tab=${tab}`),
   });
 export const useFriends = () => useQuery({ queryKey: ['friends'], queryFn: () => api<FriendsList>('/api/friends') });
 export const useUserSearch = (q: string) =>
@@ -102,7 +104,9 @@ export const useMessages = (id: string) =>
       if (!old?.length || !fresh.length) return fresh;
       const ids = new Set(fresh.map((m) => m.id));
       const older = old.filter((m) => !ids.has(m.id) && m.createdAt < fresh[0].createdAt);
-      return [...older, ...fresh];
+      // Arrivés par le socket (ou la file d'envoi) pendant le rechargement : on ne les perd pas.
+      const newer = old.filter((m) => !ids.has(m.id) && m.createdAt > fresh[fresh.length - 1].createdAt);
+      return [...older, ...fresh, ...newer];
     },
   });
 export const useNotifications = (enabled = true) =>
@@ -293,6 +297,29 @@ export async function friendAction(userId: string, action: 'add' | 'remove') {
   }
 }
 
+/** Ouvre (ou crée) la conversation à deux avec un ami. */
+export async function openConversation(userId: string, nav: (to: string) => void) {
+  try {
+    const { id } = await api<{ id: string }>('/api/conversations', { body: { userId } });
+    closeSheet();
+    nav(`/messages/${id}`);
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
+}
+
+/** Épingle un de mes posts en tête de mon profil (#81), ou le désépingle (null). */
+export async function pinPost(postId: string | null) {
+  try {
+    await api('/api/me/pinned-post', { method: 'PUT', body: { postId } });
+    qc.setQueryData<Me | null>(['me'], (m) => (m ? { ...m, pinnedPostId: postId } : m));
+    for (const k of [['user-posts'], ['profile']]) qc.invalidateQueries({ queryKey: k });
+    toast(postId ? 'Post épinglé sur ton profil' : 'Post désépinglé');
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
+}
+
 export async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
   // Rien de l'ancien compte ne doit partir depuis le suivant : file d'envoi et brouillons effacés.
@@ -301,6 +328,9 @@ export async function logout() {
   } catch {
     /* stockage indisponible */
   }
+  // Et en mémoire : sinon la file serait réécrite au prochain changement, au nom du compte suivant.
+  useOutbox.setState({ items: [] });
+  await import('./persist').then((m) => m.forgetCache()).catch(() => {});
   qc.clear();
   qc.setQueryData(['me'], null);
 }

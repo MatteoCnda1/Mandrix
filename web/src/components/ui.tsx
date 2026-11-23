@@ -62,6 +62,7 @@ export function Seg<T extends string | number>({ options, value, onChange, class
         <button
           key={String(o.value)}
           type="button"
+          aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
           className={cx(
             'tap flex-1 border-0 font-bold transition-colors duration-300',

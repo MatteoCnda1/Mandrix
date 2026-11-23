@@ -2,6 +2,7 @@ import { attachmentLabel, conversationName, MESSAGE_REACTIONS, type Conversation
 import {
   ArrowBendUpLeft,
   Bell,
+  Camera,
   BellSlash,
   CaretDown,
   CaretLeft,
@@ -24,15 +25,18 @@ import {
   X,
 } from '@phosphor-icons/react';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
+import { ConvAvatar } from '../components/ConvAvatar';
+import { SharedPostCard } from '../components/SharedPost';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { RichText } from '../components/RichText';
 import { openReport } from '../components/Report';
 import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, ApiError, errMsg, upload } from '../lib/api';
 import { useSwipeX } from '../lib/gestures';
-import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
+import { useDebounced, useLongPress, useObjectUrl, type Point } from '../lib/hooks';
 import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
 import { qc, useConversation, useConversations, useFriends, useMe, useMessages } from '../lib/data';
 import { shortTime } from '../lib/format';
@@ -45,30 +49,11 @@ import { sendTyping, useRecordingVoice, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
-/** Avatar d'une conversation : la personne, ou deux avatars superposés pour un groupe. */
-export function ConvAvatar({ isGroup, user, members, size = 48 }: { isGroup: boolean; user: UserLite | null; members: UserLite[]; size?: number }) {
-  if (!isGroup && user) return <Avatar user={user} size={size} />;
-  const [a, b] = members;
-  if (!a) {
-    return (
-      <span className="grid flex-none place-items-center rounded-full bg-tint text-ink" style={{ width: size, height: size }}>
-        <UsersThree size={size * 0.45} weight="fill" />
-      </span>
-    );
-  }
-  const s = Math.round(size * 0.7);
-  return (
-    <span className="relative flex-none" style={{ width: size, height: size }}>
-      <Avatar user={a} size={s} className="absolute top-0 left-0" />
-      {b && <Avatar user={b} size={s} className="absolute right-0 bottom-0 shadow-[0_0_0_2px_var(--card)]" />}
-    </span>
-  );
-}
 
 export function Messages() {
   const nav = useNavigate();
   const { data: me } = useMe();
-  const { data, isLoading } = useConversations();
+  const { data, isLoading, dataUpdatedAt } = useConversations();
   const now = useNow(60_000);
   const typing = useTyping();
   const presences = usePresence();
@@ -80,8 +65,8 @@ export function Messages() {
     return norm([conversationName(c, me?.id), ...c.members.map((u) => `${u.displayName} ${u.username}`)].join(' ')).includes(q);
   });
   useEffect(() => {
-    if (data) seedPresence(data.filter((c) => !c.isGroup && c.user).map((c) => [c.user!.id, c.presence]));
-  }, [data]);
+    if (data) seedPresence(data.filter((c) => !c.isGroup && c.user).map((c) => [c.user!.id, c.presence]), dataUpdatedAt);
+  }, [data, dataUpdatedAt]);
   const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['conversations'] }));
   if (isLoading) return <ScreenLoader />;
   return (
@@ -132,7 +117,7 @@ export function Messages() {
             return (
               <ConvRow key={c.id} onOpen={() => nav(`/messages/${c.id}`)} actions={muteActions}>
                 <span className="relative flex-none">
-                  <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
+                  <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} photo={c.photo} />
                   {!c.isGroup && c.user && me?.showPresence && (presences[c.user.id] ?? c.presence)?.online && (
                     <span aria-label="En ligne" className="absolute right-0 bottom-0 h-3.5 w-3.5 rounded-full border-[2.5px] border-solid border-card bg-[#30c463]" />
                   )}
@@ -273,6 +258,30 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
     }
   };
 
+  // Photo du groupe (#77) : n'importe quel membre peut la changer, comme le nom.
+  const photoPicker = useFilePicker('image/*', async (f) => {
+    setBusy(true);
+    try {
+      refresh(await upload<ConversationDetail>(`/api/conversations/${conv.id}/photo`, f, f.name || 'groupe.jpg'));
+      toast('Photo du groupe mise à jour');
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  });
+  const removePhoto = async () => {
+    setBusy(true);
+    try {
+      refresh(await api<ConversationDetail>(`/api/conversations/${conv.id}/photo`, { method: 'DELETE' }));
+      toast('Photo du groupe retirée');
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const toggle = (id: string) => {
     const n = new Set(picked);
     if (n.has(id)) n.delete(id);
@@ -282,6 +291,26 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
 
   return (
     <Sheet title={conversationName(conv, me?.id)} onClose={onClose}>
+      {photoPicker.input}
+      <div className="flex flex-col items-center gap-2 pb-1">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={photoPicker.open}
+          aria-label={conv.photo ? 'Changer la photo du groupe' : 'Ajouter une photo au groupe'}
+          className="tap relative rounded-full border-0 bg-transparent p-0"
+        >
+          <ConvAvatar isGroup user={null} members={conv.members.filter((m) => m.id !== me?.id)} photo={conv.photo} size={88} />
+          <span className="absolute right-0 bottom-0 grid h-8 w-8 place-items-center rounded-full bg-ink text-inv shadow-[0_0_0_3px_var(--card)]">
+            <Camera size={16} weight="fill" />
+          </span>
+        </button>
+        {conv.photo && (
+          <button type="button" disabled={busy} onClick={removePhoto} className="tap border-0 bg-transparent text-[0.8125rem] font-bold text-mute">
+            Retirer la photo
+          </button>
+        )}
+      </div>
       <div className="flex gap-2">
         <input className="field flex-1" value={title} maxLength={40} onChange={(e) => setTitle(e.target.value)} placeholder="Nom du groupe" />
         <button
@@ -446,6 +475,33 @@ function TypingDots() {
 }
 
 /** Un à trois émojis, et rien d'autre (affichés en grand). */
+/** « 12 mars, 14:05 » (année ajoutée si ce n'est pas l'année en cours). */
+function searchDate(iso: string) {
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const day = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+  return `${day}, ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** Met en gras le passage trouvé, sans tenir compte des accents ni de la casse. */
+function highlight(text: string, needle: string): ReactNode {
+  const fold = (c: string) => c.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const chars = [...text];
+  const folded = chars.map(fold);
+  // Un caractère qui ne se replie pas en un seul (rare) : pas de mise en gras.
+  if (folded.some((f) => f.length !== 1)) return text;
+  const at = folded.join('').indexOf(fold(needle));
+  if (at < 0) return text;
+  const len = [...fold(needle)].length;
+  return (
+    <>
+      {chars.slice(0, at).join('')}
+      <mark className="rounded bg-tint px-0.5 font-bold text-ink">{chars.slice(at, at + len).join('')}</mark>
+      {chars.slice(at + len).join('')}
+    </>
+  );
+}
+
 function isEmojiOnly(text: string) {
   const t = text.trim();
   if (!t || t.length > 40 || !/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f\s]+$/u.test(t) || /^[\d#*\s]+$/.test(t)) return false;
@@ -470,23 +526,61 @@ function ChatView({ id }: { id: string }) {
   const [info, setInfo] = useState(false);
   const [menu, setMenu] = useState<{ m: Message; at: Point } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const lastClientId = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const startReply = (m: Message) => {
     setReplyTo(m);
     requestAnimationFrame(() => inputRef.current?.focus());
   };
-  /** Fait défiler jusqu'au message cité et le met en évidence un instant. */
-  const showOriginal = (messageId: string) => {
+  /**
+   * Fait défiler jusqu'à un message (citation, résultat de recherche) et le met en évidence un instant.
+   * S'il n'est pas encore chargé, on remonte l'historique page par page jusqu'à lui.
+   */
+  const [jumping, setJumping] = useState(false);
+  const showOriginal = async (messageId: string) => {
+    let loaded = qc.getQueryData<Message[]>(['messages', id]) ?? [];
+    if (!loaded.some((x) => x.id === messageId)) {
+      setJumping(true);
+      try {
+        for (let page = 0; page < 50 && loaded.length && !loaded.some((x) => x.id === messageId); page++) {
+          const older = await api<Message[]>(`/api/conversations/${id}/messages?before=${loaded[0].id}`);
+          if (older.length < 100) setHasOlder(false);
+          if (!older.length) break;
+          const known = new Set(loaded.map((x) => x.id));
+          loaded = [...older.filter((x) => !known.has(x.id)), ...loaded];
+          qc.setQueryData<Message[]>(['messages', id], loaded);
+        }
+      } catch (e) {
+        toast(errMsg(e), 'error');
+      } finally {
+        setJumping(false);
+      }
+      // Laisse le temps d'afficher les messages chargés.
+      await new Promise((r) => setTimeout(r, 50));
+    }
     const el = document.getElementById(`msg-${messageId}`);
-    if (!el) return toast('Message trop ancien pour être affiché', 'error');
+    if (!el) return toast('Message introuvable', 'error');
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 900, iterations: 2 });
+  };
+
+  // Recherche dans la conversation (#76).
+  const [searching, setSearching] = useState(false);
+  const [searchQ, setSearchQ] = useState('');
+  const needle = useDebounced(searchQ.trim(), 300);
+  const { data: hits, isFetching: searchingNow } = useQuery({
+    queryKey: ['message-search', id, needle],
+    queryFn: () => api<Message[]>(`/api/conversations/${id}/search?q=${encodeURIComponent(needle)}`),
+    enabled: searching && needle.length >= 2,
+    staleTime: 10_000,
+  });
+  const closeSearch = () => {
+    setSearching(false);
+    setSearchQ('');
   };
   const typingIds = useTyping((s) => s[id]) ?? [];
   const voiceMap = useRecordingVoice();
   const outbox = useOutbox((s) => s.items);
-  const pending = outbox.filter((p) => p.conversationId === id);
+  const pending = outbox.filter((p) => p.conversationId === id && p.userId === me?.id);
   const presences = usePresence();
   const list = useRef<HTMLDivElement | null>(null);
 
@@ -609,7 +703,7 @@ function ChatView({ id }: { id: string }) {
   };
 
   /** Envoie un message : texte seul, ou pièce jointe (photo, vidéo, vocal) avec texte facultatif. */
-  const sendMessage = async (text: string, attachment: Blob | null, name = 'piece-jointe') => {
+  const sendMessage = async (text: string, attachment: Blob | null, name = 'piece-jointe', clientId = newClientId()) => {
     let mediaId: string | undefined;
     if (attachment) {
       setProgress(0);
@@ -618,9 +712,8 @@ function ChatView({ id }: { id: string }) {
     }
     const quoted = replyTo;
     setReplyTo(null);
-    lastClientId.current = newClientId();
     try {
-      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id, clientId: lastClientId.current } }));
+      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id, clientId } }));
     } catch (e) {
       setReplyTo(quoted);
       throw e;
@@ -640,12 +733,14 @@ function ChatView({ id }: { id: string }) {
       setReplyTo(null);
       requestAnimationFrame(() => toBottom(true));
     };
-    if (!attachment && !navigator.onLine) return queue(newClientId());
+    // Identifiant propre à ce message (deux envois rapprochés ne se mélangent pas).
+    const clientId = newClientId();
+    if (!attachment && !navigator.onLine) return queue(clientId);
     try {
-      await sendMessage(text, attachment, attachment?.name);
+      await sendMessage(text, attachment, attachment?.name, clientId);
     } catch (e) {
       // Même identifiant que la tentative échouée : si le serveur l'avait reçu, pas de doublon.
-      if (!attachment && e instanceof ApiError && e.status === 0) return queue(lastClientId.current ?? newClientId());
+      if (!attachment && e instanceof ApiError && e.status === 0) return queue(clientId);
       setDraft(text);
       setFile(attachment);
       toast(errMsg(e), 'error');
@@ -762,7 +857,7 @@ function ChatView({ id }: { id: string }) {
       onClick={() => (group ? setInfo(true) : conv.user && nav(`/u/${conv.user.username}`))}
       className="tap flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink"
     >
-      <ConvAvatar isGroup={group} user={conv.user} members={conv.members.filter((m) => m.id !== me.id)} size={40} />
+      <ConvAvatar isGroup={group} user={conv.user} members={conv.members.filter((m) => m.id !== me.id)} photo={conv.photo} size={40} />
       <span className="min-w-0">
         <span className="block truncate text-[1.0625rem] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
         {group && <span className="block truncate text-xs font-semibold text-mute">{conv.members.length} membres · infos du groupe</span>}
@@ -777,8 +872,68 @@ function ChatView({ id }: { id: string }) {
     </button>
   );
 
+  const searchBtn = (
+    <button
+      type="button"
+      aria-label={searching ? 'Fermer la recherche' : 'Rechercher dans la conversation'}
+      aria-expanded={searching}
+      onClick={() => (searching ? closeSearch() : setSearching(true))}
+      className={cx('tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 active:scale-95', searching ? 'bg-ink text-inv' : 'bg-soft text-ink')}
+    >
+      {searching ? <X size={20} weight="bold" /> : <MagnifyingGlass size={20} weight="bold" />}
+    </button>
+  );
+
+  const searchPanel = searching && (
+    <div className="absolute inset-x-0 top-0 z-10 flex max-h-[70%] flex-col gap-1.5 rounded-[24px] bg-card p-2 shadow-menu">
+      <input
+        autoFocus
+        className="field"
+        value={searchQ}
+        onChange={(e) => setSearchQ(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && closeSearch()}
+        placeholder="Rechercher un message…"
+        aria-label="Rechercher un message"
+        enterKeyHint="search"
+      />
+      <div className="no-scrollbar flex min-h-0 flex-col overflow-y-auto" aria-live="polite">
+        {needle.length < 2 ? (
+          <p className="m-0 px-2 py-2 text-[0.8125rem] text-mute">Au moins deux lettres. Les accents et majuscules ne comptent pas.</p>
+        ) : searchingNow && !hits ? (
+          <p className="m-0 px-2 py-2 text-[0.8125rem] text-mute">Recherche…</p>
+        ) : !hits?.length ? (
+          <p className="m-0 px-2 py-2 text-[0.8125rem] text-mute">Aucun message trouvé.</p>
+        ) : (
+          hits.map((h) => (
+            <button
+              key={h.id}
+              type="button"
+              onClick={() => {
+                closeSearch();
+                void showOriginal(h.id);
+              }}
+              className="tap flex flex-col gap-0.5 rounded-2xl border-0 bg-transparent px-2.5 py-2 text-left text-ink hover:bg-soft"
+            >
+              <span className="flex items-baseline gap-2 text-xs font-bold text-mute">
+                <span className="truncate">{h.senderId === me.id ? 'Toi' : (byId.get(h.senderId)?.displayName ?? 'Ancien membre')}</span>
+                <span className="ml-auto flex-none font-semibold">{searchDate(h.createdAt)}</span>
+              </span>
+              <span className="line-clamp-2 text-[0.9375rem] leading-snug">{highlight(h.text, needle)}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   const bubbles = (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {searchPanel}
+      {jumping && (
+        <div className="absolute inset-x-0 top-2 z-10 flex justify-center">
+          <span className="rounded-full bg-glass px-3 py-1 text-xs font-semibold text-mute">Chargement des anciens messages…</span>
+        </div>
+      )}
     <div ref={list} onScroll={onListScroll} className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 py-2">
       <div className="mt-auto" />
       {hasOlder && (
@@ -811,6 +966,7 @@ function ChatView({ id }: { id: string }) {
         const showSender = group && !mine && (!prev || prev.senderId !== m.senderId || prev.meta?.type === 'system');
         const sender = byId.get(m.senderId);
         const story = m.meta?.type === 'story_reply' ? m.meta : null;
+        const shared = m.meta?.type === 'post_share' ? m.meta : null;
         return (
           <div key={m.id} id={`msg-${m.id}`} className={cx('flex max-w-[82%] flex-none flex-col gap-1', mine ? 'items-end self-end' : 'items-start self-start')}>
             {showSender && (
@@ -838,7 +994,7 @@ function ChatView({ id }: { id: string }) {
               onReply={() => startReply(m)}
               className={cx(
                 'animate-in rounded-[22px] text-base leading-[1.4] break-words',
-                bigEmoji ? 'px-1 text-[2.6rem] leading-[1.15]' : m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
+                bigEmoji ? 'px-1 text-[2.6rem] leading-[1.15]' : (m.media && m.media.kind !== 'audio') || shared ? 'p-1' : 'px-3.5 py-2.5',
                 bigEmoji ? 'bg-transparent' : mine ? 'bg-brand text-white' : 'bg-soft text-ink',
               )}
               style={{ animationDuration: '.35s' }}
@@ -859,10 +1015,11 @@ function ChatView({ id }: { id: string }) {
                   <span className="line-clamp-2 opacity-85">{m.meta.replyTo.text}</span>
                 </button>
               )}
+              {shared && <SharedPostCard post={shared.post} mine={mine} />}
               {m.media?.kind === 'audio' && <VoicePlayer media={m.media} mine={mine} />}
               {m.media && m.media.kind !== 'audio' && <MessagePhotoVideo media={m.media} onOpen={() => setViewing(m.media)} />}
               {m.text && (
-                <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>
+                <span className={cx(((m.media && m.media.kind !== 'audio') || shared) && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>
                   <RichText text={m.text} linkClass={mine ? 'text-white' : undefined} />
                 </span>
               )}
@@ -1093,6 +1250,7 @@ function ChatView({ id }: { id: string }) {
               <CaretLeft size={20} weight="bold" />
             </button>
             {person}
+            {searchBtn}
           </header>
           <div className="flex min-h-0 flex-1 flex-col px-3">{bubbles}</div>
           <div className="glass-bar flex-none rounded-t-[28px] px-3 pt-2.5" style={{ paddingBottom: 'calc(10px + var(--safe-b))' }}>
@@ -1106,7 +1264,10 @@ function ChatView({ id }: { id: string }) {
 
   return (
     <div className="card flex h-[calc(100dvh-140px)] min-h-[420px] animate-in flex-col gap-3 p-3" style={{ animationDuration: '.4s' }}>
-      <div className="flex flex-none items-center gap-2.5">{person}</div>
+      <div className="flex flex-none items-center gap-2.5">
+        {person}
+        {searchBtn}
+      </div>
       {bubbles}
       {composer}
       {sheet}

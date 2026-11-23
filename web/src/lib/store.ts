@@ -1,4 +1,4 @@
-import type { PoolScope } from '@mandrix/shared';
+import type { PoolScope, Post } from '@mandrix/shared';
 import { create } from 'zustand';
 
 export type SheetName = 'friends' | 'editProfile' | 'invite' | 'newMessage' | 'install';
@@ -12,6 +12,8 @@ interface UIState {
   composer: null | { mode: 'post' | 'story'; kind?: 0 | 1 | 2; pool?: boolean };
   commentsFor: string | null;
   poolFor: null | { postId?: string; shotId?: string };
+  /** Post à envoyer en message (#73). */
+  shareFor: Post | null;
   story: null | { group: number; index: number };
   sheet: SheetName | null;
   toast: { msg: string; id: number; tone: 'ok' | 'error' } | null;
@@ -27,6 +29,7 @@ export const useUI = create<UIState>((set) => ({
   composer: null,
   commentsFor: null,
   poolFor: null,
+  shareFor: null,
   story: null,
   sheet: null,
   toast: null,
@@ -34,7 +37,7 @@ export const useUI = create<UIState>((set) => ({
   updateReady: false,
   applyUpdate: null,
   openComposer: (mode = 'post', kind, opts) => set({ composer: { mode, kind, pool: opts?.pool }, sheet: null }),
-  closeAll: () => set({ composer: null, commentsFor: null, poolFor: null, story: null, sheet: null }),
+  closeAll: () => set({ composer: null, commentsFor: null, poolFor: null, shareFor: null, story: null, sheet: null }),
 }));
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -47,5 +50,6 @@ export function toast(msg: string, tone: 'ok' | 'error' = 'ok') {
 
 export const openSheet = (sheet: SheetName) => useUI.setState({ sheet });
 export const closeSheet = () => useUI.setState({ sheet: null });
+export const openShare = (post: Post) => useUI.setState({ shareFor: post });
 export const openPool = (target: { postId?: string; shotId?: string }) => useUI.setState({ poolFor: target });
 export type { PoolScope };

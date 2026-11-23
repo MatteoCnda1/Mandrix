@@ -18,6 +18,7 @@ import { toast, useUI } from './lib/store';
 const toastSent = (n: number) => toast(n > 1 ? `${n} photos en attente envoyées dans ta Pellicule` : 'Photo en attente envoyée dans ta Pellicule');
 import { Feed } from './screens/Feed';
 import { Landing } from './screens/Landing';
+import { restoreCache, startPersisting } from './lib/persist';
 
 // Écrans chargés à la demande : le fil s'affiche sans attendre le code des autres écrans.
 const Camera = lazy(() => import('./screens/Camera').then((m) => ({ default: m.Camera })));
@@ -159,12 +160,16 @@ if (import.meta.env.PROD) {
 
 preventPinchZoom();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <Backdrop />
-    <QueryClientProvider client={qc}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  </StrictMode>,
-);
+// Données gardées sur l'appareil d'abord (ouverture instantanée), sans jamais attendre plus de 400 ms.
+void Promise.race([restoreCache(), new Promise((r) => setTimeout(r, 400))]).finally(() => {
+  startPersisting();
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <Backdrop />
+      <QueryClientProvider client={qc}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+});
 

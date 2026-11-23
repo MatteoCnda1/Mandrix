@@ -1,3 +1,4 @@
+import { renameFor, shrinkImage } from './image';
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -34,8 +35,10 @@ export async function api<T = unknown>(path: string, opts: { method?: Method; bo
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-/** Envoi de fichier avec suivi de progression (0–1). */
-export function upload<T>(path: string, file: Blob, filename = 'fichier', onProgress?: (p: number) => void): Promise<T> {
+/** Envoi de fichier avec suivi de progression (0–1). Les photos sont réduites avant de partir (#78). */
+export async function upload<T>(path: string, original: Blob, name = 'fichier', onProgress?: (p: number) => void): Promise<T> {
+  const file = await shrinkImage(original);
+  const filename = file === original ? name : renameFor(file, name);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', path);

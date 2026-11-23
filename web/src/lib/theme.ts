@@ -45,8 +45,12 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e)
 });
 
 export function useThemePref(): [ThemePref, (p: ThemePref) => void] {
-  useDark();
-  return [getThemePref(), setThemePref];
+  // Le choix lui-même (et pas seulement le thème affiché) : Sombre ↔ Automatique le soir ne change pas data-theme.
+  const pref = useSyncExternalStore((cb) => {
+    listeners.add(cb);
+    return () => listeners.delete(cb);
+  }, getThemePref);
+  return [pref, setThemePref];
 }
 
 export function useDark(): [boolean, () => void] {
