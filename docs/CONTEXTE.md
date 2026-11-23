@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 23 novembre 2026 (issues #5 à #18).
+> Dernière mise à jour : 23 novembre 2026 (lot 6, issues #73 à #86).
 
 ## 1. L'idée
 
@@ -66,6 +66,11 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - **Apparence** : Clair / Sombre / Automatique. **Administration** (`/admin`) : membres, contenus, stockage, disque du NAS.
 - Pastille **« Nouveaux posts »** (évènement `feed:new`), **brouillon** de publication conservé, **QR code** de parrainage,
   Pellicule : **annuler la dernière photo** (5 min), stories : **réactions rapides**, admin : **lien de réinitialisation** sans e-mail.
+- **Envoyer un post en message** (#73) : bouton avion sous chaque post, à des amis ou dans des groupes ; message `meta.type = 'post_share'`
+  dont l'aperçu est relu à jour (« plus disponible » si le post est supprimé ou masqué). Une conversation n'est servie que si
+  **tous** ses membres peuvent voir le post (sinon : `refused`).
+- **Répondre à un commentaire** (#74) : un seul niveau (`comments.parent_id`), notification « t'a répondu », supprimer un commentaire emporte ses réponses.
+- **Post épinglé** en tête du profil (#81, `users.pinned_post_id`, menu ··· d'un de ses posts).
 - Fil paginé par **curseur** (`?cursor=`, date de tri + id). Légende **modifiable** (« modifié »). Stories : **« N vues »** et liste des amis qui ont vu.
 - **Recherche** `/recherche` (#13) : légendes, options de sondage et mèmes du cercle, `#hashtag` exact, personnes ; « Tu les connais peut-être ? » (amis d'amis par amis en commun).
 - Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses.
@@ -108,7 +113,11 @@ puis podium des mèmes les plus aimés.
 - **Envoi idempotent** : chaque message porte un `clientId` (unique par expéditeur) ; un renvoi ne crée pas de doublon.
 - **Présence** : « En ligne » / « Actif il y a … » (connexions socket comptées dans `server/src/realtime/presence.ts`), masquable dans Réglages (réciproque).
 - **Hors ligne** : un message texte sans réseau attend dans `web/src/lib/outbox.ts` (localStorage) et part au retour du réseau.
-- **Groupes** : le créateur peut retirer un membre.
+- **Groupes** : le créateur peut retirer un membre ; **photo du groupe** (#77, `conversations.photo_media_id`, tout membre la change).
+- **Rechercher dans une conversation** (#76) : loupe dans l'en-tête, sans accents ni casse (`translate(lower(text))`) ; toucher un
+  résultat remonte l'historique page par page jusqu'au message (les citations trop anciennes aussi).
+- **Vocaux** : vitesse 1× / 1,5× / 2× (#75), mémorisée sur l'appareil (`mandrix.voiceRate`).
+- **Envoi idempotent par conversation** : chaque message a son propre `clientId` ; un conflit d'index renvoie le message déjà reçu (#82).
 - **Historique** : 100 messages à l'ouverture, puis `?before=<id>` en remontant ; bouton « ↓ » avec le nombre de nouveaux messages.
 - **Supprimer pour tout le monde** (`DELETE /api/messages/:id`, évènement `dm:update`) ; les citations du message sont effacées aussi.
 - **Sourdine** par conversation (`conversation_members.muted`) : plus de push, non-lus conservés ; appui long dans la liste ou fiche du groupe.
@@ -144,6 +153,14 @@ Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli
 - Photos : variantes WebP 360/720/1280 générées à l'envoi (rattrapage au démarrage), servies en `?w=` via `srcset` (#15).
 - Accessibilité (#16) : tailles de texte en `rem`, texte secondaire et liens ≥ 4,5:1, focus gardé dans les feuilles.
 - Mise à jour sur demande : bannière « Mettre à jour » (`registerType: 'prompt'`, message `SKIP_WAITING`).
+- **Photos réduites avant l'envoi** (#78, `web/src/lib/image.ts`) : 2048 px max, JPEG 0,85 (PNG gardé en PNG), EXIF retiré, dans `upload()`.
+- **Ouverture instantanée** (#79, `web/src/lib/persist.ts`) : cache TanStack Query gardé dans IndexedDB (`mandrix-cache`) — première page
+  du fil, 60 derniers messages par conversation… —, relu au démarrage (400 ms max), ignoré après une nouvelle version (`__BUILD_ID__`)
+  ou 3 jours, effacé à la déconnexion.
+- **En-têtes de sécurité** (#80, `server/src/lib/security.ts`) : CSP (le script de thème d'`index.html` est autorisé par son
+  empreinte SHA-256, recalculée au démarrage), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`
+  (caméra et micro pour le site seulement), HSTS en production.
+- **Anniversaire** : le 🎂 du jour n'est montré qu'au lecteur et à ses amis (`usersByIds(ids, viewerId)`, #83).
 - Overlays rendus dans un portail (`Portal`) pour passer au-dessus de la barre d'onglets.
 - Icônes générées depuis les masters du logo (`npm run icons`, logo « mandrill pensif low poly » de Solal, #19).
 - **Les URL des icônes portent une empreinte** `?v=<hash>` (manifeste, apple-touch-icon, favicon, calculée dans `web/vite.config.ts`) :
@@ -212,6 +229,9 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 - **Stories** : le visionneur fige la liste à l'ouverture ; le minuteur cumule le temps écoulé par story.
 - Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
 - Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block`.
+- `toLite(u, withBirthday)` : ne jamais écrire `.map(toLite)` (l'index passerait pour `withBirthday`).
+- Supprimer un fichier média : passer par `mediaReferenced()` (`server/src/lib/media.ts`), la même règle que le ménage nocturne.
+- Le navigateur intégré de l'app Claude n'enregistre pas de service worker sur `localhost` : à vérifier sur téléphone.
 - `gh pr update-branch` n'existe pas ici : `gh api -X PUT repos/MatteoCnda1/Mandrix/pulls/<n>/update-branch`.
 
 ## 8. Migrations
@@ -223,11 +243,12 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 | `0002_video_offline_moment` | statut/miniature/durée des vidéos, `client_id`/`taken_at`/`on_time` des photos, Moment Mandrix |
 | `0003_group_chats` | groupes (`conversation_members`, `is_group`, `title`), rattrapage des membres existants |
 | `0004_message_media` | `messages.media_id` (pièce jointe, `ON DELETE SET NULL`) |
-| `0009_message_client_id` | identifiant d'envoi des messages (anti-doublon) |
-| `0008_pin_birthday_gallery` | épinglage, anniversaire, carrousel |
-| `0007_presence` | dernière activité et réglage de présence |
-| `0006_mute_views_delete_edit` | sourdine, date de vue des stories, messages supprimés, légende modifiée |
 | `0005_reactions_moderation_daily` | réactions (posts, messages), blocages, signalements, `hidden_at`, suspension, préférences de notifications, sessions (appareil, activité), sondages (fin, public), variantes de photos, mème du jour |
+| `0006_mute_views_delete_edit` | sourdine, date de vue des stories, messages supprimés, légende modifiée |
+| `0007_presence` | dernière activité et réglage de présence |
+| `0008_pin_birthday_gallery` | épinglage, anniversaire, carrousel |
+| `0009_message_client_id` | identifiant d'envoi des messages (anti-doublon) |
+| `0010_share_replies_group_photo` | réponses aux commentaires (`parent_id`), photo de groupe, post épinglé du profil |
 
 ## 9. Pistes ouvertes
 
