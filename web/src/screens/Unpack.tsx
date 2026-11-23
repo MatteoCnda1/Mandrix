@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
+import { ZoomableImage } from '../components/Zoomable';
 import { useMediaGestures } from '../lib/gestures';
 import { lockScroll, useScrollLock } from '../lib/scrollLock';
 import { useNow } from '../lib/hooks';
@@ -63,9 +64,13 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
           </button>
         </div>
         <div className="relative min-h-0 flex-1">
-          <div {...gestures.handlers} className="absolute inset-0 touch-none select-none">
-            <MediaView key={shot.id} media={shot.media} fit="contain" />
-          </div>
+          {shot.media.kind === 'image' ? (
+            <ZoomableImage key={shot.id} media={shot.media} onDismiss={onClose} onSwipeX={(dir) => setI((x) => Math.max(0, Math.min(photos.length - 1, x - dir)))} />
+          ) : (
+            <div {...gestures.handlers} className="absolute inset-0 touch-none select-none">
+              <MediaView key={shot.id} media={shot.media} fit="contain" />
+            </div>
+          )}
           {i > 0 && (
             <button type="button" aria-label="Photo précédente" onClick={() => setI(i - 1)} className={cx(nav, 'left-3')}>
               <CaretLeft size={20} />

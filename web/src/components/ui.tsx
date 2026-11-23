@@ -140,6 +140,59 @@ export function Sheet({
 
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
+
+  // Glisser vers le bas depuis le contenu (pas seulement la poignée), quand il est défilé tout en haut.
+  const dismissRef = useRef<() => void>(() => {});
+  const [touching, setTouching] = useState(false);
+  useEffect(() => {
+    const el = panel.current;
+    if (!el) return;
+    let start: { y: number; x: number } | null = null;
+    let active = false;
+    let dy = 0;
+    const down = (e: TouchEvent) => {
+      const t = e.target as HTMLElement;
+      if (el.scrollTop > 0 || e.touches.length !== 1 || t.closest('input, textarea, select, [data-no-sheet-drag]')) return (start = null);
+      start = { y: e.touches[0].clientY, x: e.touches[0].clientX };
+      active = false;
+      dy = 0;
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      const y = e.touches[0].clientY - start.y;
+      const x = e.touches[0].clientX - start.x;
+      if (!active) {
+        if (y > 8 && y > Math.abs(x) && el.scrollTop <= 0) {
+          active = true;
+          setTouching(true);
+        }
+        else if (Math.abs(y) > 8 || Math.abs(x) > 8) return void (start = null);
+        else return;
+      }
+      e.preventDefault();
+      dy = Math.max(0, y);
+      setDragY(dy);
+    };
+    const up = () => {
+      if (active) {
+        if (dy > 120) dismissRef.current();
+        else setDragY(0);
+      }
+      start = null;
+      active = false;
+      setTouching(false);
+    };
+    el.addEventListener('touchstart', down, { passive: true });
+    el.addEventListener('touchmove', move, { passive: false });
+    el.addEventListener('touchend', up);
+    el.addEventListener('touchcancel', up);
+    return () => {
+      el.removeEventListener('touchstart', down);
+      el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', up);
+      el.removeEventListener('touchcancel', up);
+    };
+  }, []);
   const dismiss = () => {
     if (lockedRef.current) {
       setDragY(0);
@@ -148,6 +201,7 @@ export function Sheet({
     setClosing(true);
     setTimeout(onClose, 220);
   };
+  dismissRef.current = dismiss;
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
     drag.current = { y: e.clientY, t: Date.now() };
@@ -190,7 +244,7 @@ export function Sheet({
           animation: 'mxSheet .45s cubic-bezier(.2,.9,.2,1) backwards',
           paddingBottom: 'calc(18px + var(--safe-b))',
           transform: closing ? 'translateY(100%)' : dragY ? `translateY(${dragY}px)` : undefined,
-          transition: drag.current ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
+          transition: drag.current || touching ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
         }}
       >
         <div

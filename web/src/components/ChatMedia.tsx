@@ -3,6 +3,7 @@ import { Pause, Play, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useSwipeDown } from '../lib/gestures';
 import { useScrollLock } from '../lib/scrollLock';
+import { ZoomableImage } from './Zoomable';
 import { cx, fmtDuration, MediaView, Portal, VideoProcessing } from './ui';
 
 /** Barres de « forme d'onde » stables pour un vocal (dérivées de son identifiant). */
@@ -160,7 +161,11 @@ export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: ()
           style={{ transform: swipe.dy ? `translateY(${swipe.dy}px) scale(${1 - Math.min(swipe.dy, 400) / 1600})` : undefined, transition: swipe.dy ? 'none' : 'transform .25s ease' }}
           onClick={(e) => e.stopPropagation()}
         >
-          <MediaView media={media} fit="contain" controls={media.kind === 'video'} autoPlay={media.kind === 'video'} muted={false} loop={false} />
+          {media.kind === 'image' ? (
+            <ZoomableImage media={media} onDismiss={onClose} />
+          ) : (
+            <MediaView media={media} fit="contain" controls autoPlay muted={false} loop={false} />
+          )}
         </div>
         <button
           type="button"

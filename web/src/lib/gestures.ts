@@ -133,7 +133,11 @@ export function useMediaGestures(h: MediaGestureHandlers) {
       : { transition: 'transform .25s cubic-bezier(.2,.9,.2,1)' }) as React.CSSProperties,
     handlers: {
       onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* pointeur déjà relâché */
+        }
         const s = { x: e.clientX, y: e.clientY, held: false, hold: undefined as ReturnType<typeof setTimeout> | undefined };
         if (cb.current.onHold)
           s.hold = setTimeout(() => {
@@ -154,5 +158,25 @@ export function useMediaGestures(h: MediaGestureHandlers) {
       onPointerCancel: (e: React.PointerEvent<HTMLElement>) => end(e, true),
       onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     },
+  };
+}
+
+/**
+ * Tap simple ou double tap sur le même élément. Le tap simple attend un court instant
+ * pour savoir si un second tap suit (comme sur Instagram : double tap = j'aime).
+ */
+export function useDoubleTap(onSingle: (() => void) | null, onDouble: (p: { x: number; y: number }) => void, delay = 260) {
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  return (e: React.MouseEvent) => {
+    const p = { x: e.clientX, y: e.clientY };
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+      return onDouble(p);
+    }
+    timer.current = setTimeout(() => {
+      timer.current = undefined;
+      onSingle?.();
+    }, delay);
   };
 }
