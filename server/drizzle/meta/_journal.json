@@ -29,6 +29,13 @@
       "when": 1795439283969,
       "tag": "0003_group_chats",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795441215335,
+      "tag": "0004_message_media",
+      "breakpoints": true
     }
   ]
 }

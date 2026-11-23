@@ -51,7 +51,7 @@ export const media = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    kind: text('kind').$type<'image' | 'video'>().notNull(),
+    kind: text('kind').$type<'image' | 'video' | 'audio'>().notNull(),
     mime: text('mime').notNull(),
     path: text('path').notNull(),
     width: integer('width'),
@@ -299,6 +299,8 @@ export const messages = pgTable(
     senderId: uuid('sender_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     text: text('text').notNull(),
     meta: jsonb('meta'),
+    /** Pièce jointe : photo, vidéo ou message vocal. */
+    mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
     createdAt: created(),
   },
   (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt)],

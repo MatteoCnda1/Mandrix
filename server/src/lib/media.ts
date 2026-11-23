@@ -9,12 +9,23 @@ import sharp from 'sharp';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { fail } from './http.js';
-import { enqueueVideo } from './video.js';
+import { enqueueVideo, transcodeVoice } from './video.js';
 
 const VIDEO_MIMES: Record<string, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/quicktime': '.mov',
+};
+
+// Formats produits par l'enregistreur du navigateur (Safari : mp4/aac, Chrome : webm/opus…).
+const AUDIO_MIMES: Record<string, string> = {
+  'audio/mp4': '.m4a',
+  'audio/x-m4a': '.m4a',
+  'audio/aac': '.aac',
+  'audio/webm': '.webm',
+  'audio/ogg': '.ogg',
+  'audio/mpeg': '.mp3',
+  'audio/wav': '.wav',
 };
 
 interface MediaLike {
@@ -35,7 +46,7 @@ export function mediaRef(m: MediaLike | null | undefined): MediaRef | null {
   return {
     id: m.id,
     url: `/media/${m.id}`,
-    kind: video ? 'video' : 'image',
+    kind: video ? 'video' : m.kind === 'audio' ? 'audio' : 'image',
     width: m.width ?? null,
     height: m.height ?? null,
     poster: video && (m.posterPath || m.hasPoster) ? `/media/${m.id}/poster` : null,
@@ -48,17 +59,24 @@ export function mediaRef(m: MediaLike | null | undefined): MediaRef | null {
 export const MEDIA_SQL_COLUMNS = `m.status as "mediaStatus", m.duration as "mediaDuration", (m.poster_path is not null) as "mediaPoster"`;
 
 interface SaveOpts {
-  accept?: 'image' | 'video' | 'any';
+  accept?: 'image' | 'video' | 'audio' | 'any';
   sealedUntil?: Date | null;
   maxSide?: number;
 }
 
 export async function saveUpload(file: MultipartFile, ownerId: string, opts: SaveOpts = {}) {
   const accept = opts.accept ?? 'any';
-  const mime = file.mimetype.toLowerCase();
+  // « audio/webm;codecs=opus » → « audio/webm »
+  const mime = file.mimetype.toLowerCase().split(';')[0].trim();
   const isImage = mime.startsWith('image/');
   const isVideo = mime in VIDEO_MIMES;
-  if ((accept === 'image' && !isImage) || (accept === 'video' && !isVideo) || (!isImage && !isVideo)) {
+  const isAudio = mime in AUDIO_MIMES;
+  if (
+    (accept === 'image' && !isImage) ||
+    (accept === 'video' && !isVideo) ||
+    (accept === 'audio' && !isAudio) ||
+    (!isImage && !isVideo && !isAudio)
+  ) {
     file.file.resume();
     fail(415, accept === 'video' ? 'Format vidéo non supporté (MP4, WebM ou MOV)' : 'Format de fichier non supporté');
   }
@@ -97,6 +115,27 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
         size: out.info.size,
         sealedUntil: opts.sealedUntil ?? null,
       })
+      .returning();
+    return row;
+  }
+
+  if (isAudio) {
+    const sourceRel = path.join(rel, `${id}.src${AUDIO_MIMES[mime]}`);
+    const src = path.join(mediaDir, sourceRel);
+    await pipeline(file.file, createWriteStream(src));
+    if (file.file.truncated) {
+      await fs.rm(src, { force: true });
+      fail(413, 'Fichier trop volumineux');
+    }
+    const outRel = path.join(rel, `${id}.m4a`);
+    const voice = await transcodeVoice(src, path.join(mediaDir, outRel));
+    // Conversion impossible (ffmpeg absent) : on garde le fichier d'origine.
+    const finalRel = voice.ok ? outRel : sourceRel;
+    if (voice.ok) await fs.rm(src, { force: true });
+    const { size } = await fs.stat(path.join(mediaDir, finalRel));
+    const [row] = await db
+      .insert(schema.media)
+      .values({ id, ownerId, kind: 'audio', mime: voice.ok ? 'audio/mp4' : mime, path: finalRel, size, duration: voice.duration })
       .returning();
     return row;
   }

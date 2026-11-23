@@ -1,5 +1,5 @@
-import { GROUP_MAX_MEMBERS, type Conversation, type ConversationDetail, type Message, type MessageMeta } from '@mandrix/shared';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { attachmentLabel, GROUP_MAX_MEMBERS, type Conversation, type ConversationDetail, type MediaRef, type Message, type MessageMeta } from '@mandrix/shared';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
@@ -13,14 +13,30 @@ import { emitToUser } from '../realtime/io.js';
 
 const { conversations, conversationMembers, messages, conversationReads } = schema;
 
-const toMessage = (m: typeof messages.$inferSelect): Message => ({
-  id: m.id,
-  conversationId: m.conversationId,
-  senderId: m.senderId,
-  text: m.text,
-  meta: (m.meta as MessageMeta) ?? null,
-  createdAt: m.createdAt.toISOString(),
-});
+type MessageRow = typeof messages.$inferSelect;
+
+/** Pièces jointes des messages, lues à jour (une vidéo peut finir son transcodage après l'envoi). */
+async function attachments(rows: MessageRow[]) {
+  const ids = [...new Set(rows.map((r) => r.mediaId).filter((x): x is string => !!x))];
+  const map = new Map<string, MediaRef>();
+  if (ids.length === 0) return map;
+  const media = await db.select().from(schema.media).where(inArray(schema.media.id, ids));
+  for (const m of media) map.set(m.id, mediaRef(m)!);
+  return map;
+}
+
+async function toMessages(rows: MessageRow[]): Promise<Message[]> {
+  const media = await attachments(rows);
+  return rows.map((m) => ({
+    id: m.id,
+    conversationId: m.conversationId,
+    senderId: m.senderId,
+    text: m.text,
+    meta: (m.meta as MessageMeta) ?? null,
+    media: m.mediaId ? (media.get(m.mediaId) ?? null) : null,
+    createdAt: m.createdAt.toISOString(),
+  }));
+}
 
 async function memberIds(conversationId: string) {
   const rows = await db
@@ -60,18 +76,19 @@ async function markRead(conversationId: string, userId: string) {
 }
 
 /** Publie un message dans une conversation et prévient tous ses membres. */
-async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null) {
-  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta }).returning();
+async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null, mediaId: string | null = null) {
+  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId }).returning();
   await db.update(conversations).set({ lastMessageAt: m.createdAt }).where(eq(conversations.id, conv.id));
   await markRead(conv.id, from.id);
-  const msg = toMessage(m);
+  const [msg] = await toMessages([m]);
   const members = await memberIds(conv.id);
   for (const uid of members) emitToUser(uid, 'dm:new', msg);
   const others = members.filter((id) => id !== from.id);
   for (const uid of others) await emitBadges(uid);
   if (meta?.type !== 'system' && others.length) {
     const title = conv.isGroup ? (conv.title ?? 'Groupe') : from.displayName;
-    const body = conv.isGroup ? `${from.displayName} : ${text}` : text;
+    const content = text || attachmentLabel(msg.media?.kind, msg.media?.duration);
+    const body = conv.isGroup ? `${from.displayName} : ${content}` : content;
     sendPush(others, { title, body: body.slice(0, 140), url: `/messages/${conv.id}`, tag: `dm:${conv.id}` }).catch(() => {});
   }
   return msg;
@@ -126,11 +143,14 @@ export default async function messageRoutes(app: FastifyInstance) {
       at: Date | null;
       senderId: string | null;
       meta: { type?: string } | null;
+      mediaKind: 'image' | 'video' | 'audio' | null;
+      mediaDuration: number | null;
       unread: boolean;
     }>(sql`
       select c.id, c.is_group as "isGroup", c.title,
         array(select cm.user_id from conversation_members cm where cm.conversation_id = c.id and cm.user_id <> ${me.id} order by cm.created_at) as members,
         lm.text, lm.created_at as at, lm.sender_id as "senderId", lm.meta,
+        lmm.kind as "mediaKind", lmm.duration as "mediaDuration",
         exists(
           select 1 from messages msg where msg.conversation_id = c.id and msg.sender_id <> ${me.id}
             and msg.created_at > coalesce((select r.last_read_at from conversation_reads r where r.conversation_id = c.id and r.user_id = ${me.id}), 'epoch'::timestamptz)
@@ -138,8 +158,9 @@ export default async function messageRoutes(app: FastifyInstance) {
       from conversations c
       join conversation_members mine on mine.conversation_id = c.id and mine.user_id = ${me.id}
       left join lateral (
-        select m.text, m.created_at, m.sender_id, m.meta from messages m where m.conversation_id = c.id order by m.created_at desc limit 1
+        select m.text, m.created_at, m.sender_id, m.meta, m.media_id from messages m where m.conversation_id = c.id order by m.created_at desc limit 1
       ) lm on true
+      left join media lmm on lmm.id = lm.media_id
       order by c.last_message_at desc limit 100`);
     const list = [...rows];
     const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]));
@@ -156,7 +177,7 @@ export default async function messageRoutes(app: FastifyInstance) {
           members,
           last: r.at
             ? {
-                text: r.text ?? '',
+                text: r.text || attachmentLabel(r.mediaKind, r.mediaDuration),
                 at: new Date(r.at).toISOString(),
                 mine: r.senderId === me.id,
                 sender: r.isGroup && sender && r.senderId !== me.id ? firstName(sender.displayName) : null,
@@ -253,14 +274,23 @@ export default async function messageRoutes(app: FastifyInstance) {
       .limit(200);
     await markRead(c.id, me.id);
     await emitBadges(me.id);
-    return rows.reverse().map(toMessage);
+    return toMessages(rows.reverse());
   });
 
   app.post('/api/conversations/:id/messages', async (req) => {
     const me = requireUser(req);
     const c = await ownConversation(uuidParam(req.params), me.id);
-    const { text } = parse(textSchema, req.body);
-    return postMessage(c, me, text);
+    const body = parse(
+      z
+        .object({ text: z.string().trim().max(1000).default(''), mediaId: z.string().uuid().optional() })
+        .refine((b) => b.text.length > 0 || !!b.mediaId, { message: 'Message vide' }),
+      req.body,
+    );
+    if (body.mediaId) {
+      const [m] = await db.select({ ownerId: schema.media.ownerId }).from(schema.media).where(eq(schema.media.id, body.mediaId)).limit(1);
+      if (!m || m.ownerId !== me.id) fail(400, 'Pièce jointe introuvable');
+    }
+    return postMessage(c, me, body.text, null, body.mediaId ?? null);
   });
 
   app.post('/api/conversations/:id/read', async (req) => {

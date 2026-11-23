@@ -52,6 +52,7 @@ export default async function storyRoutes(app: FastifyInstance) {
     const { mediaId } = parse(z.object({ mediaId: z.string().uuid('Média invalide') }), req.body);
     const [m] = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
     if (!m || m.ownerId !== me.id) fail(404, 'Média introuvable');
+    if (m!.kind === 'audio') fail(400, 'Une story est une photo ou une vidéo');
     const [s] = await db
       .insert(stories)
       .values({ authorId: me.id, mediaId, expiresAt: new Date(Date.now() + 24 * 3600_000) })

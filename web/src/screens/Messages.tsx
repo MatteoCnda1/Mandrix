@@ -1,9 +1,26 @@
-import { conversationName, type ConversationDetail, type Message, type UserLite } from '@mandrix/shared';
-import { CaretLeft, CaretRight, ChatCircleDots, CheckCircle, PaperPlaneRight, PencilSimple, SignOut, UserPlus, UsersThree } from '@phosphor-icons/react';
+import { conversationName, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
+import {
+  CaretLeft,
+  CaretRight,
+  ChatCircleDots,
+  CheckCircle,
+  Microphone,
+  PaperPlaneRight,
+  Paperclip,
+  PencilSimple,
+  SignOut,
+  Trash,
+  UserPlus,
+  UsersThree,
+  X,
+} from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Avatar, EmptyCard, MediaView, PrimaryBtn, ScreenLoader, Sheet, confirmAction, cx } from '../components/ui';
-import { api, errMsg } from '../lib/api';
+import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
+import { Avatar, EmptyCard, MediaView, PrimaryBtn, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
+import { api, errMsg, upload } from '../lib/api';
+import { useObjectUrl } from '../lib/hooks';
+import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
 import { qc, useConversation, useConversations, useFriends, useMe, useMessages } from '../lib/data';
 import { shortTime } from '../lib/format';
 import { useNow } from '../lib/hooks';
@@ -259,17 +276,69 @@ export function Chat() {
     return () => vv.removeEventListener('resize', onResize);
   }, []);
 
+  const [file, setFile] = useState<File | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<MediaRef | null>(null);
+  const preview = useObjectUrl(file);
+  const recorder = useVoiceRecorder(() => void finishVoice(true));
+  const picker = useFilePicker('image/*,video/mp4,video/webm,video/quicktime', (f) => {
+    if (f.size > 100 * 1024 * 1024) return toast('Fichier trop volumineux (100 Mo max)', 'error');
+    setFile(f);
+  });
+
+  const append = (m: Message) => {
+    qc.setQueryData<Message[]>(['messages', id], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));
+    qc.invalidateQueries({ queryKey: ['conversations'] });
+  };
+
+  /** Envoie un message : texte seul, ou pièce jointe (photo, vidéo, vocal) avec texte facultatif. */
+  const sendMessage = async (text: string, attachment: Blob | null, name = 'piece-jointe') => {
+    let mediaId: string | undefined;
+    if (attachment) {
+      setProgress(0);
+      const m = await upload<MediaRef>('/api/media', attachment, name, (p) => setProgress(p));
+      mediaId = m.id;
+    }
+    append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId } }));
+  };
+
   const send = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if ((!text && !file) || progress !== null) return;
+    const attachment = file;
     setDraft('');
+    setFile(null);
     try {
-      const m = await api<Message>(`/api/conversations/${id}/messages`, { body: { text } });
-      qc.setQueryData<Message[]>(['messages', id], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));
-      qc.invalidateQueries({ queryKey: ['conversations'] });
+      await sendMessage(text, attachment, attachment?.name);
     } catch (e) {
       setDraft(text);
+      setFile(attachment);
       toast(errMsg(e), 'error');
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  const startVoice = async () => {
+    try {
+      await recorder.start();
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+
+  const finishVoice = async (keep: boolean) => {
+    const blob = await recorder.stop(keep);
+    if (!blob) {
+      if (keep) toast('Vocal trop court', 'error');
+      return;
+    }
+    try {
+      await sendMessage('', blob, voiceFileName(blob));
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setProgress(null);
     }
   };
 
@@ -333,10 +402,16 @@ export function Chat() {
               </div>
             )}
             <div
-              className={cx('animate-in rounded-[22px] px-3.5 py-2.5 text-base leading-[1.4] break-words', mine ? 'bg-brand text-white' : 'bg-soft text-ink')}
+              className={cx(
+                'animate-in rounded-[22px] text-base leading-[1.4] break-words',
+                m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
+                mine ? 'bg-brand text-white' : 'bg-soft text-ink',
+              )}
               style={{ animationDuration: '.35s' }}
             >
-              <span>{m.text}</span>
+              {m.media?.kind === 'audio' && <VoicePlayer media={m.media} mine={mine} />}
+              {m.media && m.media.kind !== 'audio' && <MessagePhotoVideo media={m.media} onOpen={() => setViewing(m.media)} />}
+              {m.text && <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>{m.text}</span>}
               {m.meta?.type === 'game_invite' && !mine && (
                 <button
                   type="button"
@@ -353,30 +428,94 @@ export function Chat() {
     </div>
   );
 
-  const composer = (
-    <form
-      className="flex flex-none gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        send();
-      }}
-    >
-      <input
-        className="field flex-1"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onFocus={() => setTimeout(() => toBottom(), 250)}
-        maxLength={1000}
-        placeholder={group ? 'Écris au groupe…' : 'Écris un message…'}
-        enterKeyHint="send"
-      />
-      <button type="submit" aria-label="Envoyer" className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-ink text-inv active:scale-90">
+  const busy = progress !== null;
+  const canSend = !!draft.trim() || !!file;
+  const round = 'tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 transition-transform active:scale-90';
+
+  const composer = recorder.recording ? (
+    <div className="flex flex-none items-center gap-2" role="group" aria-label="Enregistrement d’un message vocal">
+      <button type="button" aria-label="Annuler le vocal" onClick={() => void finishVoice(false)} className={cx(round, 'bg-soft text-heart')}>
+        <Trash size={20} />
+      </button>
+      <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-3xl bg-soft px-4">
+        <span className="h-3 w-3 flex-none animate-pulse rounded-full bg-heart" />
+        <span className="text-[15px] font-bold tabular-nums">{fmtDuration(recorder.elapsed) ?? '0:00'}</span>
+        <span className="flex h-6 min-w-0 flex-1 items-center gap-[3px] overflow-hidden" aria-hidden>
+          {Array.from({ length: 24 }, (_, i) => (
+            <span
+              key={i}
+              className="w-[3px] flex-none rounded-full bg-brand transition-[height] duration-100"
+              style={{ height: `${Math.max(14, Math.min(100, recorder.level * 100 * (0.55 + 0.45 * Math.abs(Math.sin(i * 1.7 + recorder.elapsed)))))}%` }}
+            />
+          ))}
+        </span>
+        <span className="hidden text-xs text-mute sm:inline">max {VOICE_MAX_SECONDS / 60} min</span>
+      </div>
+      <button type="button" aria-label="Envoyer le vocal" onClick={() => void finishVoice(true)} className={cx(round, 'bg-brand text-white shadow-blue')}>
         <PaperPlaneRight size={20} weight="fill" />
       </button>
-    </form>
+    </div>
+  ) : (
+    <div className="flex flex-none flex-col gap-2">
+      {picker.input}
+      {file && preview && (
+        <div className="flex items-center gap-2.5 rounded-[22px] bg-soft p-1.5 pr-2">
+          <div className="h-14 w-14 flex-none overflow-hidden rounded-[16px] bg-night">
+            {file.type.startsWith('video/') ? (
+              <video src={preview} muted playsInline className="h-full w-full object-cover" />
+            ) : (
+              <img src={preview} alt="" className="h-full w-full object-cover" />
+            )}
+          </div>
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {busy ? `Envoi… ${Math.round((progress ?? 0) * 100)} %` : file.type.startsWith('video/') ? 'Vidéo prête à envoyer' : 'Photo prête à envoyer'}
+          </span>
+          {!busy && (
+            <button type="button" aria-label="Retirer la pièce jointe" onClick={() => setFile(null)} className="tap grid h-10 w-10 place-items-center rounded-full border-0 bg-card text-ink">
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      )}
+      {busy && !file && <div className="px-2 text-xs font-semibold text-mute">Envoi du vocal… {Math.round((progress ?? 0) * 100)} %</div>}
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+      >
+        <button type="button" aria-label="Joindre une photo ou une vidéo" onClick={picker.open} disabled={busy} className={cx(round, 'bg-soft text-ink')}>
+          <Paperclip size={20} />
+        </button>
+        <input
+          className="field min-w-0 flex-1"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setTimeout(() => toBottom(), 250)}
+          maxLength={1000}
+          placeholder={file ? 'Ajoute un texte…' : group ? 'Écris au groupe…' : 'Écris un message…'}
+          enterKeyHint="send"
+        />
+        {canSend || !voiceSupported() ? (
+          <button type="submit" aria-label="Envoyer" disabled={busy || !canSend} className={cx(round, 'bg-ink text-inv disabled:opacity-50')}>
+            <PaperPlaneRight size={20} weight="fill" />
+          </button>
+        ) : (
+          <button type="button" aria-label="Enregistrer un message vocal" onClick={() => void startVoice()} disabled={busy} className={cx(round, 'bg-brand text-white shadow-blue')}>
+            <Microphone size={20} weight="fill" />
+          </button>
+        )}
+      </form>
+    </div>
   );
 
-  const sheet = info && conv?.isGroup && <GroupSheet conv={conv} onClose={() => setInfo(false)} />;
+  const sheet = (
+    <>
+      {info && conv?.isGroup && <GroupSheet conv={conv} onClose={() => setInfo(false)} />}
+      {viewing && <MediaLightbox media={viewing} onClose={() => setViewing(null)} />}
+    </>
+  );
 
   if (isPhone) {
     // Calé sur la zone visible (au-dessus du clavier) : rien d'autre ne bouge quand on écrit.
