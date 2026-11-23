@@ -60,6 +60,8 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - **Réactions emoji** (#5) : tap sur le cœur = j'aime, appui long = 😂 😍 😮 😢 🔥 👏 (une par personne, notification regroupée par post).
 - **@mentions et #hashtags** (#6) : suggestions d'amis en tapant « @ », notification aux amis mentionnés qui voient le post, hashtags cliquables vers la recherche.
 - Sondages : choix (jusqu'à **6 options**), photos, curseur emoji ; **durée** (1 h, 24 h, 3 jours, sans fin), **votes publics** facultatifs, vote bloqué côté serveur à la fin et résultat envoyé à l'auteur (#7).
+- **Visibilité** (#34) : un post n'est lisible (et commentable, aimable…) que par son auteur, ses amis, les amis de qui l'a republié, et par tous pour les mèmes (`visibleTo` / `visiblePost` dans `server/src/lib/posts.ts`).
+- Fil paginé par **curseur** (`?cursor=`, date de tri + id). Légende **modifiable** (« modifié »). Stories : **« N vues »** et liste des amis qui ont vu.
 - **Recherche** `/recherche` (#13) : légendes, options de sondage et mèmes du cercle, `#hashtag` exact, personnes ; « Tu les connais peut-être ? » (amis d'amis par amis en commun).
 - Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses.
 - Répondre à une story envoie un message privé qui **affiche la photo de la story** des deux côtés (instantané dans `messages.meta`).
@@ -97,6 +99,9 @@ puis podium des mèmes les plus aimés.
 ### Messages
 - Conversations privées et **groupes** (jusqu'à `GROUP_MAX_MEMBERS`) : création, renommage, ajout de membres, quitter ; messages système.
 - Non-lus, badges, push.
+- **Historique** : 100 messages à l'ouverture, puis `?before=<id>` en remontant ; bouton « ↓ » avec le nombre de nouveaux messages.
+- **Supprimer pour tout le monde** (`DELETE /api/messages/:id`, évènement `dm:update`) ; les citations du message sont effacées aussi.
+- **Sourdine** par conversation (`conversation_members.muted`) : plus de push, non-lus conservés ; appui long dans la liste ou fiche du groupe.
 - **Répondre à un message** : glisser la bulle vers la droite (ou appui long › Répondre) ; citation figée dans `messages.meta` (`type: 'reply'`).
 - **« … écrit »** (socket `dm:typing`, expire après 6 s), **accusés « Vu » / « Vu par … »** (`dm:read`, table `conversation_reads`),
   **réactions** par appui long sur une bulle (❤️ + les six emoji), avec « Copier » et « Signaler ».
@@ -203,6 +208,7 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 | `0002_video_offline_moment` | statut/miniature/durée des vidéos, `client_id`/`taken_at`/`on_time` des photos, Moment Mandrix |
 | `0003_group_chats` | groupes (`conversation_members`, `is_group`, `title`), rattrapage des membres existants |
 | `0004_message_media` | `messages.media_id` (pièce jointe, `ON DELETE SET NULL`) |
+| `0006_mute_views_delete_edit` | sourdine, date de vue des stories, messages supprimés, légende modifiée |
 | `0005_reactions_moderation_daily` | réactions (posts, messages), blocages, signalements, `hidden_at`, suspension, préférences de notifications, sessions (appareil, activité), sondages (fin, public), variantes de photos, mème du jour |
 
 ## 9. Pistes ouvertes

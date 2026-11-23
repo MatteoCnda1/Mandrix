@@ -19,10 +19,12 @@ import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
 import { ZoomableImage } from '../components/Zoomable';
+import { errMsg } from '../lib/api';
+import { downloadFile } from '../lib/download';
 import { useMediaGestures } from '../lib/gestures';
 import { lockScroll, useScrollLock } from '../lib/scrollLock';
 import { useNow } from '../lib/hooks';
-import { openPool } from '../lib/store';
+import { openPool, toast } from '../lib/store';
 
 function storageKey(revealAt: string) {
   return `mandrix.unpacked.${revealAt}`;
@@ -229,6 +231,17 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
 }
 
 export function Unpack() {
+  const [fetching, setFetching] = useState<'mine' | 'all' | null>(null);
+  const getArchive = async (revealAt: string, scope: 'mine' | 'all') => {
+    setFetching(scope);
+    try {
+      await downloadFile(`/api/pellicule/archive?revealAt=${encodeURIComponent(revealAt)}&scope=${scope}`, 'mandrix-album.zip');
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setFetching(null);
+    }
+  };
   const { data, isLoading } = useUnpack();
   const { data: me } = useMe();
   const [retro, setRetro] = useState(false);
@@ -332,24 +345,26 @@ export function Unpack() {
           </button>
           <div className="grid grid-cols-2 gap-2">
             {r.photos.some((p) => p.author.id === me?.id) && (
-              <a
-                href={`/api/pellicule/archive?revealAt=${encodeURIComponent(r.revealAt)}&scope=mine`}
-                download
-                className="tap flex h-12 items-center justify-center gap-2 rounded-3xl bg-soft text-sm font-bold text-ink no-underline hover:text-ink active:scale-[.97]"
+              <button
+                type="button"
+                disabled={!!fetching}
+                onClick={() => void getArchive(r.revealAt, 'mine')}
+                className="tap flex h-12 items-center justify-center gap-2 rounded-3xl border-0 bg-soft text-sm font-bold text-ink active:scale-[.97] disabled:opacity-60"
               >
-                <DownloadSimple size={18} /> Mes photos
-              </a>
+                <DownloadSimple size={18} /> {fetching === 'mine' ? 'Préparation…' : 'Mes photos'}
+              </button>
             )}
-            <a
-              href={`/api/pellicule/archive?revealAt=${encodeURIComponent(r.revealAt)}&scope=all`}
-              download
+            <button
+              type="button"
+              disabled={!!fetching}
+              onClick={() => void getArchive(r.revealAt, 'all')}
               className={cx(
-                'tap flex h-12 items-center justify-center gap-2 rounded-3xl bg-soft text-sm font-bold text-ink no-underline hover:text-ink active:scale-[.97]',
+                'tap flex h-12 items-center justify-center gap-2 rounded-3xl border-0 bg-soft text-sm font-bold text-ink active:scale-[.97] disabled:opacity-60',
                 !r.photos.some((p) => p.author.id === me?.id) && 'col-span-2',
               )}
             >
-              <DownloadSimple size={18} /> Tout l’album
-            </a>
+              <DownloadSimple size={18} /> {fetching === 'all' ? 'Préparation…' : 'Tout l’album'}
+            </button>
           </div>
           <button
             type="button"

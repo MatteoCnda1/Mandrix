@@ -1,6 +1,9 @@
-import { attachmentLabel, conversationName, MESSAGE_REACTIONS, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
+import { attachmentLabel, conversationName, MESSAGE_REACTIONS, type Conversation, type ConversationDetail, type MediaRef, type Message, type UserLite } from '@mandrix/shared';
 import {
   ArrowBendUpLeft,
+  Bell,
+  BellSlash,
+  CaretDown,
   CaretLeft,
   CaretRight,
   ChatCircleDots,
@@ -17,12 +20,12 @@ import {
   UsersThree,
   X,
 } from '@phosphor-icons/react';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
+import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { useSwipeX } from '../lib/gestures';
 import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
@@ -81,6 +84,13 @@ export function Messages() {
       ) : (
         <div className="card flex flex-col gap-0.5 p-2">
           {data?.map((c) => {
+            const muteActions: MenuAction[] = [
+              {
+                label: c.muted ? 'Réactiver les notifications' : 'Mettre en sourdine',
+                icon: c.muted ? <Bell size={18} /> : <BellSlash size={18} />,
+                onClick: () => void setMuted(c.id, !c.muted),
+              },
+            ];
             const preview = !c.last
               ? c.isGroup
                 ? 'Nouveau groupe'
@@ -89,12 +99,7 @@ export function Messages() {
                 ? c.last.text
                 : `${c.last.mine ? 'Toi : ' : c.last.sender ? `${c.last.sender} : ` : ''}${c.last.text}`;
             return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => nav(`/messages/${c.id}`)}
-                className="tap flex items-center gap-3 rounded-3xl border-0 bg-transparent p-2.5 text-left text-ink transition-colors hover:bg-soft"
-              >
+              <ConvRow key={c.id} onOpen={() => nav(`/messages/${c.id}`)} actions={muteActions}>
                 <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
                 <span className="min-w-0 flex-1">
                   <span className={cx('block truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
@@ -107,15 +112,49 @@ export function Messages() {
                   )}
                 </span>
                 <span className="flex flex-none flex-col items-end gap-1.5">
-                  <span className="text-xs text-mute">{c.last ? shortTime(c.last.at, now) : ''}</span>
-                  <span className="h-2.5 w-2.5 rounded-full bg-brand" style={{ opacity: c.unread ? 1 : 0 }} />
+                  <span className="flex items-center gap-1 text-xs text-mute">
+                    {c.muted && <BellSlash size={13} aria-label="En sourdine" />}
+                    {c.last ? shortTime(c.last.at, now) : ''}
+                  </span>
+                  <span className={cx('h-2.5 w-2.5 rounded-full', c.muted ? 'bg-mute' : 'bg-brand')} style={{ opacity: c.unread ? 1 : 0 }} />
                 </span>
-              </button>
+              </ConvRow>
             );
           })}
         </div>
       )}
     </div>
+  );
+}
+
+/** Sourdine d'une conversation (liste, fiche du groupe). */
+async function setMuted(id: string, muted: boolean) {
+  try {
+    await api(`/api/conversations/${id}/mute`, { method: 'PATCH', body: { muted } });
+    qc.setQueryData<Conversation[]>(['conversations'], (old) => old?.map((c) => (c.id === id ? { ...c, muted } : c)));
+    qc.setQueryData<ConversationDetail>(['conversation', id], (old) => (old ? { ...old, muted } : old));
+    toast(muted ? 'Conversation en sourdine' : 'Notifications réactivées');
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
+}
+
+/** Ligne de la liste : toucher ouvre, appui long propose la sourdine. */
+function ConvRow({ onOpen, actions, children }: { onOpen: () => void; actions: MenuAction[]; children: ReactNode }) {
+  const [at, setAt] = useState<Point | null>(null);
+  const lp = useLongPress(setAt);
+  return (
+    <>
+      <button
+        type="button"
+        {...lp}
+        onClick={onOpen}
+        className="tap flex items-center gap-3 rounded-3xl border-0 bg-transparent p-2.5 text-left text-ink transition-colors select-none hover:bg-soft [-webkit-touch-callout:none]"
+      >
+        {children}
+      </button>
+      {at && <ReactionPicker at={at} emojis={[]} current={null} onClose={() => setAt(null)} actions={actions} />}
+    </>
   );
 }
 
@@ -247,6 +286,15 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
           <UserPlus size={22} /> Ajouter des amis
         </button>
       )}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={conv.muted}
+        onClick={() => void setMuted(conv.id, !conv.muted)}
+        className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[0.9375rem] font-bold text-ink"
+      >
+        <BellSlash size={22} /> <span className="flex-1">Mettre en sourdine</span> <Switch on={conv.muted} />
+      </button>
       <button type="button" onClick={leave} className="tap flex h-14 items-center gap-3 rounded-3xl border-0 bg-soft px-4 text-left text-[0.9375rem] font-bold text-heart">
         <SignOut size={22} /> Quitter le groupe
       </button>
@@ -368,19 +416,85 @@ function ChatView({ id }: { id: string }) {
 
   const toBottom = (smooth = false) => {
     const el = list.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    // Animation seulement sur une courte distance ; de loin, on saute directement.
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth && el.scrollHeight - el.scrollTop - el.clientHeight < 1500 ? 'smooth' : 'auto' });
+    setUnseen(0);
   };
 
+  // Suivi du bas de liste : on ne fait défiler automatiquement que si l'on y était déjà.
+  const atBottom = useRef(true);
+  const [showDown, setShowDown] = useState(false);
+  const [unseen, setUnseen] = useState(0);
+  const onListScroll = () => {
+    const el = list.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    atBottom.current = near;
+    setShowDown(!near);
+    if (near) setUnseen(0);
+    // Près du haut : page précédente (en plus de l'observateur, qui ne tourne pas page masquée).
+    if (el.scrollTop < 200) void loadOlderRef.current();
+  };
+  const loadOlderRef = useRef<() => Promise<void>>(async () => {});
+
+  // Nouveau message en bas : on suit s'il est à moi ou si l'on était en bas, sinon on le compte.
+  const lastId = useRef<string | null>(null);
   useEffect(() => {
-    toBottom(true);
-    // Les messages reçus pendant que la conversation est ouverte sont lus.
     const last = msgs?.[msgs.length - 1];
-    if (last && me && last.senderId !== me.id) {
+    if (!last || last.id === lastId.current) return;
+    const first = lastId.current === null;
+    lastId.current = last.id;
+    if (first || atBottom.current || last.senderId === me?.id) toBottom(!first);
+    else setUnseen((n) => n + 1);
+    // Les messages reçus pendant que la conversation est ouverte sont lus.
+    if (!first && me && last.senderId !== me.id) {
       api(`/api/conversations/${id}/read`, { method: 'POST' })
         .then(() => qc.invalidateQueries({ queryKey: ['conversations'] }))
         .catch(() => {});
     }
-  }, [msgs?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [msgs?.[msgs.length - 1]?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Remonter dans l'historique : on charge la page précédente sans faire sauter la lecture.
+  const [hasOlder, setHasOlder] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const keepFrom = useRef<{ height: number; top: number } | null>(null);
+  useEffect(() => {
+    if (msgs && msgs.length < 100) setHasOlder(false);
+  }, [!!msgs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadOlder = async () => {
+    const el = list.current;
+    const first = msgs?.[0];
+    if (!el || !first || loadingOlder || !hasOlder) return;
+    setLoadingOlder(true);
+    try {
+      const older = await api<Message[]>(`/api/conversations/${id}/messages?before=${first.id}`);
+      if (older.length < 100) setHasOlder(false);
+      if (older.length) {
+        keepFrom.current = { height: el.scrollHeight, top: el.scrollTop };
+        qc.setQueryData<Message[]>(['messages', id], (old) => [...older.filter((m) => !old?.some((x) => x.id === m.id)), ...(old ?? [])]);
+      }
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+  loadOlderRef.current = loadOlder;
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (el && keepFrom.current) {
+      el.scrollTop = el.scrollHeight - keepFrom.current.height + keepFrom.current.top;
+      keepFrom.current = null;
+    }
+  }, [msgs?.[0]?.id]);
+  const topSentinel = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = topSentinel.current;
+    if (!el || !hasOlder) return;
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && void loadOlder(), { root: list.current, rootMargin: '200px 0px 0px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ouverture du clavier : on garde les derniers messages visibles.
   useEffect(() => {
@@ -504,6 +618,23 @@ function ChatView({ id }: { id: string }) {
     const acts: MenuAction[] = [];
     acts.push({ label: 'Répondre', icon: <ArrowBendUpLeft size={18} />, onClick: () => startReply(m) });
     if (m.text) acts.push({ label: 'Copier', icon: <Copy size={18} />, onClick: () => void navigator.clipboard?.writeText(m.text).then(() => toast('Copié')) });
+    if (m.senderId === me.id) {
+      acts.push({
+        label: 'Supprimer pour tout le monde',
+        icon: <Trash size={18} />,
+        danger: true,
+        onClick: async () => {
+          if (!(await confirmAction({ title: 'Supprimer ce message ?', message: 'Il disparaîtra pour tout le monde.', confirmLabel: 'Supprimer', destructive: true }))) return;
+          try {
+            const gone = await api<Message>(`/api/messages/${m.id}`, { method: 'DELETE' });
+            qc.setQueryData<Message[]>(['messages', id], (old) => old?.map((x) => (x.id === gone.id ? gone : x)));
+            qc.invalidateQueries({ queryKey: ['conversations'] });
+          } catch (e) {
+            toast(errMsg(e), 'error');
+          }
+        },
+      });
+    }
     if (m.senderId !== me.id) {
       const author = byId.get(m.senderId);
       acts.push({
@@ -532,8 +663,14 @@ function ChatView({ id }: { id: string }) {
   );
 
   const bubbles = (
-    <div ref={list} className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 py-2">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div ref={list} onScroll={onListScroll} className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 py-2">
       <div className="mt-auto" />
+      {hasOlder && (
+        <div ref={topSentinel} className="flex flex-none justify-center py-2 text-xs font-semibold text-mute" aria-live="polite">
+          {loadingOlder ? 'Chargement des anciens messages…' : ''}
+        </div>
+      )}
       {msgs?.length === 0 && <div className="py-8 text-center text-sm text-mute">Dis bonjour 👋</div>}
       {msgs?.map((m, i) => {
         if (m.meta?.type === 'system') {
@@ -544,6 +681,15 @@ function ChatView({ id }: { id: string }) {
           );
         }
         const mine = m.senderId === me.id;
+        if (m.deleted) {
+          return (
+            <div key={m.id} id={`msg-${m.id}`} className={cx('flex max-w-[82%] flex-none', mine ? 'self-end' : 'self-start')}>
+              <span className="rounded-[22px] border border-dashed border-line px-3.5 py-2 text-sm text-mute italic">
+                {mine ? 'Tu as supprimé ce message' : 'Message supprimé'}
+              </span>
+            </div>
+          );
+        }
         const prev = msgs[i - 1];
         const showSender = group && !mine && (!prev || prev.senderId !== m.senderId || prev.meta?.type === 'system');
         const sender = byId.get(m.senderId);
@@ -651,6 +797,18 @@ function ChatView({ id }: { id: string }) {
             </span>
           </div>
         </div>
+      )}
+    </div>
+      {showDown && (
+        <button
+          type="button"
+          onClick={() => toBottom(true)}
+          aria-label={unseen ? `${unseen} nouveau${unseen > 1 ? 'x' : ''} message${unseen > 1 ? 's' : ''} : revenir en bas` : 'Revenir en bas'}
+          className="tap absolute right-2 bottom-2 flex h-11 min-w-11 animate-pop items-center justify-center gap-1 rounded-full border-0 bg-card px-3 text-sm font-bold text-ink shadow-pill"
+        >
+          {unseen > 0 && <span className="text-acc">{unseen}</span>}
+          <CaretDown size={18} weight="bold" />
+        </button>
       )}
     </div>
   );

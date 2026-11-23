@@ -17,6 +17,7 @@ import { api, errMsg } from '../lib/api';
 import { qc, useConfig, useMe } from '../lib/data';
 import { timeAgo } from '../lib/format';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '../lib/push';
+import { downloadFile } from '../lib/download';
 import { disconnectSocket } from '../lib/socket';
 import { toast } from '../lib/store';
 import { AMBIANCES, useAmbiance } from '../lib/theme';
@@ -292,9 +293,12 @@ function AccountSettings({ me }: { me: Me }) {
           icon={<DownloadSimple size={20} />}
           label="Exporter mes données"
           sub="Archive zip : profil, posts, messages, photos"
-          onClick={() => {
-            window.location.href = '/api/me/export';
-          }}
+          onClick={() =>
+            void run(async () => {
+              toast('Préparation de l’archive…');
+              await downloadFile('/api/me/export', 'mandrix-export.zip');
+            })
+          }
         />
       </Section>
 
