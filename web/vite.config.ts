@@ -16,7 +16,7 @@ export default defineConfig({
       // La nouvelle version attend que l'utilisateur clique sur « Mettre à jour ».
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['favicon.svg', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'icons/*.png'],
       manifest: {
         name: 'Mandrix',
         short_name: 'Mandrix',
