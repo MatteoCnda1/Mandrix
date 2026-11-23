@@ -297,7 +297,7 @@ export default async function postRoutes(app: FastifyInstance) {
       data: { postId: id, kind: p.kind, text: text.slice(0, 80) },
       push: { title: me.displayName, body: `a commenté ${KIND_LABEL[p.kind] ?? 'ton post'} : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `comment:${id}` },
     });
-    await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id });
+    await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id, postAuthorId: p.authorId });
     const authors = await usersByIds([me.id]);
     return { id: c.id, postId: id, author: authors.get(me.id)!, text: c.text, createdAt: c.createdAt.toISOString(), likes: 0, liked: false };
   });

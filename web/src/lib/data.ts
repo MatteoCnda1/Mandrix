@@ -182,8 +182,20 @@ export function toggleRepost(post: Post, myId: string) {
   );
 }
 
+/** Réaction emoji sur un post (même emoji : retirée). */
+export async function reactToPost(post: Post, emoji: string) {
+  const remove = post.myReaction === emoji;
+  try {
+    const r = await api<Pick<Post, 'reactions' | 'myReaction'>>(`/api/posts/${post.id}/reaction`, remove ? { method: 'DELETE' } : { method: 'PUT', body: { emoji } });
+    patchPost(post.id, (p) => ({ ...p, ...r }));
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
+}
+
 export async function votePoll(post: Post, body: { optionId?: string; value?: number }) {
   if (!post.poll) return;
+  if (post.poll.closed) return toast('Ce sondage est terminé', 'error');
   const prev = post.poll;
   if (body.optionId) {
     const had = prev.myVote;

@@ -123,11 +123,11 @@ export function MessagePhotoVideo({ media, onOpen }: { media: MediaRef; onOpen: 
             </span>
           </span>
           {media.duration && (
-            <span className="absolute right-2 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white">{fmtDuration(media.duration)}</span>
+            <span className="absolute right-2 bottom-2 rounded-full bg-black/55 px-2 py-0.5 text-[0.6875rem] font-bold text-white">{fmtDuration(media.duration)}</span>
           )}
         </>
       ) : (
-        <img src={media.url} alt="Photo" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={media.url} srcSet={media.srcSet ?? undefined} sizes="240px" alt="Photo" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       )}
     </button>
   );

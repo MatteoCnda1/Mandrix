@@ -20,6 +20,7 @@
           var dark = d === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : d === '1';
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
           if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#071120');
+          document.documentElement.setAttribute('data-ambiance', localStorage.getItem('mandrix.ambiance') || 'aurore');
         } catch (e) {}
       })();
     </script>

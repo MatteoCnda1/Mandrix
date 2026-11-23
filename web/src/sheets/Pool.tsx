@@ -16,7 +16,7 @@ export function PoolSheet({ target }: { target: { postId?: string; shotId?: stri
   const close = () => useUI.setState({ poolFor: null });
   return (
     <Sheet title="Envoyer dans le pool" onClose={close}>
-      <p className="m-0 text-[15px] leading-[1.45] text-mute">Ce contenu pourra être tiré au sort comme image à légender dans Make It Friends.</p>
+      <p className="m-0 text-[0.9375rem] leading-[1.45] text-mute">Ce contenu pourra être tiré au sort comme image à légender dans Make It Friends.</p>
       {OPTS.map((o) => {
         const Icon = o.icon;
         return (
@@ -31,13 +31,13 @@ export function PoolSheet({ target }: { target: { postId?: string; shotId?: stri
               <Icon size={22} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-bold">{o.label}</span>
-              <span className="block text-[13px] text-mute">{o.sub}</span>
+              <span className="block text-[0.9375rem] font-bold">{o.label}</span>
+              <span className="block text-[0.8125rem] text-mute">{o.sub}</span>
             </span>
           </button>
         );
       })}
-      <div className="flex gap-2.5 px-1 text-[13px] leading-[1.45] text-mute">
+      <div className="flex gap-2.5 px-1 text-[0.8125rem] leading-[1.45] text-mute">
         <ShieldCheck size={18} className="flex-none" />
         <span>Tu peux retirer ton contenu du pool à tout moment. Chaque image peut être signalée par les joueurs et sera alors retirée en attendant vérification.</span>
       </div>

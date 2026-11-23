@@ -1,10 +1,12 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { StrictMode, useEffect } from 'react';
+import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router';
 import { registerSW } from 'virtual:pwa-register';
 import { AppLayout } from './components/AppLayout';
-import { ConfirmHost, Logo } from './components/ui';
+import { Backdrop } from './components/Backdrop';
+import { ReportHost } from './components/Report';
+import { ConfirmHost, Logo, ScreenLoader } from './components/ui';
 import { UpdateBanner } from './components/UpdateBanner';
 import './index.css';
 import { qc, useMe } from './lib/data';
@@ -14,17 +16,26 @@ import { connectSocket, disconnectSocket } from './lib/socket';
 import { toast, useUI } from './lib/store';
 
 const toastSent = (n: number) => toast(n > 1 ? `${n} photos en attente envoyées dans ta Pellicule` : 'Photo en attente envoyée dans ta Pellicule');
-import { Camera } from './screens/Camera';
 import { Feed } from './screens/Feed';
-import { Game } from './screens/Game';
 import { Landing } from './screens/Landing';
-import { Memes } from './screens/Memes';
-import { Chat, Messages } from './screens/Messages';
-import { Moderation, NotificationsPage, PostPage } from './screens/Misc';
-import { Profile } from './screens/Profile';
-import { Reels } from './screens/Reels';
-import { ResetPassword } from './screens/ResetPassword';
-import { Unpack } from './screens/Unpack';
+
+// Écrans chargés à la demande : le fil s'affiche sans attendre le code des autres écrans.
+const Camera = lazy(() => import('./screens/Camera').then((m) => ({ default: m.Camera })));
+const Game = lazy(() => import('./screens/Game').then((m) => ({ default: m.Game })));
+const Memes = lazy(() => import('./screens/Memes').then((m) => ({ default: m.Memes })));
+const Messages = lazy(() => import('./screens/Messages').then((m) => ({ default: m.Messages })));
+const Chat = lazy(() => import('./screens/Messages').then((m) => ({ default: m.Chat })));
+const Moderation = lazy(() => import('./screens/Misc').then((m) => ({ default: m.Moderation })));
+const NotificationsPage = lazy(() => import('./screens/Misc').then((m) => ({ default: m.NotificationsPage })));
+const PostPage = lazy(() => import('./screens/Misc').then((m) => ({ default: m.PostPage })));
+const Profile = lazy(() => import('./screens/Profile').then((m) => ({ default: m.Profile })));
+const Reels = lazy(() => import('./screens/Reels').then((m) => ({ default: m.Reels })));
+const Search = lazy(() => import('./screens/Search').then((m) => ({ default: m.Search })));
+const SettingsPage = lazy(() => import('./screens/Settings').then((m) => ({ default: m.SettingsPage })));
+const ResetPassword = lazy(() => import('./screens/ResetPassword').then((m) => ({ default: m.ResetPassword })));
+const Unpack = lazy(() => import('./screens/Unpack').then((m) => ({ default: m.Unpack })));
+
+const page = (el: ReactNode) => <Suspense fallback={<ScreenLoader />}>{el}</Suspense>;
 
 function Splash() {
   return (
@@ -77,6 +88,7 @@ function Root() {
       {screen}
       <UpdateBanner />
       <ConfirmHost />
+      <ReportHost />
     </>
   );
 }
@@ -88,24 +100,26 @@ function RedirectAfterLogin() {
 }
 
 const router = createBrowserRouter([
-  { path: '/reinitialiser', element: <ResetPassword /> },
+  { path: '/reinitialiser', element: page(<ResetPassword />) },
   {
     path: '/',
     element: <Root />,
     children: [
       { index: true, element: <RedirectAfterLogin /> },
-      { path: 'reels', element: <Reels /> },
-      { path: 'pellicule', element: <Camera /> },
-      { path: 'deballage', element: <Unpack /> },
-      { path: 'jeu', element: <Game /> },
-      { path: 'jeu/galerie', element: <Memes /> },
-      { path: 'profil', element: <Profile /> },
-      { path: 'u/:username', element: <Profile /> },
-      { path: 'messages', element: <Messages /> },
-      { path: 'messages/:id', element: <Chat /> },
-      { path: 'notifications', element: <NotificationsPage /> },
-      { path: 'moderation', element: <Moderation /> },
-      { path: 'p/:id', element: <PostPage /> },
+      { path: 'reels', element: page(<Reels />) },
+      { path: 'pellicule', element: page(<Camera />) },
+      { path: 'deballage', element: page(<Unpack />) },
+      { path: 'jeu', element: page(<Game />) },
+      { path: 'jeu/galerie', element: page(<Memes />) },
+      { path: 'profil', element: page(<Profile />) },
+      { path: 'u/:username', element: page(<Profile />) },
+      { path: 'messages', element: page(<Messages />) },
+      { path: 'messages/:id', element: page(<Chat />) },
+      { path: 'notifications', element: page(<NotificationsPage />) },
+      { path: 'moderation', element: page(<Moderation />) },
+      { path: 'p/:id', element: page(<PostPage />) },
+      { path: 'recherche', element: page(<Search />) },
+      { path: 'reglages', element: page(<SettingsPage />) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
@@ -139,12 +153,7 @@ preventPinchZoom();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <div className="aurora" aria-hidden="true">
-      <i />
-      <i />
-      <i />
-      <i />
-    </div>
+    <Backdrop />
     <QueryClientProvider client={qc}>
       <RouterProvider router={router} />
     </QueryClientProvider>

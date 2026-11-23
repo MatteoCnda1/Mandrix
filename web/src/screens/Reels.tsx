@@ -57,7 +57,7 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
       <div className="absolute right-[84px] bottom-5 left-[18px] flex flex-col gap-2 text-white [text-shadow:0_1px_10px_rgba(0,0,0,.45)]">
         <button type="button" onClick={() => nav(`/u/${post.author.username}`)} className="tap flex items-center gap-2.5 border-0 bg-transparent p-0 text-left text-white">
           <Avatar user={post.author} size={40} className="[text-shadow:none]" />
-          <span className="text-[15px] font-bold">{post.author.displayName}</span>
+          <span className="text-[0.9375rem] font-bold">{post.author.displayName}</span>
         </button>
         {post.text && <div className="text-base leading-[1.4]">{post.text}</div>}
       </div>

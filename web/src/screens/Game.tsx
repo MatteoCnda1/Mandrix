@@ -2,6 +2,7 @@ import { GAME, type GameRoom } from '@mandrix/shared';
 import { ArrowRight, CheckCircle, CircleNotch, Copy, Crown, Flag, HourglassMedium, Images, Play, Plus, Shuffle, SignOut, Timer, Trophy } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { DailyMemeView } from '../components/Daily';
 import { Avatar, MediaView, Podium, PrimaryBtn, Seg, confirmAction, cx } from '../components/ui';
 import { qc, useMe, usePoolStats } from '../lib/data';
 import { useNow } from '../lib/hooks';
@@ -38,8 +39,8 @@ function GalleryButton() {
         <Trophy size={24} weight="fill" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[17px] font-extrabold">Galerie des mèmes</span>
-        <span className="block text-sm text-mute">Le podium des plus aimés</span>
+        <span className="block text-[1.0625rem] font-extrabold">Galerie des mèmes</span>
+        <span className="block text-sm text-mute">Classement de la saison et podium des plus aimés</span>
       </span>
       <ArrowRight size={20} />
     </button>
@@ -62,19 +63,19 @@ function EmptyPoolCard() {
           <Images size={22} weight="fill" />
         </span>
         <div className="min-w-0">
-          <div className="text-[17px] font-extrabold">Le pool est vide</div>
+          <div className="text-[1.0625rem] font-extrabold">Le pool est vide</div>
           <div className="text-sm text-mute">Il faut au moins une photo ou une vidéo dans le pool pour jouer.</div>
         </div>
       </div>
       <PrimaryBtn onClick={() => useUI.getState().openComposer('post', 0, { pool: true })}>
         <Plus size={18} weight="bold" /> Ajouter une photo au pool
       </PrimaryBtn>
-      <p className="m-0 px-1 text-[13px] text-mute">Tu peux aussi envoyer un post existant ou une photo du déballage avec le bouton « Pool ».</p>
+      <p className="m-0 px-1 text-[0.8125rem] text-mute">Tu peux aussi envoyer un post existant ou une photo du déballage avec le bouton « Pool ».</p>
     </div>
   );
 }
 
-function NoRoom() {
+function NoRoom({ tab, setTab }: { tab: 'live' | 'jour'; setTab: (t: 'live' | 'jour') => void }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const connected = useGame((s) => s.connected);
@@ -84,14 +85,34 @@ function NoRoom() {
     await enterRoom(event, c);
     setBusy(false);
   };
+  const tabs = (
+    <Seg
+      value={tab}
+      onChange={setTab}
+      options={[
+        { value: 'live' as const, label: 'Partie en direct' },
+        { value: 'jour' as const, label: 'Mème du jour' },
+      ]}
+    />
+  );
+  if (tab === 'jour') {
+    return (
+      <div className="flex animate-in flex-col gap-3.5">
+        {tabs}
+        <DailyMemeView emptyPool={pool && pool.publicCount === 0 ? <EmptyPoolCard /> : null} />
+        <GalleryButton />
+      </div>
+    );
+  }
   return (
     <div className="flex animate-in flex-col gap-3.5">
+      {tabs}
       <Hero />
       <div className="card flex flex-col gap-3 p-[18px]">
-        <div className="text-[17px] font-extrabold">Jouer avec tes amis</div>
+        <div className="text-[1.0625rem] font-extrabold">Jouer avec tes amis</div>
         <PrimaryBtn
           tone="brand"
-          className="h-[60px] rounded-[30px] text-[17px] font-extrabold"
+          className="h-[60px] rounded-[30px] text-[1.0625rem] font-extrabold"
           disabled={busy || !connected}
           onClick={() => run('game:create')}
         >
@@ -106,7 +127,7 @@ function NoRoom() {
           }}
         >
           <input className="field flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code du salon (MDRX-482)" maxLength={8} autoCapitalize="characters" />
-          <button type="submit" disabled={busy || !connected || !code.trim()} className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95 disabled:bg-line disabled:text-mute">
+          <button type="submit" disabled={busy || !connected || !code.trim()} className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[0.9375rem] font-bold text-inv active:scale-95 disabled:bg-line disabled:text-mute">
             Rejoindre
           </button>
         </form>
@@ -132,13 +153,13 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
       )}
       <div className="card flex flex-col gap-3.5 p-[18px]">
         <div className="flex items-center gap-2.5">
-          <div className="text-[17px] font-extrabold">
+          <div className="text-[1.0625rem] font-extrabold">
             Joueurs · {room.players.length}/{GAME.maxPlayers}
           </div>
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(room.code).then(() => toast('Code copié'))}
-            className="tap ml-auto flex items-center gap-1.5 rounded-[14px] border-0 bg-soft px-3 py-2 font-mono text-[13px] font-semibold text-ink"
+            className="tap ml-auto flex items-center gap-1.5 rounded-[14px] border-0 bg-soft px-3 py-2 font-mono text-[0.8125rem] font-semibold text-ink"
             aria-label="Copier le code du salon"
           >
             {room.code} <Copy size={14} />
@@ -149,7 +170,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
             <div key={p.user.id} className="relative flex w-[60px] flex-col items-center gap-1.5" style={{ opacity: p.connected ? 1 : 0.45 }}>
               <Avatar user={p.user} size={54} />
               {p.user.id === room.hostId && <Crown size={18} weight="fill" className="absolute -top-2 right-0 text-acc" />}
-              <span className="max-w-full truncate text-[13px] font-semibold">{p.user.id === meId ? 'Toi' : p.user.displayName.split(' ')[0]}</span>
+              <span className="max-w-full truncate text-[0.8125rem] font-semibold">{p.user.id === meId ? 'Toi' : p.user.displayName.split(' ')[0]}</span>
             </div>
           ))}
           {room.players.length < GAME.maxPlayers && (
@@ -157,13 +178,13 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
               <button type="button" aria-label="Inviter" onClick={() => openSheet('invite')} className="tap grid h-[54px] w-[54px] place-items-center rounded-full border-2 border-dashed border-[#8FA3B5] bg-transparent text-ink">
                 <Plus size={20} />
               </button>
-              <span className="text-[13px] font-semibold">Inviter</span>
+              <span className="text-[0.8125rem] font-semibold">Inviter</span>
             </div>
           )}
         </div>
       </div>
       <div className="card flex flex-wrap items-center gap-3 p-[18px]">
-        <div className="mr-auto text-[17px] font-extrabold">Manches</div>
+        <div className="mr-auto text-[1.0625rem] font-extrabold">Manches</div>
         <Seg
           className={cx(!host && 'pointer-events-none opacity-70')}
           value={room.rounds}
@@ -172,7 +193,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
         />
       </div>
       <div className="card flex flex-wrap items-center gap-3 p-[18px]">
-        <div className="mr-auto text-[17px] font-extrabold">Images tirées du</div>
+        <div className="mr-auto text-[1.0625rem] font-extrabold">Images tirées du</div>
         <Seg
           className={cx(!host && 'pointer-events-none opacity-70')}
           value={room.source}
@@ -190,7 +211,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
           disabled={!enough}
           onClick={() => gameEmit('game:start')}
           className={cx(
-            'tap flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] border-0 text-[17px] font-extrabold transition-transform duration-200',
+            'tap flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] border-0 text-[1.0625rem] font-extrabold transition-transform duration-200',
             enough ? 'bg-brand text-white shadow-blue hover:-translate-y-0.5 active:scale-[.97]' : 'cursor-not-allowed bg-line text-mute',
           )}
         >
@@ -198,7 +219,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
           <span>{enough ? 'Lancer la partie' : 'Invite au moins un ami'}</span>
         </button>
       ) : (
-        <div className="flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] bg-glass text-[15px] font-bold text-mute">
+        <div className="flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] bg-glass text-[0.9375rem] font-bold text-mute">
           <HourglassMedium size={20} /> En attente de l’hôte…
         </div>
       )}
@@ -237,7 +258,7 @@ function Caption({ room }: { room: GameRoom }) {
         <span className="flex h-10 items-center rounded-[20px] bg-ink px-3.5 text-sm font-bold text-inv">
           Manche {room.round}/{room.rounds}
         </span>
-        <span className="ml-auto flex h-10 items-center gap-1.5 rounded-[20px] bg-card px-3.5 text-[15px] font-extrabold tabular-nums">
+        <span className="ml-auto flex h-10 items-center gap-1.5 rounded-[20px] bg-card px-3.5 text-[0.9375rem] font-extrabold tabular-nums">
           <Timer size={18} />
           <span>{left} s</span>
         </span>
@@ -252,7 +273,7 @@ function Caption({ room }: { room: GameRoom }) {
         <div className="ph relative grid aspect-[4/3] place-items-center overflow-hidden rounded-3xl">
           {room.me.image ? <MediaView media={room.me.image.media} autoPlay /> : <span className="font-mono text-xs text-phink">aucune image</span>}
           {room.me.image && (
-            <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[13px] font-bold text-ink">du pool · {room.me.image.by}</span>
+            <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[0.8125rem] font-bold text-ink">du pool · {room.me.image.by}</span>
           )}
           {!submitted && (
             <>
@@ -280,14 +301,14 @@ function Caption({ room }: { room: GameRoom }) {
                 )}
               >
                 <Shuffle size={20} />
-                <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[11px] font-extrabold text-white">{room.me.shufflesLeft}</span>
+                <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[0.6875rem] font-extrabold text-white">{room.me.shufflesLeft}</span>
               </button>
             </>
           )}
         </div>
       </div>
       {submitted ? (
-        <div className="flex h-16 items-center justify-center gap-2 rounded-[32px] bg-card text-[15px] font-bold text-mute shadow-card">
+        <div className="flex h-16 items-center justify-center gap-2 rounded-[32px] bg-card text-[0.9375rem] font-bold text-mute shadow-card">
           <CheckCircle size={20} weight="fill" className="text-brand" /> Légende envoyée · {done}/{room.players.length}
         </div>
       ) : (
@@ -299,7 +320,7 @@ function Caption({ room }: { room: GameRoom }) {
           }}
         >
           <input className="field flex-1" value={text} onChange={(e) => setText(e.target.value)} maxLength={GAME.captionMax} placeholder="Écris ta légende…" autoFocus />
-          <button type="submit" className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95">
+          <button type="submit" className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[0.9375rem] font-bold text-inv active:scale-95">
             Valider
           </button>
         </form>
@@ -321,7 +342,7 @@ function Vote({ room }: { room: GameRoom }) {
       <div className="card flex animate-in flex-col items-center gap-3 px-6 py-10 text-center">
         <HourglassMedium size={34} className="text-acc" />
         <div className="text-xl font-extrabold">Votes envoyés</div>
-        <div className="text-[15px] text-mute">
+        <div className="text-[0.9375rem] text-mute">
           En attente des autres joueurs · {voted}/{room.players.length} · {left} s
         </div>
       </div>
@@ -331,7 +352,7 @@ function Vote({ room }: { room: GameRoom }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <div className="text-[17px] font-extrabold">
+        <div className="text-[1.0625rem] font-extrabold">
           Mème {idx}/{room.memes.length} · note la légende
         </div>
         <span className="ml-auto flex h-9 items-center gap-1.5 rounded-[18px] bg-card px-3 text-sm font-extrabold tabular-nums">
@@ -343,7 +364,7 @@ function Vote({ room }: { room: GameRoom }) {
         <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
           <MediaView media={current.image.media} autoPlay />
         </div>
-        <div className="px-1 text-[13px] text-mute">Légende de {current.author.displayName}</div>
+        <div className="px-1 text-[0.8125rem] text-mute">Légende de {current.author.displayName}</div>
       </div>
       <div className="grid grid-cols-3 gap-2">
         {GAME.ratings.map((r) => (
@@ -351,7 +372,7 @@ function Vote({ room }: { room: GameRoom }) {
             key={r.value}
             type="button"
             onClick={() => gameEmit('game:rate', current.id, r.value)}
-            className={cx('tap h-14 rounded-[28px] border-0 text-[15px] font-bold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[.94]', tones[r.value])}
+            className={cx('tap h-14 rounded-[28px] border-0 text-[0.9375rem] font-bold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[.94]', tones[r.value])}
           >
             {r.label}
           </button>
@@ -384,7 +405,7 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
   return (
     <div className="flex animate-in flex-col gap-3.5">
       <div className="card flex flex-col gap-4 p-5">
-        <div className="text-[22px] font-extrabold tracking-[-.02em]">{final ? 'Classement final' : `Résultats de la manche ${room.round}`}</div>
+        <div className="text-[1.375rem] font-extrabold tracking-[-.02em]">{final ? 'Classement final' : `Résultats de la manche ${room.round}`}</div>
         <Podium
           entries={ranking.slice(0, 3).map((p, i) => ({
             key: p.user.id,
@@ -412,14 +433,14 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
       </div>
       {room.winner && (
         <div className="card flex flex-col gap-2.5 p-3.5">
-          <div className="px-1 text-[13px] font-bold text-acc">Mème gagnant · {room.winner.author.id === meId ? 'toi' : room.winner.author.displayName}</div>
+          <div className="px-1 text-[0.8125rem] font-bold text-acc">Mème gagnant · {room.winner.author.id === meId ? 'toi' : room.winner.author.displayName}</div>
           <div className="px-2.5 py-1 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{room.winner.caption}</div>
           <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
             <MediaView media={room.winner.image.media} autoPlay />
           </div>
         </div>
       )}
-      {!room.winner && <div className="card p-5 text-center text-[15px] text-mute">Personne n’a écrit de légende cette manche.</div>}
+      {!room.winner && <div className="card p-5 text-center text-[0.9375rem] text-mute">Personne n’a écrit de légende cette manche.</div>}
       <div className="flex flex-wrap gap-2">
         {room.me.memeId && (
           <PrimaryBtn className="h-14 flex-[1_1_160px] rounded-[28px]" disabled={room.me.published || publishing} onClick={publish}>
@@ -461,8 +482,11 @@ export function Game() {
     setParams({}, { replace: true });
   }, [code, synced]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const tab = params.get('onglet') === 'jour' ? 'jour' : 'live';
+  const setTab = (t: 'live' | 'jour') => setParams(t === 'jour' ? { onglet: 'jour' } : {}, { replace: true });
+
   if (!me) return null;
-  if (!room) return <NoRoom />;
+  if (!room) return <NoRoom tab={tab} setTab={setTab} />;
   return (
     <div data-screen-label="Make It Friends">
       {room.stage === 'lobby' && <Lobby room={room} meId={me.id} />}

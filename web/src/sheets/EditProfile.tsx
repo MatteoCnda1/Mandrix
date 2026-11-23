@@ -47,7 +47,7 @@ export function EditProfileSheet() {
     }
   };
 
-  const label = 'px-1 text-[13px] font-bold text-mute';
+  const label = 'px-1 text-[0.8125rem] font-bold text-mute';
   return (
     <Sheet title="Modifier le profil" onClose={closeSheet}>
       {input}

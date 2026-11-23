@@ -7,8 +7,9 @@ import { api, errMsg } from '../lib/api';
 import { friendAction, useFriends, useUserSearch } from '../lib/data';
 import { useDebounced } from '../lib/hooks';
 import { closeSheet, toast } from '../lib/store';
+import { Suggestions } from '../screens/Search';
 
-const small = 'tap h-10 flex-none rounded-[20px] border-0 px-3.5 text-[13px] font-bold transition-transform active:scale-95';
+const small = 'tap h-10 flex-none rounded-[20px] border-0 px-3.5 text-[0.8125rem] font-bold transition-transform active:scale-95';
 
 export function FriendButton({ user, status, className }: { user: UserLite; status: Friendship; className?: string }) {
   const [busy, setBusy] = useState(false);
@@ -66,8 +67,8 @@ function Row({ user, children }: { user: UserLite; children?: React.ReactNode })
       >
         <Avatar user={user} size={44} />
         <span className="min-w-0">
-          <span className="block truncate text-[15px] font-bold">{user.displayName}</span>
-          <span className="block truncate text-[13px] text-mute">@{user.username}</span>
+          <span className="block truncate text-[0.9375rem] font-bold">{user.displayName}</span>
+          <span className="block truncate text-[0.8125rem] text-mute">@{user.username}</span>
         </span>
       </button>
       {children}
@@ -75,7 +76,7 @@ function Row({ user, children }: { user: UserLite; children?: React.ReactNode })
   );
 }
 
-const Title = ({ children }: { children: React.ReactNode }) => <div className="px-2 pt-2 text-[13px] font-bold tracking-wide text-mute uppercase">{children}</div>;
+const Title = ({ children }: { children: React.ReactNode }) => <div className="px-2 pt-2 text-[0.8125rem] font-bold tracking-wide text-mute uppercase">{children}</div>;
 
 export function FriendsSheet() {
   const nav = useNavigate();
@@ -126,6 +127,7 @@ export function FriendsSheet() {
               ))}
             </>
           )}
+          <Suggestions limit={5} onOpen={closeSheet} />
           <Title>Tes amis · {friends?.friends.length ?? 0}</Title>
           {friends?.friends.length === 0 && (
             <div className="px-2 py-3 text-sm text-mute">Cherche tes amis par leur pseudo pour leur envoyer une demande.</div>

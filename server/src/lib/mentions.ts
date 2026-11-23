@@ -6,13 +6,19 @@ import { notify } from './notify.js';
 import { friendIds } from './users.js';
 
 /** Prévient les amis mentionnés (@pseudo) dans un post ou un commentaire. */
-export async function notifyMentions(author: AuthUser, text: string, target: { postId: string; kind: string; where: 'post' | 'comment'; id: string }) {
+export async function notifyMentions(
+  author: AuthUser,
+  text: string,
+  target: { postId: string; kind: string; where: 'post' | 'comment'; id: string; postAuthorId?: string },
+) {
   const names = extractMentions(text).filter((u) => u !== author.username);
   if (names.length === 0) return;
   const rows = await db.select({ id: schema.users.id }).from(schema.users).where(inArray(schema.users.username, names));
   const friends = new Set(await friendIds(author.id));
+  // Dans un commentaire : seulement les personnes qui voient le post (l'auteur du post et ses amis).
+  const audience = target.postAuthorId && target.postAuthorId !== author.id ? new Set([target.postAuthorId, ...(await friendIds(target.postAuthorId))]) : null;
   for (const u of rows) {
-    if (!friends.has(u.id)) continue;
+    if (!friends.has(u.id) || (audience && !audience.has(u.id))) continue;
     await notify({
       userId: u.id,
       type: 'mention',

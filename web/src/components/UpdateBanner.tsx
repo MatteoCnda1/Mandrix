@@ -15,7 +15,7 @@ export function UpdateBanner() {
         className="pointer-events-auto flex max-w-full animate-drop items-center gap-2 rounded-[28px] bg-hero py-1.5 pr-1.5 pl-3.5 text-white shadow-hero"
       >
         <Sparkle size={16} weight="fill" className="flex-none text-ice" />
-        <span className="min-w-0 truncate text-[13px] font-bold sm:text-sm">
+        <span className="min-w-0 truncate text-[0.8125rem] font-bold sm:text-sm">
           Nouvelle version<span className="hidden sm:inline"> disponible</span>
         </span>
         <button
@@ -25,7 +25,7 @@ export function UpdateBanner() {
             setBusy(true);
             apply?.();
           }}
-          className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-brand px-3.5 text-[13px] font-bold text-white transition-transform active:scale-95 sm:px-4 sm:text-sm"
+          className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-brand px-3.5 text-[0.8125rem] font-bold text-white transition-transform active:scale-95 sm:px-4 sm:text-sm"
         >
           <ArrowClockwise size={16} weight="bold" className={busy ? 'animate-spin' : undefined} />
           {busy ? 'Mise à jour…' : 'Mettre à jour'}

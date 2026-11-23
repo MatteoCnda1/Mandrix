@@ -1,7 +1,10 @@
 import type { Post, UserProfile } from '@mandrix/shared';
 import {
-  BellRinging,
   CaretRight,
+  DotsThree,
+  Flag,
+  GearSix,
+  Prohibit,
   ChatCircleDots,
   ChartBar,
   Copy,
@@ -19,10 +22,13 @@ import {
 } from '@phosphor-icons/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Avatar, ScreenLoader, Switch, cx } from '../components/ui';
-import { errMsg } from '../lib/api';
-import { logout, useConfig, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
-import { currentSubscription, disablePush, enablePush, isStandalone, pushSupported } from '../lib/push';
+import { ReactionPicker } from '../components/Reactions';
+import { openReport } from '../components/Report';
+import { Avatar, ScreenLoader, Switch, confirmAction, cx } from '../components/ui';
+import { api, errMsg } from '../lib/api';
+import { logout, qc, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
+import type { Point } from '../lib/hooks';
+import { isStandalone } from '../lib/push';
 import { disconnectSocket } from '../lib/socket';
 import { openSheet, toast, useUI } from '../lib/store';
 import { useDark } from '../lib/theme';
@@ -44,7 +50,7 @@ function Tile({ post, ratio }: { post: Post; ratio: string }) {
       className="tap ph relative grid place-items-center overflow-hidden rounded-[20px] border-0 p-0 font-mono text-xs text-phink transition-[aspect-ratio] duration-[400ms]"
       style={{ aspectRatio: ratio }}
     >
-      {post.media?.kind === 'image' && <img src={post.media.url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+      {post.media?.kind === 'image' && <img src={post.media.url} srcSet={post.media.srcSet ?? undefined} sizes="(max-width: 700px) 34vw, 220px" alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
       {post.media?.kind === 'video' && (
         <>
           {post.media.poster ? (
@@ -56,13 +62,13 @@ function Tile({ post, ratio }: { post: Post; ratio: string }) {
         </>
       )}
       {post.kind === 'poll' && (
-        <span className="flex flex-col items-center gap-1 px-2 text-center font-sans text-[13px] leading-tight font-bold text-ink">
+        <span className="flex flex-col items-center gap-1 px-2 text-center font-sans text-[0.8125rem] leading-tight font-bold text-ink">
           <ChartBar size={20} />
           <span className="line-clamp-3">{post.text}</span>
         </span>
       )}
       {post.kind === 'meme' && (
-        <span className="absolute inset-x-1.5 top-1.5 line-clamp-2 rounded-xl bg-card/90 px-2 py-1 text-center font-sans text-[11px] leading-tight font-extrabold text-ink">{post.text}</span>
+        <span className="absolute inset-x-1.5 top-1.5 line-clamp-2 rounded-xl bg-card/90 px-2 py-1 text-center font-sans text-[0.6875rem] leading-tight font-extrabold text-ink">{post.text}</span>
       )}
     </button>
   );
@@ -73,7 +79,7 @@ function Row({ icon, label, onClick, right, danger }: { icon: ReactNode; label: 
     <button
       type="button"
       onClick={onClick}
-      className={cx('tap flex min-h-14 items-center gap-3 rounded-3xl border-0 bg-transparent px-2 text-left text-[15px] font-bold hover:bg-soft', danger ? 'text-heart' : 'text-ink')}
+      className={cx('tap flex min-h-14 items-center gap-3 rounded-3xl border-0 bg-transparent px-2 text-left text-[0.9375rem] font-bold hover:bg-soft', danger ? 'text-heart' : 'text-ink')}
     >
       <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-soft">{icon}</span>
       <span className="flex-1">{label}</span>
@@ -106,17 +112,17 @@ function InviteCard() {
         </span>
         <div className="min-w-0">
           <div className="text-lg font-extrabold">Parraine tes amis</div>
-          <div className="text-[13px] text-white/80">
+          <div className="text-[0.8125rem] text-white/80">
             {data.invited > 0 ? `${data.invited} ami${data.invited > 1 ? 's' : ''} parrainé${data.invited > 1 ? 's' : ''}` : 'Ils deviennent tes amis dès leur inscription'}
           </div>
         </div>
       </div>
       <div className="flex items-center gap-2 rounded-[26px] bg-card p-2 pl-4 text-ink">
-        <span className="min-w-0 flex-1 truncate font-mono text-[17px] font-bold tracking-wider">{data.code}</span>
+        <span className="min-w-0 flex-1 truncate font-mono text-[1.0625rem] font-bold tracking-wider">{data.code}</span>
         <button type="button" aria-label="Copier le code" onClick={copy} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
           <Copy size={18} />
         </button>
-        <button type="button" aria-label="Partager l’invitation" onClick={share} className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-ink px-3.5 text-[13px] font-bold text-inv active:scale-95">
+        <button type="button" aria-label="Partager l’invitation" onClick={share} className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
           <ShareNetwork size={18} /> Inviter
         </button>
       </div>
@@ -127,32 +133,9 @@ function InviteCard() {
 function Settings() {
   const nav = useNavigate();
   const { data: me } = useMe();
-  const { data: config } = useConfig();
   const { data: friends } = useFriends();
   const { data: reports } = useReports(!!me?.isAdmin);
   const installEvent = useUI((s) => s.installEvent);
-  const [push, setPush] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    currentSubscription().then((s) => setPush(!!s));
-  }, []);
-
-  const togglePush = async () => {
-    try {
-      if (push) {
-        await disablePush();
-        setPush(false);
-        toast('Notifications désactivées');
-      } else {
-        if (!config?.vapidPublicKey) throw new Error('Notifications push indisponibles sur ce serveur');
-        await enablePush(config.vapidPublicKey);
-        setPush(true);
-        toast('Notifications activées');
-      }
-    } catch (e) {
-      toast(errMsg(e), 'error');
-    }
-  };
 
   const install = async () => {
     if (installEvent) {
@@ -169,7 +152,7 @@ function Settings() {
         onClick={() => openSheet('friends')}
         right={friends?.incoming.length ? <span className="rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-white">{friends.incoming.length}</span> : undefined}
       />
-      {(pushSupported() || !isStandalone()) && <Row icon={<BellRinging size={20} />} label="Notifications push" onClick={togglePush} right={<Switch on={!!push} />} />}
+      <Row icon={<GearSix size={20} />} label="Réglages" onClick={() => nav('/reglages')} />
       {!isStandalone() && <Row icon={<DownloadSimple size={20} />} label="Installer l’application" onClick={install} />}
       {me?.isAdmin && (
         <Row
@@ -198,6 +181,36 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
   const nav = useNavigate();
   const [dark, toggleDark] = useDark();
   const [tab, setTab] = useState<Tab>('posts');
+  const [menu, setMenu] = useState<Point | null>(null);
+
+  const refresh = () => {
+    for (const k of [['profile'], ['friends'], ['feed'], ['stories'], ['user-posts'], ['blocks'], ['conversations']]) qc.invalidateQueries({ queryKey: k });
+  };
+  const block = async () => {
+    const ok = await confirmAction({
+      title: `Bloquer ${profile.displayName} ?`,
+      message: 'Vous ne serez plus amis, vous ne verrez plus vos contenus et ne pourrez plus vous écrire. Tu peux débloquer à tout moment dans Réglages.',
+      confirmLabel: 'Bloquer',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/users/${profile.id}/block`, { method: 'POST' });
+      toast(`${profile.displayName} est bloqué·e`);
+      refresh();
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+  const unblock = async () => {
+    try {
+      await api(`/api/users/${profile.id}/block`, { method: 'DELETE' });
+      toast(`${profile.displayName} est débloqué·e`);
+      refresh();
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
   const { data: posts, isLoading } = useUserPosts(profile.username, tab);
   const ti = TABS.findIndex((t) => t.id === tab);
   const ratio = tab === 'reels' ? '9 / 14' : '1';
@@ -206,9 +219,9 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
     <div data-screen-label="Profil" className="flex animate-in flex-col gap-3.5">
       <div className="card flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-center gap-4">
-          <Avatar user={profile} size={84} ring className="text-[28px] font-extrabold" />
+          <Avatar user={profile} size={84} ring className="text-[1.75rem] font-extrabold" />
           <div className="min-w-0 flex-[1_1_160px]">
-            <div className="truncate text-[22px] font-extrabold tracking-[-.02em]">{profile.displayName}</div>
+            <div className="truncate text-[1.375rem] font-extrabold tracking-[-.02em]">{profile.displayName}</div>
             <div className="truncate text-sm text-mute">
               @{profile.username}
               {profile.city ? ` · ${profile.city}` : ''}
@@ -220,7 +233,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             </button>
           ) : (
             <div className="flex gap-2">
-              <FriendButton user={profile} status={profile.friendship} className="h-[46px] rounded-[23px] px-5 text-sm" />
+              {!profile.blockedByMe && <FriendButton user={profile} status={profile.friendship} className="h-[46px] rounded-[23px] px-5 text-sm" />}
               {profile.friendship === 'friends' && (
                 <button
                   type="button"
@@ -231,9 +244,48 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
                   <ChatCircleDots size={20} />
                 </button>
               )}
+              <button
+                type="button"
+                aria-label="Plus d’options"
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setMenu({ x: r.left + r.width / 2, y: r.bottom + 60 });
+                }}
+                className="tap grid h-[46px] w-[46px] place-items-center rounded-full border-0 bg-soft text-ink"
+              >
+                <DotsThree size={22} />
+              </button>
             </div>
           )}
         </div>
+        {profile.blockedByMe && (
+          <div className="flex items-center gap-3 rounded-[22px] bg-soft p-3.5">
+            <Prohibit size={22} className="flex-none text-heart" />
+            <span className="flex-1 text-sm font-semibold">Tu as bloqué @{profile.username}.</span>
+            <button type="button" onClick={() => void unblock()} className="tap h-10 rounded-[20px] border-0 bg-card px-3.5 text-[0.8125rem] font-bold text-ink">
+              Débloquer
+            </button>
+          </div>
+        )}
+        {menu && (
+          <ReactionPicker
+            at={menu}
+            emojis={[]}
+            current={null}
+            onClose={() => setMenu(null)}
+            actions={[
+              profile.blockedByMe
+                ? { label: 'Débloquer', icon: <Prohibit size={18} />, onClick: () => void unblock() }
+                : { label: 'Bloquer', icon: <Prohibit size={18} />, danger: true, onClick: () => void block() },
+              {
+                label: 'Signaler le compte',
+                icon: <Flag size={18} />,
+                danger: true,
+                onClick: () => openReport({ targetType: 'user', targetId: profile.id }),
+              },
+            ]}
+          />
+        )}
         {profile.bio && <p className="m-0 text-base leading-[1.45]">{profile.bio}</p>}
         <div className="grid grid-cols-3 gap-2">
           {[
@@ -247,8 +299,8 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
               onClick={onClick as (() => void) | undefined}
               className={cx('rounded-[22px] border-0 bg-soft px-3.5 py-3 text-left text-ink', onClick ? 'tap' : 'cursor-default')}
             >
-              <div className="text-[22px] font-extrabold">{n as number}</div>
-              <div className="text-[13px] text-mute">{l as string}</div>
+              <div className="text-[1.375rem] font-extrabold">{n as number}</div>
+              <div className="text-[0.8125rem] text-mute">{l as string}</div>
             </button>
           ))}
         </div>
@@ -264,7 +316,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
               <div className="text-lg font-extrabold">
                 Série de {profile.streak.weeks} semaine{profile.streak.weeks > 1 ? 's' : ''}
               </div>
-              <div className="text-[13px] text-mute">Au moins une photo par semaine dans la Pellicule</div>
+              <div className="text-[0.8125rem] text-mute">Au moins une photo par semaine dans la Pellicule</div>
             </div>
           </div>
           <div className="flex gap-1.5">
@@ -330,6 +382,6 @@ export function Profile() {
   const target = username ?? me?.username ?? '';
   const { data: profile, isLoading, error } = useProfile(target);
   if (isLoading || !me) return <ScreenLoader />;
-  if (error || !profile) return <div className="card p-8 text-center text-[15px] text-mute">Utilisateur introuvable.</div>;
+  if (error || !profile) return <div className="card p-8 text-center text-[0.9375rem] text-mute">Utilisateur introuvable.</div>;
   return <ProfileView key={profile.id} profile={profile} isMe={profile.id === me.id} />;
 }
