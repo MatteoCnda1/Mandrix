@@ -1,5 +1,5 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
-import { CircleNotch, X } from '@phosphor-icons/react';
+import { ArrowClockwise, CircleNotch, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
@@ -347,6 +347,26 @@ export function MediaView({ media, className, style, controls, autoPlay, muted =
       style={style}
       onClick={onClick}
     />
+  );
+}
+
+/** Indicateur « tirer pour rafraîchir » (voir usePullToRefresh). */
+export function PullIndicator({ pull, refreshing }: { pull: number; refreshing: boolean }) {
+  return (
+    <div
+      className="-mb-3.5 flex items-end justify-center overflow-hidden"
+      style={{ height: pull, transition: pull && !refreshing ? 'none' : 'height .3s cubic-bezier(.2,.9,.2,1)' }}
+      aria-hidden={!refreshing}
+    >
+      <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-card text-acc shadow-pill">
+        <ArrowClockwise
+          size={20}
+          weight="bold"
+          className={refreshing ? 'animate-spin' : undefined}
+          style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)`, opacity: Math.min(1, pull / 60) }}
+        />
+      </span>
+    </div>
   );
 }
 

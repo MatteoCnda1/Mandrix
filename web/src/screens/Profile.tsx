@@ -24,10 +24,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ReactionPicker } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, ScreenLoader, Switch, confirmAction, cx } from '../components/ui';
+import { Avatar, PullIndicator, ScreenLoader, Switch, confirmAction, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { logout, qc, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
-import type { Point } from '../lib/hooks';
+import { useSwipeX } from '../lib/gestures';
+import { usePullToRefresh, type Point } from '../lib/hooks';
 import { isStandalone } from '../lib/push';
 import { disconnectSocket } from '../lib/socket';
 import { openSheet, toast, useUI } from '../lib/store';
@@ -182,6 +183,9 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
   const [dark, toggleDark] = useDark();
   const [tab, setTab] = useState<Tab>('posts');
   const [menu, setMenu] = useState<Point | null>(null);
+  const { pull, refreshing } = usePullToRefresh(() =>
+    Promise.all([qc.invalidateQueries({ queryKey: ['profile'] }), qc.invalidateQueries({ queryKey: ['user-posts'] }), qc.invalidateQueries({ queryKey: ['friends'] })]),
+  );
 
   const refresh = () => {
     for (const k of [['profile'], ['friends'], ['feed'], ['stories'], ['user-posts'], ['blocks'], ['conversations']]) qc.invalidateQueries({ queryKey: k });
@@ -213,10 +217,12 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
   };
   const { data: posts, isLoading } = useUserPosts(profile.username, tab);
   const ti = TABS.findIndex((t) => t.id === tab);
+  const tabSwipe = useSwipeX((dir) => setTab(TABS[Math.min(TABS.length - 1, Math.max(0, ti - dir))].id), { threshold: 60 });
   const ratio = tab === 'reels' ? '9 / 14' : '1';
 
   return (
     <div data-screen-label="Profil" className="flex animate-in flex-col gap-3.5">
+      <PullIndicator pull={pull} refreshing={refreshing} />
       <div className="card flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-center gap-4">
           <Avatar user={profile} size={84} ring className="text-[1.75rem] font-extrabold" />
@@ -353,25 +359,28 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
           </button>
         ))}
       </div>
-      {posts?.locked ? (
-        <div className="card flex flex-col items-center gap-2 p-8 text-center">
-          <LockSimple size={28} weight="fill" className="text-acc" />
-          <div className="font-extrabold">Profil réservé aux amis</div>
-          <div className="text-sm text-mute">Ajoute @{profile.username} en ami pour voir ses posts.</div>
-        </div>
-      ) : isLoading ? (
-        <div className="grid grid-cols-3 gap-2">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="skel rounded-[20px]" style={{ aspectRatio: ratio }} />
-          ))}
-        </div>
-      ) : posts?.items.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-mute">{tab === 'memes' ? 'Aucun mème publié.' : tab === 'reels' ? 'Aucune vidéo.' : 'Aucun post pour l’instant.'}</div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {posts?.items.map((p) => <Tile key={p.id} post={p} ratio={ratio} />)}
-        </div>
-      )}
+      {/* Glisser à gauche / à droite sur la grille : onglet suivant ou précédent. */}
+      <div {...tabSwipe.handlers} className="touch-pan-y" style={{ transform: tabSwipe.dx ? `translateX(${tabSwipe.dx * 0.35}px)` : undefined, transition: tabSwipe.dx ? 'none' : 'transform .2s ease' }}>
+        {posts?.locked ? (
+          <div className="card flex flex-col items-center gap-2 p-8 text-center">
+            <LockSimple size={28} weight="fill" className="text-acc" />
+            <div className="font-extrabold">Profil réservé aux amis</div>
+            <div className="text-sm text-mute">Ajoute @{profile.username} en ami pour voir ses posts.</div>
+          </div>
+        ) : isLoading ? (
+          <div className="grid grid-cols-3 gap-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="skel rounded-[20px]" style={{ aspectRatio: ratio }} />
+            ))}
+          </div>
+        ) : posts?.items.length === 0 ? (
+          <div className="card p-8 text-center text-sm text-mute">{tab === 'memes' ? 'Aucun mème publié.' : tab === 'reels' ? 'Aucune vidéo.' : 'Aucun post pour l’instant.'}</div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {posts?.items.map((p) => <Tile key={p.id} post={p} ratio={ratio} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

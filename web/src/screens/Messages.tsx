@@ -22,14 +22,14 @@ import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, EmptyCard, MediaView, PrimaryBtn, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
+import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { useSwipeX } from '../lib/gestures';
 import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
 import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
 import { qc, useConversation, useConversations, useFriends, useMe, useMessages } from '../lib/data';
 import { shortTime } from '../lib/format';
-import { useNow } from '../lib/hooks';
+import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
 import { useGoBack } from '../lib/nav';
 import { sendTyping, useTyping } from '../lib/socket';
@@ -62,9 +62,11 @@ export function Messages() {
   const { data, isLoading } = useConversations();
   const now = useNow(60_000);
   const typing = useTyping();
+  const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['conversations'] }));
   if (isLoading) return <ScreenLoader />;
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
+      <PullIndicator pull={pull} refreshing={refreshing} />
       <button
         type="button"
         onClick={() => openSheet('newMessage')}

@@ -4,6 +4,7 @@ import { Avatar, MediaView, confirmAction } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
+import { useMediaGestures } from '../lib/gestures';
 import { toast, useUI } from '../lib/store';
 
 const IMAGE_MS = 4500;
@@ -15,7 +16,6 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const [reply, setReply] = useState('');
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // Temps déjà écoulé sur la photo en cours (remis à zéro à chaque story, conservé pendant une pause).
   const elapsed = useRef(0);
@@ -79,41 +79,12 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
 
   // Gestes : tap gauche/droite, maintenir pour mettre en pause, glisser vers le bas pour fermer,
   // glisser à gauche/droite pour changer d'ami.
-  const gesture = useRef<{ x: number; y: number; held: boolean; hold: ReturnType<typeof setTimeout> } | null>(null);
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const g = { x: e.clientX, y: e.clientY, held: false, hold: undefined as unknown as ReturnType<typeof setTimeout> };
-    g.hold = setTimeout(() => {
-      g.held = true;
-      setPaused(true);
-    }, 220);
-    gesture.current = g;
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    const g = gesture.current;
-    if (!g) return;
-    const x = e.clientX - g.x;
-    const y = e.clientY - g.y;
-    if (Math.abs(x) > 8 || Math.abs(y) > 8) clearTimeout(g.hold);
-    setDrag({ x, y });
-  };
-  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    const g = gesture.current;
-    gesture.current = null;
-    setDrag(null);
-    if (!g) return;
-    clearTimeout(g.hold);
-    const x = e.clientX - g.x;
-    const y = e.clientY - g.y;
-    if (g.held) setPaused(false);
-    if (y > 90 && y > Math.abs(x)) return close();
-    if (Math.abs(x) > 70 && Math.abs(x) > Math.abs(y)) return void (x < 0 ? nextGroup() : prevGroup());
-    if (!g.held && Math.abs(x) < 10 && Math.abs(y) < 10) {
-      const r = e.currentTarget.getBoundingClientRect();
-      if (e.clientX - r.left < r.width * 0.35) prev();
-      else next();
-    }
-  };
+  const gestures = useMediaGestures({
+    onTap: (zone) => (zone === 'left' ? prev() : next()),
+    onHold: (on) => setPaused(on),
+    onSwipeDown: close,
+    onSwipeX: (dir) => (dir === -1 ? nextGroup() : prevGroup()),
+  });
 
   useEffect(() => {
     const v = videoRef.current;
@@ -167,14 +138,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
     >
       <div
         className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-24px),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]"
-        style={
-          drag
-            ? {
-                transform: drag.y > 0 && drag.y > Math.abs(drag.x) ? `translateY(${drag.y}px) scale(${1 - Math.min(drag.y, 400) / 2000})` : `translateX(${drag.x * 0.4}px)`,
-                transition: 'none',
-              }
-            : { transition: 'transform .25s cubic-bezier(.2,.9,.2,1)' }
-        }
+        style={gestures.style}
       >
         <MediaView
           key={story.id}
@@ -198,11 +162,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
         </div>
         <div
           className="absolute inset-x-0 top-[90px] bottom-[90px] cursor-pointer touch-none select-none [-webkit-touch-callout:none]"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onContextMenu={(e) => e.preventDefault()}
+          {...gestures.handlers}
           aria-hidden
         />
         {/* Clavier et lecteur d'écran. */}

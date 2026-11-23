@@ -79,3 +79,79 @@ export function useSwipeX(onSwipe: (dir: 1 | -1) => void, { threshold = 64, max 
     },
   };
 }
+
+export interface MediaGestureHandlers {
+  /** Tap court : zone gauche (35 %) ou droite. */
+  onTap?: (zone: 'left' | 'right') => void;
+  /** Maintenir le doigt (pause), puis relâcher. */
+  onHold?: (holding: boolean) => void;
+  onSwipeDown?: () => void;
+  /** Glisser horizontal : -1 vers la gauche (suivant), 1 vers la droite (précédent). */
+  onSwipeX?: (dir: 1 | -1) => void;
+}
+
+/**
+ * Gestes des visionneuses plein écran (stories, rétrospective, photos du déballage) :
+ * tap gauche/droite, maintenir pour mettre en pause, glisser vers le bas pour fermer,
+ * glisser sur le côté pour changer. Un appui maintenu ne déclenche jamais de tap au relâcher.
+ * À poser sur un calque en `touch-action: none`.
+ */
+export function useMediaGestures(h: MediaGestureHandlers) {
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const cb = useRef(h);
+  cb.current = h;
+  const g = useRef<{ x: number; y: number; held: boolean; hold: ReturnType<typeof setTimeout> | undefined } | null>(null);
+  const end = (e: React.PointerEvent<HTMLElement>, cancelled = false) => {
+    const s = g.current;
+    g.current = null;
+    setDrag(null);
+    if (!s) return;
+    clearTimeout(s.hold);
+    if (s.held) cb.current.onHold?.(false);
+    if (cancelled) return;
+    const x = e.clientX - s.x;
+    const y = e.clientY - s.y;
+    if (y > 90 && y > Math.abs(x) && cb.current.onSwipeDown) return cb.current.onSwipeDown();
+    if (Math.abs(x) > 70 && Math.abs(x) > Math.abs(y) && cb.current.onSwipeX) return cb.current.onSwipeX(x < 0 ? -1 : 1);
+    if (!s.held && Math.abs(x) < 10 && Math.abs(y) < 10) {
+      const r = e.currentTarget.getBoundingClientRect();
+      cb.current.onTap?.(e.clientX - r.left < r.width * 0.35 ? 'left' : 'right');
+    }
+  };
+  return {
+    drag,
+    /** Transformation à appliquer au cadre pendant le glisser. */
+    style: (drag
+      ? {
+          transform:
+            drag.y > 0 && drag.y > Math.abs(drag.x)
+              ? `translateY(${drag.y}px) scale(${1 - Math.min(drag.y, 400) / 2000})`
+              : `translateX(${drag.x * 0.4}px)`,
+          transition: 'none',
+        }
+      : { transition: 'transform .25s cubic-bezier(.2,.9,.2,1)' }) as React.CSSProperties,
+    handlers: {
+      onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const s = { x: e.clientX, y: e.clientY, held: false, hold: undefined as ReturnType<typeof setTimeout> | undefined };
+        if (cb.current.onHold)
+          s.hold = setTimeout(() => {
+            s.held = true;
+            cb.current.onHold?.(true);
+          }, 220);
+        g.current = s;
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+        const s = g.current;
+        if (!s) return;
+        const x = e.clientX - s.x;
+        const y = e.clientY - s.y;
+        if (Math.abs(x) > 8 || Math.abs(y) > 8) clearTimeout(s.hold);
+        setDrag({ x, y });
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLElement>) => end(e),
+      onPointerCancel: (e: React.PointerEvent<HTMLElement>) => end(e, true),
+      onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    },
+  };
+}
