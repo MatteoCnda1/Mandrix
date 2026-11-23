@@ -15,7 +15,10 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const [reply, setReply] = useState('');
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // Temps déjà écoulé sur la photo en cours (remis à zéro à chaque story, conservé pendant une pause).
+  const elapsed = useRef(0);
   const close = () => {
     useUI.setState({ story: null });
     qc.invalidateQueries({ queryKey: ['stories'] });
@@ -35,27 +38,82 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
     if (!groups) return;
     if (pos.index > 0) setPos({ group: pos.group, index: pos.index - 1 });
     else if (pos.group > 0) setPos({ group: pos.group - 1, index: groups[pos.group - 1].stories.length - 1 });
+    else {
+      // Première story : on la relance depuis le début.
+      elapsed.current = 0;
+      setProgress(0);
+      if (videoRef.current) videoRef.current.currentTime = 0;
+    }
   };
+  /** Glisser à gauche / à droite : ami suivant ou précédent. */
+  const nextGroup = () => (groups && pos.group + 1 < groups.length ? setPos({ group: pos.group + 1, index: 0 }) : close());
+  const prevGroup = () => pos.group > 0 && setPos({ group: pos.group - 1, index: 0 });
+  const nextRef = useRef(next);
+  nextRef.current = next;
 
-  // Marque la story comme vue.
+  // Nouvelle story : progression à zéro (avant que le minuteur ne reparte), et marquée comme vue.
   useEffect(() => {
+    elapsed.current = 0;
     setProgress(0);
     if (story && !mine && !story.seen) api(`/api/stories/${story.id}/seen`, { method: 'POST' }).catch(() => {});
   }, [story?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Avance automatique pour les photos.
+  // Avance automatique pour les photos : le temps écoulé est cumulé image par image,
+  // donc un passage manuel ou une pause ne décale jamais la story suivante.
   useEffect(() => {
     if (!story || story.media.kind === 'video' || paused) return;
-    const startAt = Date.now() - progress * IMAGE_MS;
+    let last = performance.now();
     const t = setInterval(() => {
-      const p = (Date.now() - startAt) / IMAGE_MS;
+      const now = performance.now();
+      // Écart plafonné : une app restée en arrière-plan ne saute pas plusieurs stories au retour.
+      elapsed.current += Math.min(250, Math.max(0, now - last));
+      last = now;
+      const p = elapsed.current / IMAGE_MS;
       if (p >= 1) {
         clearInterval(t);
-        next();
+        nextRef.current();
       } else setProgress(p);
-    }, 50);
+    }, 40);
     return () => clearInterval(t);
   }, [story?.id, paused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Gestes : tap gauche/droite, maintenir pour mettre en pause, glisser vers le bas pour fermer,
+  // glisser à gauche/droite pour changer d'ami.
+  const gesture = useRef<{ x: number; y: number; held: boolean; hold: ReturnType<typeof setTimeout> } | null>(null);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const g = { x: e.clientX, y: e.clientY, held: false, hold: undefined as unknown as ReturnType<typeof setTimeout> };
+    g.hold = setTimeout(() => {
+      g.held = true;
+      setPaused(true);
+    }, 220);
+    gesture.current = g;
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    if (!g) return;
+    const x = e.clientX - g.x;
+    const y = e.clientY - g.y;
+    if (Math.abs(x) > 8 || Math.abs(y) > 8) clearTimeout(g.hold);
+    setDrag({ x, y });
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gesture.current;
+    gesture.current = null;
+    setDrag(null);
+    if (!g) return;
+    clearTimeout(g.hold);
+    const x = e.clientX - g.x;
+    const y = e.clientY - g.y;
+    if (g.held) setPaused(false);
+    if (y > 90 && y > Math.abs(x)) return close();
+    if (Math.abs(x) > 70 && Math.abs(x) > Math.abs(y)) return void (x < 0 ? nextGroup() : prevGroup());
+    if (!g.held && Math.abs(x) < 10 && Math.abs(y) < 10) {
+      const r = e.currentTarget.getBoundingClientRect();
+      if (e.clientX - r.left < r.width * 0.35) prev();
+      else next();
+    }
+  };
 
   useEffect(() => {
     const v = videoRef.current;
@@ -107,7 +165,17 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
       aria-modal="true"
       aria-label={`Story de ${group.user.displayName}`}
     >
-      <div className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-24px),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]">
+      <div
+        className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-24px),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]"
+        style={
+          drag
+            ? {
+                transform: drag.y > 0 && drag.y > Math.abs(drag.x) ? `translateY(${drag.y}px) scale(${1 - Math.min(drag.y, 400) / 2000})` : `translateX(${drag.x * 0.4}px)`,
+                transition: 'none',
+              }
+            : { transition: 'transform .25s cubic-bezier(.2,.9,.2,1)' }
+        }
+      >
         <MediaView
           key={story.id}
           media={story.media}
@@ -128,8 +196,22 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
             </div>
           ))}
         </div>
-        <button type="button" aria-label="Story précédente" onClick={prev} className="absolute top-[90px] bottom-[90px] left-0 w-[35%] cursor-pointer border-0 bg-transparent" />
-        <button type="button" aria-label="Story suivante" onClick={next} className="absolute top-[90px] right-0 bottom-[90px] w-[65%] cursor-pointer border-0 bg-transparent" />
+        <div
+          className="absolute inset-x-0 top-[90px] bottom-[90px] cursor-pointer touch-none select-none [-webkit-touch-callout:none]"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-hidden
+        />
+        {/* Clavier et lecteur d'écran. */}
+        <button type="button" onClick={prev} className="sr-only">
+          Story précédente
+        </button>
+        <button type="button" onClick={next} className="sr-only">
+          Story suivante
+        </button>
         <div className="absolute top-[30px] right-3.5 left-[18px] flex items-center gap-2.5 text-white">
           <Avatar user={group.user} size={40} />
           <span className="text-[0.9375rem] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>

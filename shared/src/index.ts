@@ -281,7 +281,16 @@ export type MessageMeta =
   | { type: 'story_reply'; storyId: ID; media?: MediaRef | null }
   /** Évènement de groupe (création, ajout, départ, renommage), affiché au centre. */
   | { type: 'system' }
+  /** Réponse à un message (glisser la bulle) : extrait du message d'origine. */
+  | { type: 'reply'; replyTo: ReplyQuote }
   | null;
+
+export interface ReplyQuote {
+  id: ID;
+  senderId: ID;
+  /** Texte d'origine (raccourci) ou libellé de la pièce jointe. */
+  text: string;
+}
 
 export interface Message {
   id: ID;

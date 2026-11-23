@@ -358,7 +358,7 @@ export default async function messageRoutes(app: FastifyInstance) {
     const c = await ownConversation(uuidParam(req.params), me.id);
     const body = parse(
       z
-        .object({ text: z.string().trim().max(1000).default(''), mediaId: z.string().uuid().optional() })
+        .object({ text: z.string().trim().max(1000).default(''), mediaId: z.string().uuid().optional(), replyToId: z.string().uuid().optional() })
         .refine((b) => b.text.length > 0 || !!b.mediaId, { message: 'Message vide' }),
       req.body,
     );
@@ -370,7 +370,20 @@ export default async function messageRoutes(app: FastifyInstance) {
       const [m] = await db.select({ ownerId: schema.media.ownerId }).from(schema.media).where(eq(schema.media.id, body.mediaId)).limit(1);
       if (!m || m.ownerId !== me.id) fail(400, 'Pièce jointe introuvable');
     }
-    return postMessage(c, me, body.text, null, body.mediaId ?? null);
+    let meta: MessageMeta = null;
+    if (body.replyToId) {
+      // Citation figée au moment de la réponse : elle reste lisible même si l'original disparaît.
+      const [orig] = await db
+        .select({ m: messages, kind: schema.media.kind, duration: schema.media.duration })
+        .from(messages)
+        .leftJoin(schema.media, eq(schema.media.id, messages.mediaId))
+        .where(and(eq(messages.id, body.replyToId), eq(messages.conversationId, c.id)))
+        .limit(1);
+      if (!orig || (orig.m.meta as MessageMeta)?.type === 'system') fail(400, 'Message d’origine introuvable');
+      const text = orig!.m.text || attachmentLabel(orig!.kind, orig!.duration);
+      meta = { type: 'reply', replyTo: { id: orig!.m.id, senderId: orig!.m.senderId, text: text.length > 140 ? `${text.slice(0, 139)}…` : text } };
+    }
+    return postMessage(c, me, body.text, meta, body.mediaId ?? null);
   });
 
   app.post('/api/conversations/:id/read', async (req) => {

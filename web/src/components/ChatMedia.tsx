@@ -1,6 +1,7 @@
 import type { MediaRef } from '@mandrix/shared';
 import { Pause, Play, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import { useSwipeDown } from '../lib/gestures';
 import { cx, fmtDuration, MediaView, Portal, VideoProcessing } from './ui';
 
 /** Barres de « forme d'onde » stables pour un vocal (dérivées de son identifiant). */
@@ -135,6 +136,7 @@ export function MessagePhotoVideo({ media, onOpen }: { media: MediaRef; onOpen: 
 
 /** Affichage plein écran d'une photo ou d'une vidéo de conversation. */
 export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: () => void }) {
+  const swipe = useSwipeDown(onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -142,8 +144,20 @@ export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: ()
   }, [onClose]);
   return (
     <Portal>
-      <div className="fixed inset-0 z-[55] grid animate-fade place-items-center bg-black/95 p-2" role="dialog" aria-modal="true" onClick={onClose}>
-        <div className="relative h-full max-h-[100dvh] w-full max-w-[900px]" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="fixed inset-0 z-[55] grid animate-fade place-items-center p-2"
+        style={{ background: `rgba(0,0,0,${0.95 * (1 - Math.min(swipe.dy, 300) / 400)})` }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={media.kind === 'video' ? 'Vidéo' : 'Photo'}
+        onClick={onClose}
+      >
+        <div
+          {...swipe.handlers}
+          className="relative h-full max-h-[100dvh] w-full max-w-[900px] touch-none"
+          style={{ transform: swipe.dy ? `translateY(${swipe.dy}px) scale(${1 - Math.min(swipe.dy, 400) / 1600})` : undefined, transition: swipe.dy ? 'none' : 'transform .25s ease' }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <MediaView media={media} fit="contain" controls={media.kind === 'video'} autoPlay={media.kind === 'video'} muted={false} loop={false} />
         </div>
         <button
