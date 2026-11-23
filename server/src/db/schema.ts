@@ -111,6 +111,8 @@ export const posts = pgTable(
     pollNotifiedAt: ts('poll_notified_at'),
     /** Masqué après plusieurs signalements ou par un admin. */
     hiddenAt: ts('hidden_at'),
+    /** Légende modifiée par l'auteur. */
+    editedAt: ts('edited_at'),
     createdAt: created(),
   },
   (t) => [index('posts_author_idx').on(t.authorId, t.createdAt), index('posts_kind_idx').on(t.kind, t.createdAt)],
@@ -211,6 +213,7 @@ export const storyViews = pgTable(
   {
     storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
     viewerId: uuid('viewer_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    viewedAt: ts('viewed_at').defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.storyId, t.viewerId] })],
 );
@@ -308,6 +311,8 @@ export const conversationMembers = pgTable(
     conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     joinedAt: created(),
+    /** Conversation en sourdine : pas de notification push. */
+    muted: boolean('muted').notNull().default(false),
   },
   (t) => [primaryKey({ columns: [t.conversationId, t.userId] }), index('conversation_members_user_idx').on(t.userId)],
 );
@@ -332,6 +337,8 @@ export const messages = pgTable(
     meta: jsonb('meta'),
     /** Pièce jointe : photo, vidéo ou message vocal. */
     mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
+    /** Supprimé pour tout le monde par son auteur (texte et pièce jointe effacés). */
+    deletedAt: ts('deleted_at'),
     createdAt: created(),
   },
   (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt)],

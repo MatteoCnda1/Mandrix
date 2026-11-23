@@ -8,7 +8,8 @@ import { fail, parse, uuidParam } from '../lib/http.js';
 import { mediaRef, saveUpload } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
 import { notifyMentions } from '../lib/mentions.js';
-import { getPost, loadPolls, notBlocked, selectPosts } from '../lib/posts.js';
+import { getPost, loadPolls, notBlocked, selectPosts, visiblePost, visibleTo } from '../lib/posts.js';
+import { extractMentions } from '@mandrix/shared';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
 import { upsertPoolItem } from './pool.js';
 
@@ -60,18 +61,26 @@ export default async function postRoutes(app: FastifyInstance) {
     return mediaRef(row);
   });
 
+  /** Fil paginé par curseur (date de tri + identifiant) : rien ne saute ni ne se répète quand des posts arrivent. */
   app.get('/api/feed', async (req): Promise<Page<Post>> => {
     const me = requireUser(req);
-    const page = pageOf(req);
+    const raw = String((req.query as { cursor?: string }).cursor ?? '');
+    let after: { at: string; id: string } | null = null;
+    if (raw) {
+      const [at, id] = Buffer.from(raw, 'base64url').toString().split('|');
+      if (!at || !id || Number.isNaN(Date.parse(at)) || !/^[0-9a-f-]{36}$/i.test(id)) fail(400, 'Curseur invalide');
+      after = { at, id };
+    }
     const circle = [me.id, ...(await friendIds(me.id))];
     const c = uuidArray(circle);
     const items = await selectPosts(me.id, {
       where: sql`p.author_id = any(${c}) or exists(select 1 from reposts r where r.post_id = p.id and r.user_id = any(${c}))`,
       circle,
       limit: PAGE,
-      offset: page * PAGE,
+      after,
     });
-    return { items, next: items.length === PAGE ? page + 1 : null };
+    const last = items[items.length - 1];
+    return { items, next: items.length === PAGE && last?.sortAt ? Buffer.from(`${last.sortAt}|${last.id}`).toString('base64url') : null };
   });
 
   app.get('/api/reels', async (req): Promise<Page<Post>> => {
@@ -153,6 +162,23 @@ export default async function postRoutes(app: FastifyInstance) {
     return post;
   });
 
+  /** Modifier la légende de son post (photo, vidéo). Seules les nouvelles @mentions sont notifiées. */
+  app.patch('/api/posts/:id', async (req) => {
+    const me = requireUser(req);
+    const id = uuidParam(req.params);
+    const { text } = parse(z.object({ text: z.string().trim().max(280) }), req.body);
+    const [p] = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
+    if (!p || p.authorId !== me.id) return fail(404, 'Post introuvable');
+    if (p.kind !== 'photo' && p.kind !== 'video') fail(400, 'Seules les légendes des photos et vidéos se modifient');
+    if (p.text !== text) {
+      await db.update(posts).set({ text, editedAt: new Date() }).where(eq(posts.id, id));
+      const before = new Set(extractMentions(p.text));
+      const added = extractMentions(text).filter((u) => !before.has(u));
+      if (added.length) await notifyMentions(me, added.map((u) => `@${u}`).join(' '), { postId: id, kind: p.kind, where: 'post', id: `${id}:${Date.now()}` });
+    }
+    return getPost(me.id, id);
+  });
+
   app.delete('/api/posts/:id', async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
@@ -167,7 +193,7 @@ export default async function postRoutes(app: FastifyInstance) {
   app.put('/api/posts/:id/like', async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
-    const p = await postAuthor(id);
+    const p = await visiblePost(me.id, id);
     const ins = await db.insert(likes).values({ postId: id, userId: me.id }).onConflictDoNothing().returning();
     if (ins.length) {
       await notify({ userId: p.authorId, type: 'like', actorId: me.id, data: { postId: id, kind: p.kind }, dedupeKey: `like:${id}:${me.id}` });
@@ -180,7 +206,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const { emoji } = parse(z.object({ emoji: z.enum(REACTIONS) }), req.body);
-    const p = await postAuthor(id);
+    const p = await visiblePost(me.id, id);
     const [before] = await db.select().from(postReactions).where(and(eq(postReactions.postId, id), eq(postReactions.userId, me.id))).limit(1);
     await db
       .insert(postReactions)
@@ -218,7 +244,7 @@ export default async function postRoutes(app: FastifyInstance) {
   app.put('/api/posts/:id/repost', async (req) => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
-    const p = await postAuthor(id);
+    const p = await visiblePost(me.id, id);
     if (p.authorId === me.id) fail(400, 'Tu ne peux pas republier ton propre post');
     const ins = await db.insert(reposts).values({ postId: id, userId: me.id }).onConflictDoNothing().returning();
     if (ins.length) {
@@ -238,6 +264,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const body = parse(z.object({ optionId: z.string().uuid().optional(), value: z.number().int().min(0).max(100).optional() }), req.body);
+    await visiblePost(me.id, id);
     const [p] = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
     if (!p || p.kind !== 'poll') return fail(404, 'Sondage introuvable');
     if (p.pollEndsAt && p.pollEndsAt <= new Date()) fail(409, 'Ce sondage est terminé');
@@ -263,6 +290,7 @@ export default async function postRoutes(app: FastifyInstance) {
   app.get('/api/posts/:id/comments', async (req): Promise<Comment[]> => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
+    await visiblePost(me.id, id);
     const rows = await db.execute<{ id: string; authorId: string; text: string; createdAt: Date; likes: number; liked: boolean }>(sql`
       select c.id, c.author_id as "authorId", c.text, c.created_at as "createdAt",
         (select count(*)::int from comment_likes cl where cl.comment_id = c.id) as likes,
@@ -288,7 +316,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const id = uuidParam(req.params);
     const { text } = parse(z.object({ text: z.string().trim().min(1, 'Commentaire vide').max(200) }), req.body);
-    const p = await postAuthor(id);
+    const p = await visiblePost(me.id, id);
     const [c] = await db.insert(comments).values({ postId: id, authorId: me.id, text }).returning();
     await notify({
       userId: p.authorId,

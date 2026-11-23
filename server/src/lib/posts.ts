@@ -2,7 +2,8 @@ import type { Poll, PollKind, PoolScope, Post, PostKind, ReactionCount, UserLite
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from './media.js';
-import { usersByIds, uuidArray } from './users.js';
+import { fail } from './http.js';
+import { friendIds, usersByIds, uuidArray } from './users.js';
 
 interface PostRow extends Record<string, unknown> {
   id: string;
@@ -31,6 +32,8 @@ interface PostRow extends Record<string, unknown> {
   myReaction: string | null;
   pollEndsAt: Date | null;
   pollPublic: boolean;
+  edited: boolean;
+  sortAt: Date;
 }
 
 /** Ni bloqué ni bloquant, par rapport au lecteur (`who` : colonne SQL de l'auteur). */
@@ -45,6 +48,31 @@ interface SelectOpts {
   offset?: number;
   /** Cercle du lecteur (lui + ses amis) : active l'affichage « republié par ». */
   circle?: string[];
+  /** Curseur : posts triés strictement après (date de tri, identifiant). */
+  after?: { at: string; id: string } | null;
+}
+
+/**
+ * Condition SQL « le lecteur peut voir le post p » : son auteur, ses amis, les amis de quelqu'un
+ * qui l'a republié, et tout le monde pour les mèmes (galerie publique).
+ */
+export function visibleTo(viewerId: string, circle: string[]) {
+  const c = uuidArray(circle);
+  return sql`(p.kind = 'meme' or p.author_id = ${viewerId} or p.author_id = any(${c})
+    or exists(select 1 from reposts r where r.post_id = p.id and r.user_id = any(${c})))`;
+}
+
+/** Auteur et type d'un post que le lecteur peut voir ; 404 sinon (sans révéler qu'il existe). */
+export async function visiblePost(viewerId: string, postId: string) {
+  const circle = [viewerId, ...(await friendIds(viewerId))];
+  const [p] = await db.execute<{ authorId: string; kind: PostKind; text: string; pollKind: PollKind | null; pollEndsAt: Date | null; pollPublic: boolean }>(sql`
+    select p.author_id as "authorId", p.kind, p.text, p.poll_kind as "pollKind", p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic"
+    from posts p
+    where p.id = ${postId} and ${visibleTo(viewerId, circle)}
+      and (p.hidden_at is null or p.author_id = ${viewerId}) and ${notBlocked(viewerId, sql`p.author_id`)}
+    limit 1`);
+  if (!p) fail(404, 'Post introuvable');
+  return p!;
 }
 
 export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<Post[]> {
@@ -72,14 +100,15 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
       (select coalesce(json_agg(json_build_object('emoji', x.emoji, 'count', x.n) order by x.n desc, x.first), '[]'::json)
         from (select pr.emoji, count(*)::int as n, min(pr.created_at) as first from post_reactions pr where pr.post_id = p.id group by pr.emoji) x) as reactions,
       (select pr.emoji from post_reactions pr where pr.post_id = p.id and pr.user_id = ${viewerId}) as "myReaction",
-      p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic",
+      p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic", (p.edited_at is not null) as edited,
       ${sortAt} as "sortAt"
     from posts p
     left join media m on m.id = p.media_id
     where (${opts.where})
       and (p.hidden_at is null or p.author_id = ${viewerId})
       and ${notBlocked(viewerId, sql`p.author_id`)}
-    order by ${opts.orderBy ?? sql`"sortAt" desc`}
+      ${opts.after ? sql`and (${sortAt}, p.id) < (${opts.after.at}::timestamptz, ${opts.after.id}::uuid)` : sql``}
+    order by ${opts.orderBy ?? sql`"sortAt" desc, p.id desc`}
     limit ${opts.limit ?? 20} offset ${opts.offset ?? 0}
   `);
 
@@ -110,6 +139,8 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     poll: polls.get(r.id) ?? null,
     reactions: r.reactions ?? [],
     myReaction: r.myReaction,
+    edited: r.edited,
+    sortAt: new Date(r.sortAt).toISOString(),
   }));
 }
 
@@ -193,7 +224,9 @@ export async function loadPolls(viewerId: string, posts: PollRef[]): Promise<Map
   return map;
 }
 
+/** Un post, seulement s'il est visible par le lecteur. */
 export async function getPost(viewerId: string, postId: string): Promise<Post | null> {
-  const [p] = await selectPosts(viewerId, { where: sql`p.id = ${postId}`, limit: 1 });
+  const circle = [viewerId, ...(await friendIds(viewerId))];
+  const [p] = await selectPosts(viewerId, { where: sql`p.id = ${postId} and ${visibleTo(viewerId, circle)}`, limit: 1 });
   return p ?? null;
 }

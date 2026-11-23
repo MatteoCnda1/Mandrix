@@ -143,6 +143,10 @@ export interface Post {
   /** Réactions emoji, les plus fréquentes d'abord. */
   reactions: ReactionCount[];
   myReaction: string | null;
+  /** Légende modifiée après publication. */
+  edited: boolean;
+  /** Date de tri dans le fil (curseur de pagination). */
+  sortAt?: string;
 }
 
 export interface PostSearch {
@@ -197,7 +201,8 @@ export function splitRichText(text: string): TextPart[] {
 
 export interface Page<T> {
   items: T[];
-  next: number | null;
+  /** Page suivante : numéro, ou curseur opaque (fil). */
+  next: number | string | null;
 }
 
 export interface Comment {
@@ -215,6 +220,13 @@ export interface Story {
   media: MediaRef;
   createdAt: string;
   seen: boolean;
+  /** Mes stories : nombre de vues (null pour celles des autres). */
+  views: number | null;
+}
+
+export interface StoryView {
+  user: UserLite;
+  at: string;
 }
 
 export interface StoryGroup {
@@ -301,6 +313,8 @@ export interface Message {
   /** Pièce jointe : photo, vidéo ou message vocal (kind « audio »). */
   media: MediaRef | null;
   reactions: MessageReaction[];
+  /** Supprimé pour tout le monde par son auteur. */
+  deleted: boolean;
   createdAt: string;
 }
 
@@ -326,6 +340,8 @@ export interface Conversation {
   members: UserLite[];
   last: { text: string; at: string; mine: boolean; sender: string | null; system: boolean } | null;
   unread: boolean;
+  /** En sourdine : pas de notification push. */
+  muted: boolean;
 }
 
 export interface ConversationDetail {
@@ -338,6 +354,7 @@ export interface ConversationDetail {
   createdBy: ID | null;
   /** Dernière lecture de chaque autre membre (accusés « Vu »). */
   reads: ReadMark[];
+  muted: boolean;
 }
 
 export interface ReadMark {
@@ -604,6 +621,8 @@ export interface ServerToClientEvents {
   'game:state': (room: GameRoom | null) => void;
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
+  /** Message modifié (supprimé pour tout le monde…). */
+  'dm:update': (m: Message) => void;
   'dm:typing': (e: TypingEvent) => void;
   'dm:read': (e: ReadMark & { conversationId: ID }) => void;
   'dm:reaction': (e: { conversationId: ID; messageId: ID; reactions: MessageReaction[] }) => void;
