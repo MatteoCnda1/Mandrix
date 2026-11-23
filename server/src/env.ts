@@ -10,6 +10,9 @@ export const env = {
   port: int(process.env.PORT, 3000),
   host: process.env.HOST ?? '0.0.0.0',
   isProd: process.env.NODE_ENV === 'production',
+  isTest: process.env.NODE_ENV === 'test',
+  /** Tentatives de connexion / inscription par minute et par IP. */
+  authRateLimit: int(process.env.AUTH_RATE_LIMIT, 10),
   appUrl: (process.env.APP_URL ?? 'http://localhost:5173').replace(/\/$/, ''),
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://mandrix:mandrix@localhost:5433/mandrix',
   dataDir: path.resolve(process.env.DATA_DIR ?? path.join(here, '../../data')),

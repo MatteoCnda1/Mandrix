@@ -9,7 +9,9 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
-    "cli": "tsx --env-file-if-exists=../.env src/cli.ts"
+    "cli": "tsx --env-file-if-exists=../.env src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
@@ -36,7 +38,9 @@
     "@types/nodemailer": "^7.0.2",
     "@types/web-push": "^3.6.4",
     "drizzle-kit": "~0.31.5",
+    "socket.io-client": "^4.8.4",
     "tsup": "^8.5.0",
-    "tsx": "^4.20.6"
+    "tsx": "^4.20.6",
+    "vitest": "^3.2.7"
   }
 }
