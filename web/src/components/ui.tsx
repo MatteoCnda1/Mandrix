@@ -3,28 +3,29 @@ import { CircleNotch, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
+import logoSymbol from '../assets/logo/mandrix-symbol.svg';
 import { useUI } from '../lib/store';
 
 /** Fusionne les classes Tailwind (la dernière gagne en cas de conflit). */
 const cx = (...c: (string | false | null | undefined)[]) => twMerge(c.filter(Boolean).join(' '));
 export { cx };
 
-/** Mascotte Mandrix (singe pensif) reproduite à partir des formes de la maquette. */
+/**
+ * Logo Mandrix : le mandrill pensif low poly sur sa tuile ciel (docs/logo).
+ * La tuile porte son propre fond, donc le logo reste lisible en mode clair comme en mode sombre.
+ */
 export function Logo({ size = 42, className }: { size?: number; className?: string }) {
-  const abs = 'absolute';
   return (
-    <div className={cx('relative flex-none', className)} style={{ width: '1em', height: '1em', fontSize: size }} aria-hidden>
-      <div className={cx(abs, 'rounded-full bg-brand2')} style={{ left: '-.07em', top: '.3em', width: '.3em', height: '.3em' }} />
-      <div className={cx(abs, 'rounded-full bg-brand2')} style={{ right: '-.07em', top: '.3em', width: '.3em', height: '.3em' }} />
-      <div className={cx(abs, 'rounded-full bg-ink')} style={{ inset: '.04em' }} />
-      <div className={cx(abs, 'bg-card')} style={{ left: '.23em', top: '.37em', width: '.54em', height: '.48em', borderRadius: '.24em .24em .27em .27em' }} />
-      <div className={cx(abs, 'rounded-full bg-ink')} style={{ left: '.36em', top: '.47em', width: '.08em', height: '.08em' }} />
-      <div className={cx(abs, 'rounded-full bg-ink')} style={{ left: '.56em', top: '.47em', width: '.08em', height: '.08em' }} />
-      <div className={cx(abs, 'bg-ink')} style={{ left: '.44em', top: '.66em', width: '.12em', height: '.03em', borderRadius: '.02em' }} />
-      <div className={cx(abs, 'bg-brand2')} style={{ left: '.5em', top: '.76em', width: '.36em', height: '.17em', borderRadius: '.09em', transform: 'rotate(-30deg)' }} />
-      <div className={cx(abs, 'rounded-full bg-ink')} style={{ right: '-.06em', top: '.02em', width: '.13em', height: '.13em' }} />
-      <div className={cx(abs, 'rounded-full bg-ink')} style={{ right: '-.2em', top: '-.14em', width: '.09em', height: '.09em' }} />
-    </div>
+    <img
+      src={logoSymbol}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden
+      draggable={false}
+      // 22 % = rayon de la tuile (56/256) : l'ombre suit les coins arrondis du SVG
+      className={cx('flex-none select-none rounded-[22%] shadow-pill', className)}
+    />
   );
 }
 
