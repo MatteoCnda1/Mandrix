@@ -53,26 +53,86 @@ function DropZone({ file, accept, label, onPick, onClear, aspect = '16 / 9' }: {
   );
 }
 
-interface Draft {
-  text: string;
+/** Photos d'un post : la première en grand, les suivantes en vignettes (carrousel, 10 au plus). */
+function PhotoPicker({ photos, onAdd, onRemove }: { photos: File[]; onAdd: (f: File) => void; onRemove: (i: number) => void }) {
+  const { input, open } = useFilePicker('image/*', onAdd, undefined, true);
+  const first = useObjectUrl(photos[0] ?? null);
+  return (
+    <div className="flex flex-col gap-2">
+      {input}
+      <button
+        type="button"
+        onClick={open}
+        className={cx(
+          'tap relative grid w-full place-items-center overflow-hidden rounded-3xl p-0 font-mono text-xs text-phink',
+          photos.length ? 'ph border-0' : 'border-2 border-dashed border-line bg-soft',
+        )}
+        style={{ aspectRatio: '16 / 9' }}
+      >
+        {first ? (
+          <img src={first} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="flex flex-col items-center gap-2">
+            <ImageIcon size={26} />
+            Touche pour ajouter des photos (10 max)
+          </span>
+        )}
+        {photos.length > 1 && <span className="absolute top-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 font-sans text-xs font-bold text-white">1/{photos.length}</span>}
+      </button>
+      {photos.length > 0 && (
+        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+          {photos.map((f, i) => (
+            <Thumb key={`${f.name}-${f.size}-${i}`} file={f} onRemove={() => onRemove(i)} />
+          ))}
+          {photos.length < 10 && (
+            <button
+              type="button"
+              onClick={open}
+              aria-label="Ajouter des photos"
+              className="tap grid h-16 w-16 flex-none place-items-center rounded-[16px] border-2 border-dashed border-line bg-soft text-mute"
+            >
+              <Plus size={20} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Thumb({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const url = useObjectUrl(file);
+  return (
+    <div className="relative h-16 w-16 flex-none overflow-hidden rounded-[16px] bg-soft">
+      {url && <img src={url} alt="" className="h-full w-full object-cover" />}
+      <button type="button" aria-label="Retirer la photo" onClick={onRemove} className="tap absolute top-0.5 right-0.5 grid h-6 w-6 place-items-center rounded-full border-0 bg-black/60 text-white">
+        <X size={12} weight="bold" />
+      </button>
+    </div>
+  );
+}
+
+// Deux brouillons distincts : la légende (photo, vidéo) et le sondage. Publier l'un n'efface pas l'autre.
+interface PollDraft {
   q: string;
   opts: string[];
   pollKind: PollKind;
   duration: number | null;
   isPublic: boolean;
 }
-const DRAFT_KEY = 'mandrix.draft.post';
-function loadDraft(): Draft | null {
+const CAPTION_KEY = 'mandrix.draft.post';
+const POLL_KEY = 'mandrix.draft.poll';
+function load<T>(key: string): T | null {
   try {
-    return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
+    return JSON.parse(localStorage.getItem(key) ?? 'null') as T | null;
   } catch {
     return null;
   }
 }
-function saveDraft(d: Draft | null) {
+function save(key: string, value: unknown) {
   try {
-    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-    else localStorage.removeItem(DRAFT_KEY);
+    if (value) localStorage.setItem(key, JSON.stringify(value));
+    else localStorage.removeItem(key);
   } catch {
     /* stockage indisponible */
   }
@@ -80,22 +140,28 @@ function saveDraft(d: Draft | null) {
 
 export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2; initialPool?: boolean }) {
   const { data: config } = useConfig();
-  const [kind, setKind] = useState<0 | 1 | 2>(() => initialKind ?? (mode === 'post' && loadDraft()?.q ? 2 : 0));
+  const [kind, setKind] = useState<0 | 1 | 2>(() => initialKind ?? (mode === 'post' && load<PollDraft>(POLL_KEY)?.q && !load<string>(CAPTION_KEY) ? 2 : 0));
   const [file, setFile] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   // Brouillon gardé si l'on ferme la feuille par erreur (texte et sondage ; les fichiers ne sont pas gardés).
-  const draft = mode === 'post' ? loadDraft() : null;
-  const [text, setText] = useState(draft?.text ?? '');
+  // La légende n'est restaurée que pour une publication ouverte « à vide » (pas depuis le jeu ou les Reels).
+  const caption = mode === 'post' && initialKind === undefined ? load<string>(CAPTION_KEY) : null;
+  const poll = mode === 'post' ? load<PollDraft>(POLL_KEY) : null;
+  const [text, setText] = useState(caption ?? '');
   const [pool, setPool] = useState(!!initialPool);
-  const [pollKind, setPollKind] = useState<PollKind>(draft?.pollKind ?? 'text');
-  const [q, setQ] = useState(draft?.q ?? '');
-  const [opts, setOpts] = useState(draft?.opts ?? ['', '', '']);
-  const [duration, setDuration] = useState<number | null>(draft ? draft.duration : 24);
-  const [isPublic, setIsPublic] = useState(draft?.isPublic ?? false);
+  const [pollKind, setPollKind] = useState<PollKind>(poll?.pollKind ?? 'text');
+  const [q, setQ] = useState(poll?.q ?? '');
+  const [opts, setOpts] = useState(poll?.opts ?? ['', '', '']);
+  const [duration, setDuration] = useState<number | null>(poll ? poll.duration : 24);
+  const [isPublic, setIsPublic] = useState(poll?.isPublic ?? false);
+  useEffect(() => {
+    if (mode === 'post') save(CAPTION_KEY, text.trim() ? text : null);
+  }, [mode, text]);
   useEffect(() => {
     if (mode !== 'post') return;
-    const empty = !text.trim() && !q.trim() && opts.every((o) => !o.trim());
-    saveDraft(empty ? null : { text, q, opts, pollKind, duration, isPublic });
-  }, [mode, text, q, opts, pollKind, duration, isPublic]);
+    const empty = !q.trim() && opts.every((o) => !o.trim());
+    save(POLL_KEY, empty ? null : { q, opts, pollKind, duration, isPublic });
+  }, [mode, q, opts, pollKind, duration, isPublic]);
   const textRef = useRef<HTMLInputElement | null>(null);
   const qRef = useRef<HTMLInputElement | null>(null);
   const [imgOpts, setImgOpts] = useState<(File | null)[]>([null, null]);
@@ -111,9 +177,11 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const valid =
     mode === 'story'
       ? !!file
-      : kind < 2
-        ? !!file
-        : !!q.trim() && (pollKind === 'text' ? labels.length >= 2 : pollKind === 'image' ? imgOpts.every(Boolean) : true);
+      : kind === 0
+        ? photos.length > 0
+        : kind === 1
+          ? !!file
+          : !!q.trim() && (pollKind === 'text' ? labels.length >= 2 : pollKind === 'image' ? imgOpts.every(Boolean) : true);
 
   const busy = progress !== null;
 
@@ -129,10 +197,18 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         await api('/api/stories', { body: { mediaId: m.id } });
         qc.invalidateQueries({ queryKey: ['stories'] });
         toast('Story publiée');
-      } else if (kind < 2) {
+      } else if (kind === 0) {
+        // Carrousel : envoi des photos une à une, la progression couvre l'ensemble.
+        const ids: string[] = [];
+        for (const [i, f] of photos.entries()) ids.push((await uploadOne(f, i / photos.length, 1 / photos.length)).id);
+        await api<Post>('/api/posts', {
+          body: { kind: 'photo', mediaId: ids[0], extraMediaIds: ids.slice(1), text: text.trim(), pool: pool ? 'public' : null },
+        });
+        toast(photos.length > 1 ? `Post publié (${photos.length} photos)` : 'Post publié');
+      } else if (kind === 1) {
         const m = await uploadOne(file!);
         await api<Post>('/api/posts', {
-          body: { kind: kind === 0 ? 'photo' : 'video', mediaId: m.id, text: text.trim(), pool: pool ? 'public' : null },
+          body: { kind: 'video', mediaId: m.id, text: text.trim(), pool: pool ? 'public' : null },
         });
         toast('Post publié');
       } else {
@@ -154,7 +230,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         // On reste sur l'écran d'où l'on publiait (jeu, profil…) ; sur le fil, on remonte voir le post.
         if (window.location.pathname === '/') window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      if (mode === 'post') saveDraft(null);
+      if (mode === 'post') save(kind === 2 ? POLL_KEY : CAPTION_KEY, null);
       close();
     } catch (e) {
       toast(errMsg(e), 'error');
@@ -192,14 +268,25 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
           />
           {kind < 2 ? (
             <>
-              <DropZone
-                key={kind}
-                file={file}
-                accept={kind === 1 ? 'video/mp4,video/webm,video/quicktime' : 'image/*'}
-                label={kind === 1 ? 'Touche pour ajouter une vidéo' : 'Touche pour ajouter une photo'}
-                onPick={pick}
-                onClear={() => setFile(null)}
-              />
+              {kind === 0 ? (
+                <PhotoPicker
+                  photos={photos}
+                  onAdd={(f) => {
+                    if (f.size > maxMb * 1024 * 1024) return toast(`Photo trop volumineuse (max ${maxMb} Mo)`, 'error');
+                    setPhotos((p) => (p.length < 10 ? [...p, f] : p));
+                  }}
+                  onRemove={(i) => setPhotos((p) => p.filter((_, j) => j !== i))}
+                />
+              ) : (
+                <DropZone
+                  key={kind}
+                  file={file}
+                  accept="video/mp4,video/webm,video/quicktime"
+                  label="Touche pour ajouter une vidéo"
+                  onPick={pick}
+                  onClear={() => setFile(null)}
+                />
+              )}
               <input
                 ref={textRef}
                 className="field"

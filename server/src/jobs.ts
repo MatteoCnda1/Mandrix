@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { db } from './db/index.js';
 import { env } from './env.js';
 import { DAILY } from '@mandrix/shared';
+import { announceBirthdays } from './lib/birthdays.js';
 import { announceVote, closeDaily, drawDaily, parisDay, shiftDay } from './lib/daily.js';
 import { deleteMediaFile, variantPath } from './lib/media.js';
 import { scheduleTodayMoment } from './lib/moment.js';
@@ -22,6 +23,8 @@ export function startJobs() {
   new Cron(`0 ${DAILY.drawHour} * * *`, paris, async () => void (await drawDaily()));
   new Cron(`0 ${DAILY.voteHour} * * *`, paris, () => announceVote());
   new Cron('5 0 * * *', paris, () => closeDaily(shiftDay(parisDay(), -1)));
+  // Anniversaires : 9 h, heure de Paris.
+  new Cron('0 9 * * *', paris, async () => void (await announceBirthdays()));
   // Serveur redémarré dans la journée : rattrape le tirage (sans notification) et la clôture d'hier.
   void (async () => {
     await closeDaily(shiftDay(parisDay(), -1));
@@ -70,6 +73,7 @@ export function startJobs() {
       select m.id, m.path, m.poster_path as "posterPath", m.source_path as "sourcePath", m.variants from media m
       where m.created_at < now() - interval '1 day'
         and not exists (select 1 from posts p where p.media_id = m.id)
+        and not exists (select 1 from post_media pm where pm.media_id = m.id)
         and not exists (select 1 from poll_options o where o.media_id = m.id)
         and not exists (select 1 from stories s where s.media_id = m.id and s.expires_at > now() - interval '2 days')
         and not exists (select 1 from shots s where s.media_id = m.id)

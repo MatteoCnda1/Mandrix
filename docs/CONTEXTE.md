@@ -61,6 +61,9 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - **@mentions et #hashtags** (#6) : suggestions d'amis en tapant « @ », notification aux amis mentionnés qui voient le post, hashtags cliquables vers la recherche.
 - Sondages : choix (jusqu'à **6 options**), photos, curseur emoji ; **durée** (1 h, 24 h, 3 jours, sans fin), **votes publics** facultatifs, vote bloqué côté serveur à la fin et résultat envoyé à l'auteur (#7).
 - **Visibilité** (#34) : un post n'est lisible (et commentable, aimable…) que par son auteur, ses amis, les amis de qui l'a republié, et par tous pour les mèmes (`visibleTo` / `visiblePost` dans `server/src/lib/posts.ts`).
+- **Carrousel** : jusqu'à 10 photos par post (`post_media`, la première reste dans `posts.media_id`).
+- **Anniversaires** (MM-JJ, sans l'année) : 🎂 sur l'avatar le jour J, notification aux amis à 9 h.
+- **Apparence** : Clair / Sombre / Automatique. **Administration** (`/admin`) : membres, contenus, stockage, disque du NAS.
 - Pastille **« Nouveaux posts »** (évènement `feed:new`), **brouillon** de publication conservé, **QR code** de parrainage,
   Pellicule : **annuler la dernière photo** (5 min), stories : **réactions rapides**, admin : **lien de réinitialisation** sans e-mail.
 - Fil paginé par **curseur** (`?cursor=`, date de tri + id). Légende **modifiable** (« modifié »). Stories : **« N vues »** et liste des amis qui ont vu.
@@ -101,6 +104,8 @@ puis podium des mèmes les plus aimés.
 ### Messages
 - Conversations privées et **groupes** (jusqu'à `GROUP_MAX_MEMBERS`) : création, renommage, ajout de membres, quitter ; messages système.
 - Non-lus, badges, push.
+- **Messages** : liens cliquables, émojis seuls en grand, recherche et épinglage (5 max) dans la liste, « enregistre un vocal… ».
+- **Envoi idempotent** : chaque message porte un `clientId` (unique par expéditeur) ; un renvoi ne crée pas de doublon.
 - **Présence** : « En ligne » / « Actif il y a … » (connexions socket comptées dans `server/src/realtime/presence.ts`), masquable dans Réglages (réciproque).
 - **Hors ligne** : un message texte sans réseau attend dans `web/src/lib/outbox.ts` (localStorage) et part au retour du réseau.
 - **Groupes** : le créateur peut retirer un membre.
@@ -201,6 +206,8 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
   le zoom de la page reste bloqué. Glisser depuis le bord gauche = retour, seulement dans la PWA iOS.
 - **Hooks React** : un hook après un `return` anticipé fait planter l'écran ; `npm run lint` (ESLint `rules-of-hooks`) le détecte, aussi en CI.
 - **Anti-spam** : `perMinute(n)` (`server/src/lib/limits.ts`) sur les routes d'envoi, clé = compte ; désactivé en test (sauf `limits.test.ts`) et avec `SPAM_LIMITS=0`.
+- **Curseurs** : comparer `(date, id)` côté PostgreSQL (microsecondes) ; une date passée par JavaScript (millisecondes) fait sauter des éléments.
+- **Serveur de dev** : après une modification de `shared/`, relancer Vite si le changement n'apparaît pas (module hors de `web/`).
 - **Zod 4** : `z.record(z.enum(...), …)` exige toutes les clés, utiliser `z.partialRecord` ; `errorMap` devient `error`.
 - **Stories** : le visionneur fige la liste à l'ouverture ; le minuteur cumule le temps écoulé par story.
 - Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
@@ -216,6 +223,8 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 | `0002_video_offline_moment` | statut/miniature/durée des vidéos, `client_id`/`taken_at`/`on_time` des photos, Moment Mandrix |
 | `0003_group_chats` | groupes (`conversation_members`, `is_group`, `title`), rattrapage des membres existants |
 | `0004_message_media` | `messages.media_id` (pièce jointe, `ON DELETE SET NULL`) |
+| `0009_message_client_id` | identifiant d'envoi des messages (anti-doublon) |
+| `0008_pin_birthday_gallery` | épinglage, anniversaire, carrousel |
 | `0007_presence` | dernière activité et réglage de présence |
 | `0006_mute_views_delete_edit` | sourdine, date de vue des stories, messages supprimés, légende modifiée |
 | `0005_reactions_moderation_daily` | réactions (posts, messages), blocages, signalements, `hidden_at`, suspension, préférences de notifications, sessions (appareil, activité), sondages (fin, public), variantes de photos, mème du jour |

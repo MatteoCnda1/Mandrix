@@ -14,8 +14,8 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser, type AuthUser } from '../lib/auth.js';
-import { fail, parse, uuidParam } from '../lib/http.js';
-import { mediaRef } from '../lib/media.js';
+import { fail, isUuid, parse, uuidParam } from '../lib/http.js';
+import { deleteMediaFile, mediaRef, variantPath } from '../lib/media.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { sendPush } from '../lib/push.js';
 import { isBlockedBetween } from '../lib/blocks.js';
@@ -117,7 +117,7 @@ async function markRead(conversationId: string, userId: string, announce = true)
 // « En train d'écrire » : relayé aux autres membres, sans passer par la base à chaque frappe.
 const membersCache = new Map<string, { ids: string[]; at: number }>();
 
-export async function relayTyping(userId: string, conversationId: string, typing: boolean) {
+export async function relayTyping(userId: string, conversationId: string, typing: boolean, activity: 'text' | 'voice' = 'text') {
   if (typeof conversationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(conversationId)) return;
   let cached = membersCache.get(conversationId);
   if (!cached || Date.now() - cached.at > 30_000) {
@@ -126,12 +126,18 @@ export async function relayTyping(userId: string, conversationId: string, typing
     if (membersCache.size > 2000) membersCache.clear();
   }
   if (!cached.ids.includes(userId)) return;
-  for (const uid of cached.ids) if (uid !== userId) emitToUser(uid, 'dm:typing', { conversationId, userId, typing: !!typing });
+  const act = activity === 'voice' ? 'voice' : 'text';
+  for (const uid of cached.ids) if (uid !== userId) emitToUser(uid, 'dm:typing', { conversationId, userId, typing: !!typing, activity: act });
 }
 
 /** Publie un message dans une conversation et prévient tous ses membres. */
-async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null, mediaId: string | null = null) {
-  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId }).returning();
+async function postMessage(conv: typeof conversations.$inferSelect, from: AuthUser, text: string, meta: MessageMeta = null, mediaId: string | null = null, clientId: string | null = null) {
+  if (clientId) {
+    // Renvoi d'un message déjà reçu (file hors ligne, réseau coupé au mauvais moment) : pas de doublon.
+    const [dup] = await db.select().from(messages).where(and(eq(messages.senderId, from.id), eq(messages.clientId, clientId))).limit(1);
+    if (dup) return (await toMessages([dup]))[0];
+  }
+  const [m] = await db.insert(messages).values({ conversationId: conv.id, senderId: from.id, text, meta, mediaId, clientId }).returning();
   await db.update(conversations).set({ lastMessageAt: m.createdAt }).where(eq(conversations.id, conv.id));
   await markRead(conv.id, from.id, false);
   const [msg] = await toMessages([m]);
@@ -169,6 +175,23 @@ async function reactable(messageId: string, userId: string) {
   if (!m || m.deletedAt || (m.meta as MessageMeta)?.type === 'system') fail(404, 'Message introuvable');
   await ownConversation(m!.conversationId, userId);
   return m!;
+}
+
+/** Efface le fichier d'un message supprimé, s'il ne sert nulle part ailleurs (post, story, pool…). */
+async function dropAttachment(mediaId: string) {
+  const [used] = await db.execute<{ n: number }>(sql`
+    select (
+      (select count(*) from posts where media_id = ${mediaId}) + (select count(*) from post_media where media_id = ${mediaId})
+      + (select count(*) from stories where media_id = ${mediaId}) + (select count(*) from shots where media_id = ${mediaId})
+      + (select count(*) from pool_items where media_id = ${mediaId}) + (select count(*) from messages where media_id = ${mediaId})
+      + (select count(*) from users where avatar_media_id = ${mediaId})
+    )::int as n`);
+  if (used?.n) return;
+  const [row] = await db.delete(schema.media).where(eq(schema.media.id, mediaId)).returning();
+  if (!row) return;
+  for (const rel of [row.path, row.posterPath, row.sourcePath, ...(row.variants ?? []).map((w) => variantPath(row.path, w))]) {
+    if (rel) await deleteMediaFile(rel).catch(() => {});
+  }
 }
 
 async function broadcastReactions(m: MessageRow) {
@@ -250,12 +273,13 @@ export default async function messageRoutes(app: FastifyInstance) {
       mediaDuration: number | null;
       deleted: boolean;
       muted: boolean;
+      pinned: boolean;
       unread: boolean;
     }>(sql`
       select c.id, c.is_group as "isGroup", c.title,
         array(select cm.user_id from conversation_members cm where cm.conversation_id = c.id and cm.user_id <> ${me.id} order by cm.created_at) as members,
         lm.text, lm.created_at as at, lm.sender_id as "senderId", lm.meta,
-        lmm.kind as "mediaKind", lmm.duration as "mediaDuration", (lm.deleted_at is not null) as deleted, mine.muted,
+        lmm.kind as "mediaKind", lmm.duration as "mediaDuration", (lm.deleted_at is not null) as deleted, mine.muted, (mine.pinned_at is not null) as pinned,
         exists(
           select 1 from messages msg where msg.conversation_id = c.id and msg.sender_id <> ${me.id}
             and msg.created_at > coalesce((select r.last_read_at from conversation_reads r where r.conversation_id = c.id and r.user_id = ${me.id}), 'epoch'::timestamptz)
@@ -266,7 +290,7 @@ export default async function messageRoutes(app: FastifyInstance) {
         select m.text, m.created_at, m.sender_id, m.meta, m.media_id, m.deleted_at from messages m where m.conversation_id = c.id order by m.created_at desc limit 1
       ) lm on true
       left join media lmm on lmm.id = lm.media_id
-      order by c.last_message_at desc limit 100`);
+      order by mine.pinned_at desc nulls last, c.last_message_at desc limit 100`);
     const list = [...rows];
     const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]));
     const presence = await presenceOf(me, list.filter((r) => !r.isGroup && r.members[0]).map((r) => r.members[0]));
@@ -293,6 +317,7 @@ export default async function messageRoutes(app: FastifyInstance) {
           unread: r.unread,
           muted: r.muted,
           presence: r.isGroup ? null : (presence.get(r.members[0]) ?? null),
+          pinned: r.pinned,
         };
       });
   });
@@ -395,21 +420,27 @@ export default async function messageRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const c = await ownConversation(uuidParam(req.params), me.id);
     const before = String((req.query as { before?: string }).before ?? '');
-    let older: Date | null = null;
+    const older = !!before;
     if (before) {
+      if (!isUuid(before)) fail(400, 'Message de référence invalide');
       const [ref] = await db
-        .select({ at: messages.createdAt })
+        .select({ id: messages.id })
         .from(messages)
         .where(and(eq(messages.id, before), eq(messages.conversationId, c.id)))
         .limit(1);
       if (!ref) fail(400, 'Message de référence introuvable');
-      older = ref!.at;
     }
+    // (date, id) comparés côté base : aucune perte de précision, aucun message sauté à égalité.
     const rows = await db
       .select()
       .from(messages)
-      .where(and(eq(messages.conversationId, c.id), older ? lt(messages.createdAt, older) : undefined))
-      .orderBy(desc(messages.createdAt))
+      .where(
+        and(
+          eq(messages.conversationId, c.id),
+          older ? sql`(${messages.createdAt}, ${messages.id}) < (select m2.created_at, m2.id from messages m2 where m2.id = ${before})` : undefined,
+        ),
+      )
+      .orderBy(desc(messages.createdAt), desc(messages.id))
       .limit(HISTORY_PAGE);
     // Ouvrir la conversation la marque comme lue ; remonter dans l'historique, non.
     if (!older) {
@@ -424,7 +455,12 @@ export default async function messageRoutes(app: FastifyInstance) {
     const c = await ownConversation(uuidParam(req.params), me.id);
     const body = parse(
       z
-        .object({ text: z.string().trim().max(1000).default(''), mediaId: z.string().uuid().optional(), replyToId: z.string().uuid().optional() })
+        .object({
+          text: z.string().trim().max(1000).default(''),
+          mediaId: z.string().uuid().optional(),
+          replyToId: z.string().uuid().optional(),
+          clientId: z.string().min(8).max(64).optional(),
+        })
         .refine((b) => b.text.length > 0 || !!b.mediaId, { message: 'Message vide' }),
       req.body,
     );
@@ -449,7 +485,7 @@ export default async function messageRoutes(app: FastifyInstance) {
       const text = orig!.m.text || attachmentLabel(orig!.kind, orig!.duration);
       meta = { type: 'reply', replyTo: { id: orig!.m.id, senderId: orig!.m.senderId, text: text.length > 140 ? `${text.slice(0, 139)}…` : text } };
     }
-    return postMessage(c, me, body.text, meta, body.mediaId ?? null);
+    return postMessage(c, me, body.text, meta, body.mediaId ?? null, body.clientId ?? null);
   });
 
   app.post('/api/conversations/:id/read', async (req) => {
@@ -471,6 +507,7 @@ export default async function messageRoutes(app: FastifyInstance) {
       .where(eq(messages.id, m.id))
       .returning();
     await db.delete(messageReactions).where(eq(messageReactions.messageId, m.id));
+    if (m.mediaId) await dropAttachment(m.mediaId);
     // Les réponses qui le citaient ne gardent plus son texte.
     const quoting = await db
       .update(messages)
@@ -480,6 +517,25 @@ export default async function messageRoutes(app: FastifyInstance) {
     const changed = await toMessages([updated, ...quoting]);
     for (const uid of await memberIds(m.conversationId)) for (const x of changed) emitToUser(uid, 'dm:update', x);
     return changed[0];
+  });
+
+  /** Épingler en haut de la liste (5 au plus). */
+  app.patch('/api/conversations/:id/pin', async (req) => {
+    const me = requireUser(req);
+    const c = await ownConversation(uuidParam(req.params), me.id);
+    const { pinned } = parse(z.object({ pinned: z.boolean() }), req.body);
+    if (pinned) {
+      const [{ n }] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(conversationMembers)
+        .where(and(eq(conversationMembers.userId, me.id), sql`${conversationMembers.pinnedAt} is not null`, ne(conversationMembers.conversationId, c.id)));
+      if (n >= 5) fail(400, 'Tu peux épingler 5 conversations au plus');
+    }
+    await db
+      .update(conversationMembers)
+      .set({ pinnedAt: pinned ? new Date() : null })
+      .where(and(eq(conversationMembers.conversationId, c.id), eq(conversationMembers.userId, me.id)));
+    return { pinned };
   });
 
   /** Sourdine : plus de notification push pour cette conversation. */
@@ -504,7 +560,12 @@ export default async function messageRoutes(app: FastifyInstance) {
       .values({ messageId: m.id, userId: me.id, emoji })
       .onConflictDoUpdate({ target: [messageReactions.messageId, messageReactions.userId], set: { emoji, createdAt: new Date() } });
     const reactions = await broadcastReactions(m);
-    if (m.senderId !== me.id) {
+    const [author] = await db
+      .select({ muted: conversationMembers.muted })
+      .from(conversationMembers)
+      .where(and(eq(conversationMembers.conversationId, m.conversationId), eq(conversationMembers.userId, m.senderId)))
+      .limit(1);
+    if (m.senderId !== me.id && !author?.muted) {
       sendPush(
         m.senderId,
         { title: me.displayName, body: `A réagi ${emoji} à ton message`, url: `/messages/${m.conversationId}`, tag: `dm:${m.conversationId}` },

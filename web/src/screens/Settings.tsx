@@ -13,15 +13,16 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { Avatar, confirmAction, cx, PrimaryBtn, ScreenLoader, Switch } from '../components/ui';
+import { Avatar, confirmAction, cx, PrimaryBtn, ScreenLoader, Seg, Switch } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useConfig, useMe } from '../lib/data';
 import { timeAgo } from '../lib/format';
 import { currentSubscription, disablePush, enablePush, pushSupported } from '../lib/push';
 import { downloadFile } from '../lib/download';
+import { resetPresence } from '../lib/presence';
 import { disconnectSocket } from '../lib/socket';
 import { toast } from '../lib/store';
-import { AMBIANCES, useAmbiance } from '../lib/theme';
+import { AMBIANCES, useAmbiance, useThemePref } from '../lib/theme';
 
 function Section({ title, children, footer }: { title: string; children: ReactNode; footer?: string }) {
   return (
@@ -183,8 +184,20 @@ function NotificationSettings({ me }: { me: Me }) {
 
 function AmbianceSettings() {
   const [ambiance, setAmbiance] = useAmbiance();
+  const [theme, setTheme] = useThemePref();
   return (
-    <Section title="Ambiance" footer="Mémorisée sur cet appareil. « Réduire les animations » du téléphone fige toutes les ambiances.">
+    <Section title="Apparence" footer="Mémorisée sur cet appareil. « Réduire les animations » du téléphone fige toutes les ambiances.">
+      <div className="p-1">
+        <Seg
+          value={theme}
+          onChange={setTheme}
+          options={[
+            { value: 'light' as const, label: 'Clair' },
+            { value: 'dark' as const, label: 'Sombre' },
+            { value: 'auto' as const, label: 'Automatique' },
+          ]}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-2 p-1" role="radiogroup" aria-label="Ambiance de fond">
         {AMBIANCES.map((a) => (
           <button
@@ -212,6 +225,9 @@ function PrivacySettings({ me }: { me: Me }) {
   const toggle = async (show: boolean) => {
     try {
       qc.setQueryData(['me'], await api<Me>('/api/me/presence', { method: 'PATCH', body: { show } }));
+      resetPresence();
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      qc.invalidateQueries({ queryKey: ['conversation'] });
     } catch (e) {
       toast(errMsg(e), 'error');
     }

@@ -68,8 +68,8 @@ export function attachSocket(app: FastifyInstance) {
     socket.on('game:next', (ack) => wrap(ack, () => game.next(userId)));
     socket.on('game:publish', (ack) => wrap(ack, async () => void (await game.publish(userId))));
 
-    socket.on('dm:typing', (conversationId, typing) => {
-      relayTyping(userId, conversationId, typing).catch(() => {});
+    socket.on('dm:typing', (conversationId, typing, activity) => {
+      relayTyping(userId, conversationId, typing, activity).catch(() => {});
     });
 
     socket.on('disconnect', () => {

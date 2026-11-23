@@ -9,7 +9,7 @@ import { useNow } from '../lib/hooks';
 import { useEdgeSwipeBack, useGoBack, useHistoryTracker } from '../lib/nav';
 import { useUI } from '../lib/store';
 import { useDark, useViewport } from '../lib/theme';
-import { NotificationList } from './Notifications';
+import { markAllRead, NotificationList } from './Notifications';
 import { Overlays } from './Overlays';
 import { cx, Logo, Toast } from './ui';
 
@@ -20,7 +20,7 @@ const NAV: { to: string; icon: IconC; label: string; long: string; match: string
   { to: '/reels', icon: Play, label: 'Reels', long: 'Reels', match: ['/reels'] },
   { to: '/pellicule', icon: Camera, label: 'Pellicule', long: 'La Pellicule', match: ['/pellicule', '/deballage'] },
   { to: '/jeu', icon: GameController, label: 'Jeu', long: 'Make It Friends', match: ['/jeu'] },
-  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation', '/reglages'] },
+  { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation', '/reglages', '/admin'] },
 ];
 
 /** Titre de l'écran et destination du bouton « retour » (navigation hiérarchique, HIG). */
@@ -39,6 +39,7 @@ const ROUTES: { prefix: string; title: string; back?: string | -1; backLabel?: s
   { prefix: '/p/', title: 'Post', back: -1, backLabel: 'Retour' },
   { prefix: '/recherche', title: 'Recherche', back: -1, backLabel: 'Retour' },
   { prefix: '/reglages', title: 'Réglages', back: '/profil', backLabel: 'Profil' },
+  { prefix: '/admin', title: 'Administration', back: '/profil', backLabel: 'Profil' },
 ];
 
 const routeInfo = (path: string) => (path === '/' ? { prefix: '/', title: 'Pour toi' } : (ROUTES.find((r) => path.startsWith(r.prefix)) ?? { prefix: path, title: '' }));
@@ -194,7 +195,16 @@ function Header({ isPhone }: { isPhone: boolean }) {
           <div className="absolute top-[62px] right-0 flex max-h-[70vh] w-[min(390px,100%)] origin-top-right animate-drop flex-col gap-0.5 overflow-auto rounded-[28px] bg-card p-2.5 shadow-menu">
             <div className="flex items-center px-2.5 py-2">
               <div className="text-[1.0625rem] font-extrabold">Notifications</div>
-              <button type="button" className="tap ml-auto border-0 bg-transparent text-[0.8125rem] font-bold text-acc" onClick={() => nav('/notifications')}>
+              {!!badges?.notifications && (
+                <button type="button" className="tap ml-auto border-0 bg-transparent text-[0.8125rem] font-bold text-mute" onClick={() => void markAllRead()}>
+                  Tout marquer comme lu
+                </button>
+              )}
+              <button
+                type="button"
+                className={cx('tap border-0 bg-transparent pl-3 text-[0.8125rem] font-bold text-acc', !badges?.notifications && 'ml-auto')}
+                onClick={() => nav('/notifications')}
+              >
                 Tout voir
               </button>
             </div>

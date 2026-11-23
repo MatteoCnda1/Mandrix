@@ -39,6 +39,8 @@ export const users = pgTable('users', {
   lastSeenAt: ts('last_seen_at'),
   /** Montrer sa présence (sinon, on ne voit pas non plus celle des autres). */
   showPresence: boolean('show_presence').notNull().default(true),
+  /** Anniversaire « MM-JJ » (l'année n'est pas demandée). */
+  birthday: text('birthday'),
   createdAt: created(),
 });
 
@@ -154,6 +156,17 @@ export const likes = pgTable(
     createdAt: created(),
   },
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+/** Photos supplémentaires d'un post (carrousel) ; la première reste dans posts.media_id. */
+export const postMedia = pgTable(
+  'post_media',
+  {
+    postId: uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.position] }), index('post_media_media_idx').on(t.mediaId)],
 );
 
 export const postReactions = pgTable(
@@ -317,6 +330,8 @@ export const conversationMembers = pgTable(
     joinedAt: created(),
     /** Conversation en sourdine : pas de notification push. */
     muted: boolean('muted').notNull().default(false),
+    /** Épinglée en haut de la liste (date d'épinglage). */
+    pinnedAt: ts('pinned_at'),
   },
   (t) => [primaryKey({ columns: [t.conversationId, t.userId] }), index('conversation_members_user_idx').on(t.userId)],
 );
@@ -343,9 +358,11 @@ export const messages = pgTable(
     mediaId: uuid('media_id').references(() => media.id, { onDelete: 'set null' }),
     /** Supprimé pour tout le monde par son auteur (texte et pièce jointe effacés). */
     deletedAt: ts('deleted_at'),
+    /** Identifiant d'envoi choisi par l'app : un renvoi (file hors ligne) ne crée pas de doublon. */
+    clientId: text('client_id'),
     createdAt: created(),
   },
-  (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt)],
+  (t) => [index('messages_conv_idx').on(t.conversationId, t.createdAt), uniqueIndex('messages_client_idx').on(t.senderId, t.clientId)],
 );
 
 export const messageReactions = pgTable(

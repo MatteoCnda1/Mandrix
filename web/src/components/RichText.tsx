@@ -5,19 +5,30 @@ import { useFriends } from '../lib/data';
 import { Avatar, cx } from './ui';
 
 /** Texte avec @mentions et #hashtags cliquables (aucun HTML injecté : uniquement des nœuds React). */
-export function RichText({ text }: { text: string }) {
+export function RichText({ text, linkClass }: { text: string; linkClass?: string }) {
   const parts = useMemo(() => splitRichText(text), [text]);
   return (
     <>
       {parts.map((p, i) =>
         p.type === 'text' ? (
           <Fragment key={i}>{p.value}</Fragment>
+        ) : p.type === 'url' ? (
+          <a
+            key={i}
+            href={p.href}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            onClick={(e) => e.stopPropagation()}
+            className={cx('font-semibold break-all underline underline-offset-2', linkClass ?? 'text-acc')}
+          >
+            {p.value.replace(/^https?:\/\/(www\.)?/, '')}
+          </a>
         ) : (
           <Link
             key={i}
             to={p.type === 'mention' ? `/u/${p.username}` : `/recherche?q=${encodeURIComponent(`#${p.tag}`)}`}
             onClick={(e) => e.stopPropagation()}
-            className="font-bold text-acc no-underline hover:underline"
+            className={cx('font-bold no-underline hover:underline', linkClass ?? 'text-acc')}
           >
             {p.value}
           </Link>

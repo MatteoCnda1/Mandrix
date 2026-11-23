@@ -139,6 +139,7 @@ export default async function accountRoutes(app: FastifyInstance) {
       where f.requester_id = ${me.id} or f.addressee_id = ${me.id}`);
     const posts = await q(sql`
       select p.id, p.kind, p.text, p.location, p.created_at as "createdAt", p.media_id as "mediaId",
+        (select json_agg(pm.media_id order by pm.position) from post_media pm where pm.post_id = p.id) as "moreMediaIds",
         (select json_agg(json_build_object('label', o.label, 'votes', (select count(*) from poll_votes v where v.option_id = o.id)) order by o.position)
           from poll_options o where o.post_id = p.id) as options
       from posts p where p.author_id = ${me.id} order by p.created_at`);

@@ -3,7 +3,11 @@ import { and, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 
 const { users, friendships } = schema;
-type UserRow = Pick<typeof users.$inferSelect, 'id' | 'username' | 'displayName' | 'avatarMediaId'>;
+type UserRow = Pick<typeof users.$inferSelect, 'id' | 'username' | 'displayName' | 'avatarMediaId'> & { birthday?: string | null };
+
+/** « MM-JJ » du jour, à Paris. */
+export const parisMonthDay = (d = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', month: '2-digit', day: '2-digit' }).format(d).replace('/', '-');
 
 export function toLite(u: UserRow): UserLite {
   return {
@@ -13,6 +17,7 @@ export function toLite(u: UserRow): UserLite {
     avatarUrl: u.avatarMediaId ? `/media/${u.avatarMediaId}` : null,
     initials: initialsOf(u.displayName),
     tone: toneOf(u.id),
+    ...(u.birthday && u.birthday === parisMonthDay() ? { birthdayToday: true } : {}),
   };
 }
 
@@ -26,6 +31,7 @@ export function toMe(u: typeof users.$inferSelect): Me {
     createdAt: u.createdAt.toISOString(),
     notificationPrefs: u.notificationPrefs ?? {},
     showPresence: u.showPresence,
+    birthday: u.birthday,
   };
 }
 
@@ -34,7 +40,7 @@ export async function usersByIds(ids: Iterable<string | null | undefined>): Prom
   const map = new Map<string, UserLite>();
   if (list.length === 0) return map;
   const rows = await db
-    .select({ id: users.id, username: users.username, displayName: users.displayName, avatarMediaId: users.avatarMediaId })
+    .select({ id: users.id, username: users.username, displayName: users.displayName, avatarMediaId: users.avatarMediaId, birthday: users.birthday })
     .from(users)
     .where(inArray(users.id, list));
   for (const r of rows) map.set(r.id, toLite(r));

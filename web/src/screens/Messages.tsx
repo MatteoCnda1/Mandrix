@@ -6,6 +6,8 @@ import {
   CaretDown,
   CaretLeft,
   CloudArrowUp,
+  MagnifyingGlass,
+  PushPin,
   CaretRight,
   ChatCircleDots,
   CheckCircle,
@@ -25,6 +27,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
+import { RichText } from '../components/RichText';
 import { openReport } from '../components/Report';
 import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, ApiError, errMsg, upload } from '../lib/api';
@@ -36,9 +39,9 @@ import { shortTime } from '../lib/format';
 import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
 import { useGoBack } from '../lib/nav';
-import { discardPending, queueMessage, retryPending, useOutbox } from '../lib/outbox';
+import { discardPending, newClientId, queueMessage, retryPending, useOutbox } from '../lib/outbox';
 import { presenceLabel, seedPresence, usePresence } from '../lib/presence';
-import { sendTyping, useTyping } from '../lib/socket';
+import { sendTyping, useRecordingVoice, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
@@ -69,6 +72,13 @@ export function Messages() {
   const now = useNow(60_000);
   const typing = useTyping();
   const presences = usePresence();
+  const [search, setSearch] = useState('');
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const shown = (data ?? []).filter((c) => {
+    const q = norm(search.trim());
+    if (!q) return true;
+    return norm([conversationName(c, me?.id), ...c.members.map((u) => `${u.displayName} ${u.username}`)].join(' ')).includes(q);
+  });
   useEffect(() => {
     if (data) seedPresence(data.filter((c) => !c.isGroup && c.user).map((c) => [c.user!.id, c.presence]));
   }, [data]);
@@ -77,21 +87,35 @@ export function Messages() {
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
       <PullIndicator pull={pull} refreshing={refreshing} />
-      <button
-        type="button"
-        onClick={() => openSheet('newMessage')}
-        className="tap flex h-[52px] items-center gap-2.5 self-start rounded-[26px] border-0 bg-card px-5 text-[0.9375rem] font-bold text-ink shadow-pill active:scale-[.97]"
-      >
-        <PencilSimple size={20} /> Nouveau message
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => openSheet('newMessage')}
+          className="tap flex h-[52px] flex-none items-center gap-2.5 rounded-[26px] border-0 bg-card px-5 text-[0.9375rem] font-bold text-ink shadow-pill active:scale-[.97]"
+        >
+          <PencilSimple size={20} /> Nouveau
+        </button>
+        {(data?.length ?? 0) > 4 && (
+          <label className="relative flex min-w-0 flex-1 items-center">
+            <MagnifyingGlass size={18} className="pointer-events-none absolute left-4 text-mute" />
+            <input className="field h-[52px] w-full pl-11" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher" aria-label="Rechercher une conversation" />
+          </label>
+        )}
+      </div>
       {data?.length === 0 ? (
         <EmptyCard icon={<ChatCircleDots size={30} weight="fill" />} title="Aucune conversation" text="Écris à un ami, crée un groupe, réponds à une story ou invite quelqu’un dans un salon Make It Friends.">
           <PrimaryBtn onClick={() => openSheet('newMessage')}>Écrire à un ami</PrimaryBtn>
         </EmptyCard>
       ) : (
         <div className="card flex flex-col gap-0.5 p-2">
-          {data?.map((c) => {
+          {shown.length === 0 && <div className="p-4 text-center text-sm text-mute">Aucune conversation pour « {search} ».</div>}
+          {shown.map((c) => {
             const muteActions: MenuAction[] = [
+              {
+                label: c.pinned ? 'Désépingler' : 'Épingler en haut',
+                icon: <PushPin size={18} />,
+                onClick: () => void setPinned(c.id, !c.pinned),
+              },
               {
                 label: c.muted ? 'Réactiver les notifications' : 'Mettre en sourdine',
                 icon: c.muted ? <Bell size={18} /> : <BellSlash size={18} />,
@@ -109,12 +133,16 @@ export function Messages() {
               <ConvRow key={c.id} onOpen={() => nav(`/messages/${c.id}`)} actions={muteActions}>
                 <span className="relative flex-none">
                   <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
-                  {!c.isGroup && c.user && (presences[c.user.id] ?? c.presence)?.online && (
+                  {!c.isGroup && c.user && me?.showPresence && (presences[c.user.id] ?? c.presence)?.online && (
                     <span aria-label="En ligne" className="absolute right-0 bottom-0 h-3.5 w-3.5 rounded-full border-[2.5px] border-solid border-card bg-[#30c463]" />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={cx('block truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
+                  <span className={cx('flex items-center gap-1 truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>
+                    <span className="truncate">{conversationName(c, me?.id)}</span>
+                    {!c.isGroup && c.user?.birthdayToday && <span aria-label="Anniversaire aujourd’hui">🎂</span>}
+                    {c.pinned && <PushPin size={13} weight="fill" className="flex-none text-mute" aria-label="Épinglée" />}
+                  </span>
                   {typing[c.id]?.length ? (
                     <span className="block truncate text-sm font-semibold text-acc">
                       {c.isGroup ? `${c.members.find((u) => u.id === typing[c.id][0])?.displayName.split(' ')[0] ?? 'Quelqu’un'} écrit…` : 'écrit…'}
@@ -137,6 +165,16 @@ export function Messages() {
       )}
     </div>
   );
+}
+
+/** Épingler une conversation en haut de la liste. */
+async function setPinned(id: string, pinned: boolean) {
+  try {
+    await api(`/api/conversations/${id}/pin`, { method: 'PATCH', body: { pinned } });
+    qc.invalidateQueries({ queryKey: ['conversations'] });
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
 }
 
 /** Sourdine d'une conversation (liste, fiche du groupe). */
@@ -407,6 +445,14 @@ function TypingDots() {
   );
 }
 
+/** Un à trois émojis, et rien d'autre (affichés en grand). */
+function isEmojiOnly(text: string) {
+  const t = text.trim();
+  if (!t || t.length > 40 || !/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f\s]+$/u.test(t) || /^[\d#*\s]+$/.test(t)) return false;
+  const count = [...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(t.replace(/\s/g, ''))].length;
+  return count >= 1 && count <= 3;
+}
+
 /** Une conversation par instance : passer d'une conversation à l'autre repart d'un état vide. */
 export function Chat() {
   const { id = '' } = useParams();
@@ -424,6 +470,7 @@ function ChatView({ id }: { id: string }) {
   const [info, setInfo] = useState(false);
   const [menu, setMenu] = useState<{ m: Message; at: Point } | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const lastClientId = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const startReply = (m: Message) => {
     setReplyTo(m);
@@ -437,6 +484,7 @@ function ChatView({ id }: { id: string }) {
     el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 900, iterations: 2 });
   };
   const typingIds = useTyping((s) => s[id]) ?? [];
+  const voiceMap = useRecordingVoice();
   const outbox = useOutbox((s) => s.items);
   const pending = outbox.filter((p) => p.conversationId === id);
   const presences = usePresence();
@@ -570,8 +618,9 @@ function ChatView({ id }: { id: string }) {
     }
     const quoted = replyTo;
     setReplyTo(null);
+    lastClientId.current = newClientId();
     try {
-      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id } }));
+      append(await api<Message>(`/api/conversations/${id}/messages`, { body: { text, mediaId, replyToId: quoted?.id, clientId: lastClientId.current } }));
     } catch (e) {
       setReplyTo(quoted);
       throw e;
@@ -586,16 +635,17 @@ function ChatView({ id }: { id: string }) {
     setDraft('');
     setFile(null);
     // Sans réseau, un message texte attend dans la conversation et part au retour du réseau.
-    const queue = () => {
-      queueMessage(id, text, replyTo?.id);
+    const queue = (clientId: string) => {
+      queueMessage(me!.id, id, text, replyTo?.id, clientId);
       setReplyTo(null);
       requestAnimationFrame(() => toBottom(true));
     };
-    if (!attachment && !navigator.onLine) return queue();
+    if (!attachment && !navigator.onLine) return queue(newClientId());
     try {
       await sendMessage(text, attachment, attachment?.name);
     } catch (e) {
-      if (!attachment && e instanceof ApiError && e.status === 0) return queue();
+      // Même identifiant que la tentative échouée : si le serveur l'avait reçu, pas de doublon.
+      if (!attachment && e instanceof ApiError && e.status === 0) return queue(lastClientId.current ?? newClientId());
       setDraft(text);
       setFile(attachment);
       toast(errMsg(e), 'error');
@@ -607,10 +657,20 @@ function ChatView({ id }: { id: string }) {
   const startVoice = async () => {
     try {
       await recorder.start();
+      sendTyping(id, true, 'voice');
     } catch (e) {
       toast(errMsg(e), 'error');
     }
   };
+  // Pendant l'enregistrement, on rappelle aux autres qu'on enregistre (sinon l'indicateur expire).
+  useEffect(() => {
+    if (!recorder.recording) return;
+    const t = setInterval(() => sendTyping(id, true, 'voice'), 3500);
+    return () => {
+      clearInterval(t);
+      sendTyping(id, false, 'voice');
+    };
+  }, [recorder.recording, id]);
 
   const finishVoice = async (keep: boolean) => {
     const blob = await recorder.stop(keep);
@@ -661,6 +721,7 @@ function ChatView({ id }: { id: string }) {
             ? 'Vu par tout le monde'
             : `Vu par ${seenBy.map((u) => u.displayName.split(' ')[0]).join(', ')}`;
   const typers = typingIds.map((uid) => byId.get(uid)).filter((u): u is UserLite => !!u);
+  const voiceTypers = typers.filter((u) => voiceMap[`${id}:${u.id}`]);
 
   const menuActions = (m: Message): MenuAction[] => {
     const acts: MenuAction[] = [];
@@ -705,7 +766,7 @@ function ChatView({ id }: { id: string }) {
       <span className="min-w-0">
         <span className="block truncate text-[1.0625rem] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
         {group && <span className="block truncate text-xs font-semibold text-mute">{conv.members.length} membres · infos du groupe</span>}
-        {!group && conv.user && presenceLabel(presences[conv.user.id] ?? conv.presence) && (
+        {!group && conv.user && me.showPresence && presenceLabel(presences[conv.user.id] ?? conv.presence) && (
           <span className="flex items-center gap-1.5 truncate text-xs font-semibold text-mute">
             {(presences[conv.user.id] ?? conv.presence)?.online && <span className="h-2 w-2 flex-none rounded-full bg-[#30c463]" />}
             {presenceLabel(presences[conv.user.id] ?? conv.presence)}
@@ -745,6 +806,8 @@ function ChatView({ id }: { id: string }) {
           );
         }
         const prev = msgs[i - 1];
+        // Un à trois émojis seuls : en grand, sans bulle.
+        const bigEmoji = !m.media && !m.meta && isEmojiOnly(m.text);
         const showSender = group && !mine && (!prev || prev.senderId !== m.senderId || prev.meta?.type === 'system');
         const sender = byId.get(m.senderId);
         const story = m.meta?.type === 'story_reply' ? m.meta : null;
@@ -775,8 +838,8 @@ function ChatView({ id }: { id: string }) {
               onReply={() => startReply(m)}
               className={cx(
                 'animate-in rounded-[22px] text-base leading-[1.4] break-words',
-                m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
-                mine ? 'bg-brand text-white' : 'bg-soft text-ink',
+                bigEmoji ? 'px-1 text-[2.6rem] leading-[1.15]' : m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
+                bigEmoji ? 'bg-transparent' : mine ? 'bg-brand text-white' : 'bg-soft text-ink',
               )}
               style={{ animationDuration: '.35s' }}
             >
@@ -798,7 +861,11 @@ function ChatView({ id }: { id: string }) {
               )}
               {m.media?.kind === 'audio' && <VoicePlayer media={m.media} mine={mine} />}
               {m.media && m.media.kind !== 'audio' && <MessagePhotoVideo media={m.media} onOpen={() => setViewing(m.media)} />}
-              {m.text && <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>{m.text}</span>}
+              {m.text && (
+                <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>
+                  <RichText text={m.text} linkClass={mine ? 'text-white' : undefined} />
+                </span>
+              )}
               {m.meta?.type === 'game_invite' && !mine && (
                 <button
                   type="button"
@@ -867,7 +934,13 @@ function ChatView({ id }: { id: string }) {
           <div className="flex h-10 items-center gap-2 rounded-[22px] bg-soft px-3.5">
             <TypingDots />
             <span className="text-[0.8125rem] font-semibold text-mute">
-              {group ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'écrivent' : 'écrit'}…` : 'écrit…'}
+              {voiceTypers.length === typers.length
+                ? group
+                  ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'enregistrent' : 'enregistre'} un vocal…`
+                  : 'enregistre un vocal…'
+                : group
+                  ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'écrivent' : 'écrit'}…`
+                  : 'écrit…'}
             </span>
           </div>
         </div>

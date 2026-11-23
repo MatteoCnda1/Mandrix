@@ -1,4 +1,4 @@
-import type { Message } from '@mandrix/shared';
+import type { Me, Message } from '@mandrix/shared';
 import { create } from 'zustand';
 import { api, ApiError } from './api';
 import { qc } from './data';
@@ -7,6 +7,8 @@ import { qc } from './data';
 
 export interface Pending {
   tempId: string;
+  /** Compte qui a écrit le message (la file n'envoie que ceux du compte connecté). */
+  userId: string;
   conversationId: string;
   text: string;
   replyToId?: string;
@@ -18,7 +20,7 @@ export interface Pending {
 const KEY = 'mandrix.outbox';
 const load = (): Pending[] => {
   try {
-    return (JSON.parse(localStorage.getItem(KEY) ?? '[]') as Pending[]).map((p) => ({ ...p, status: p.status ?? 'pending' }));
+    return (JSON.parse(localStorage.getItem(KEY) ?? '[]') as Pending[]).filter((p) => p.userId).map((p) => ({ ...p, status: p.status ?? 'pending' }));
   } catch {
     return [];
   }
@@ -39,8 +41,10 @@ const update = (tempId: string, patch: Partial<Pending> | null) =>
     items: patch === null ? s.items.filter((p) => p.tempId !== tempId) : s.items.map((p) => (p.tempId === tempId ? { ...p, ...patch } : p)),
   }));
 
-export function queueMessage(conversationId: string, text: string, replyToId?: string) {
-  const item: Pending = { tempId: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, conversationId, text, replyToId, createdAt: new Date().toISOString(), status: 'pending' };
+export const newClientId = () => `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export function queueMessage(userId: string, conversationId: string, text: string, replyToId?: string, tempId = newClientId()) {
+  const item: Pending = { tempId, userId, conversationId, text, replyToId, createdAt: new Date().toISOString(), status: 'pending' };
   useOutbox.setState((s) => ({ items: [...s.items, item] }));
   return item;
 }
@@ -50,13 +54,22 @@ export const discardPending = (tempId: string) => update(tempId, null);
 let flushing = false;
 /** Envoie les messages en attente, dans l'ordre. Une erreur réseau arrête le tour (on réessaiera). */
 export async function flushOutbox(onlyId?: string) {
-  if (flushing || !navigator.onLine) return;
+  if (!navigator.onLine) return;
+  if (flushing) {
+    again = true;
+    return;
+  }
+  const me = qc.getQueryData<Me | null>(['me']);
+  if (!me) return;
   flushing = true;
   try {
-    for (const p of [...useOutbox.getState().items]) {
-      if (onlyId ? p.tempId !== onlyId : p.status !== 'pending') continue;
+    for (const { tempId } of [...useOutbox.getState().items]) {
+      // État relu à chaque tour : un « Réessayer » pendant l'envoi est pris en compte.
+      const p = useOutbox.getState().items.find((x) => x.tempId === tempId);
+      if (!p || p.userId !== me.id || p.status !== 'pending' || (onlyId && p.tempId !== onlyId)) continue;
       try {
-        const m = await api<Message>(`/api/conversations/${p.conversationId}/messages`, { body: { text: p.text, replyToId: p.replyToId } });
+        // Même identifiant d'envoi à chaque tentative : le serveur ne crée jamais de doublon.
+        const m = await api<Message>(`/api/conversations/${p.conversationId}/messages`, { body: { text: p.text, replyToId: p.replyToId, clientId: p.tempId } });
         update(p.tempId, null);
         qc.setQueryData<Message[]>(['messages', p.conversationId], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));
         qc.invalidateQueries({ queryKey: ['conversations'] });
@@ -68,7 +81,12 @@ export async function flushOutbox(onlyId?: string) {
   } finally {
     flushing = false;
   }
+  if (again) {
+    again = false;
+    void flushOutbox();
+  }
 }
+let again = false;
 
 export const retryPending = (tempId: string) => {
   update(tempId, { status: 'pending', error: undefined });
