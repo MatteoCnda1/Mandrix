@@ -1,9 +1,11 @@
 import type { StoryGroup } from '@mandrix/shared';
-import { ArrowRight, LockSimple, MagnifyingGlass, Plus, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUp, LockSimple, MagnifyingGlass, Plus, UsersThree } from '@phosphor-icons/react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx, PullIndicator } from '../components/ui';
-import { qc, useFeed, useMe, usePellicule, useStories } from '../lib/data';
+import { qc, useFeed, useFriends, useMe, usePellicule, useStories } from '../lib/data';
+import { useFeedFresh } from '../lib/socket';
 import { countdown } from '../lib/format';
 import { useNow, usePullToRefresh, useSentinel } from '../lib/hooks';
 import { openSheet, useUI } from '../lib/store';
@@ -110,10 +112,54 @@ export function Feed() {
     Promise.all([feed.refetch(), qc.invalidateQueries({ queryKey: ['stories'] }), qc.invalidateQueries({ queryKey: ['pellicule'] })]),
   );
 
+  // Pastille « Nouveaux posts » : un ami a publié pendant qu'on lisait le fil.
+  const { data: me } = useMe();
+  const fresh = useFeedFresh();
+  const freshFromOthers = fresh.authors.some((a) => a !== me?.id);
+  const showFresh = fresh.count > 0 && freshFromOthers;
+  useEffect(() => {
+    // Retour sur le fil après des publications : on recharge une fois, sans pastille.
+    if (useFeedFresh.getState().count > 0) {
+      useFeedFresh.setState({ count: 0, authors: [] });
+      void feed.refetch();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    // Déjà tout en haut : on recharge directement, sans pastille.
+    if (showFresh && window.scrollY < 80) {
+      useFeedFresh.setState({ count: 0, authors: [] });
+      void feed.refetch();
+    }
+  }, [showFresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  const people = useFriends().data?.friends ?? [];
+  const freshPeople = fresh.authors.map((id) => people.find((u) => u.id === id)).filter((u): u is NonNullable<typeof u> => !!u);
+  const showNew = () => {
+    useFeedFresh.setState({ count: 0, authors: [] });
+    // Retour immédiat en haut : une animation serait décalée par l'arrivée des nouveaux posts.
+    window.scrollTo({ top: 0 });
+    void feed.refetch();
+  };
+
   if (feed.isLoading) return <ScreenLoader />;
 
   return (
     <div className="flex flex-col gap-3.5">
+      {showFresh && (
+        <button
+          type="button"
+          onClick={showNew}
+          className="tap fixed left-1/2 z-30 flex h-11 -translate-x-1/2 animate-pop items-center gap-2 rounded-full border-0 bg-brand pr-4 pl-2 text-sm font-bold text-white shadow-blue"
+          style={{ top: 'calc(74px + env(safe-area-inset-top))' }}
+        >
+          <span className="flex -space-x-2">
+            {freshPeople.map((u) => (
+              <Avatar key={u.id} user={u} size={28} className="shadow-[0_0_0_2px_var(--color-brand)]" />
+            ))}
+          </span>
+          <ArrowUp size={16} weight="bold" />
+          Nouveaux posts
+        </button>
+      )}
       <PullIndicator pull={pull} refreshing={refreshing} />
       <button
         type="button"

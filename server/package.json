@@ -17,30 +17,30 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/multipart": "^9.0.3",
     "@fastify/rate-limit": "^10.3.0",
-    "@fastify/static": "^8.2.0",
+    "@fastify/static": "^10.1.12",
     "@node-rs/argon2": "^2.0.2",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "croner": "^9.1.0",
-    "drizzle-orm": "~0.44.7",
+    "drizzle-orm": "^0.45.4",
     "fastify": "^5.6.0",
     "nanoid": "^5.1.5",
-    "nodemailer": "^7.0.6",
+    "nodemailer": "^10.6.1",
     "postgres": "^3.4.7",
-    "sharp": "^0.34.4",
+    "sharp": "^0.35.5",
     "socket.io": "^4.8.1",
     "web-push": "^3.6.7",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@mandrix/shared": "*",
-    "@types/archiver": "^6.0.4",
+    "@types/archiver": "^8.0.0",
     "@types/node": "^24.6.0",
-    "@types/nodemailer": "^7.0.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/web-push": "^3.6.4",
     "drizzle-kit": "~0.31.5",
     "socket.io-client": "^4.8.4",
     "tsup": "^8.5.0",
     "tsx": "^4.20.6",
-    "vitest": "^3.2.7"
+    "vitest": "^5.1.1"
   }
 }

@@ -11,6 +11,7 @@ import { useScrollLock } from '../lib/scrollLock';
 import { toast, useUI } from '../lib/store';
 
 const IMAGE_MS = 4500;
+const QUICK = ['😂', '😍', '😮', '🔥', '👏'];
 
 export function StoryViewer({ start }: { start: { group: number; index: number } }) {
   // Liste figée à l'ouverture : une story vue repasse en fin de liste côté serveur, et un
@@ -26,6 +27,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [viewersOpen, setViewersOpen] = useState(false);
+  const [flying, setFlying] = useState<{ id: number; emoji: string } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // Temps déjà écoulé sur la photo en cours (remis à zéro à chaque story, conservé pendant une pause).
   const elapsed = useRef(0);
@@ -124,6 +126,18 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
     return null;
   }
 
+  /** Réaction rapide : envoyée en message privé avec la story, sans ouvrir le clavier. */
+  const quickReact = async (emoji: string) => {
+    setFlying({ id: Date.now(), emoji });
+    navigator.vibrate?.(10);
+    try {
+      await api(`/api/messages/to/${group.user.id}`, { body: { text: emoji, storyId: story.id } });
+      toast(`${emoji} envoyé à ${group.user.displayName.split(' ')[0]}`);
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+
   const sendReply = async () => {
     const text = reply.trim();
     if (!text) return;
@@ -214,6 +228,26 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
           >
             <Eye size={18} /> {story.views} vue{story.views > 1 ? 's' : ''}
           </button>
+        )}
+        {!mine && !reply && (
+          <div className="absolute right-3.5 bottom-[76px] left-3.5 flex justify-center gap-1.5" role="group" aria-label="Réactions rapides">
+            {QUICK.map((e) => (
+              <button
+                key={e}
+                type="button"
+                aria-label={`Réagir ${e}`}
+                onClick={() => void quickReact(e)}
+                className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-[24px] leading-none backdrop-blur transition-transform active:scale-125"
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        )}
+        {flying && (
+          <span key={flying.id} aria-hidden className="pointer-events-none absolute bottom-24 left-1/2 -translate-x-1/2 animate-burst text-[72px] leading-none" onAnimationEnd={() => setFlying(null)}>
+            {flying.emoji}
+          </span>
         )}
         {!mine && (
           <form

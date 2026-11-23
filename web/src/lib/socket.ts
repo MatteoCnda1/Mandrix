@@ -2,6 +2,8 @@ import type { ClientToServerEvents, ConversationDetail, GameRoom, Message, Serve
 import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { qc } from './data';
+import { flushOutbox } from './outbox';
+import { setPresence } from './presence';
 import { toast } from './store';
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -13,6 +15,9 @@ export const useGame = create<{ room: GameRoom | null; connected: boolean; synce
   connected: false,
   synced: false,
 }));
+
+/** Nouveaux posts d'amis arrivés pendant qu'on est sur le fil (pastille). */
+export const useFeedFresh = create<{ count: number; authors: string[] }>(() => ({ count: 0, authors: [] }));
 
 export function getSocket() {
   return socket;
@@ -53,6 +58,7 @@ export function connectSocket() {
       if (res.ok) useGame.setState({ room: res.data ?? null, synced: true });
     });
     qc.invalidateQueries({ queryKey: ['badges'] });
+    void flushOutbox();
   });
   socket.on('disconnect', () => useGame.setState({ connected: false }));
   socket.on('game:state', (room) => useGame.setState({ room }));
@@ -81,6 +87,8 @@ export function connectSocket() {
       old ? { ...old, reads: [...old.reads.filter((r) => r.userId !== e.userId), { userId: e.userId, at: e.at }] } : old,
     );
   });
+  socket.on('presence', (e) => setPresence(e.userId, { online: e.online, lastSeenAt: e.lastSeenAt }));
+  socket.on('feed:new', (e) => useFeedFresh.setState((s) => ({ count: s.count + 1, authors: [...new Set([e.authorId, ...s.authors])].slice(0, 3) })));
   socket.on('dm:update', (m: Message) => {
     qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => old?.map((x) => (x.id === m.id ? m : x)));
     qc.invalidateQueries({ queryKey: ['conversations'] });

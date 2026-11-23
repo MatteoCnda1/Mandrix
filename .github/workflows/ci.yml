@@ -52,6 +52,9 @@ jobs:
       - name: Vérifier les types (serveur + PWA)
         run: npm run typecheck
 
+      - name: Règles des hooks React (ESLint)
+        run: npm run lint -w web
+
       - name: Tests d'API (Vitest + PostgreSQL)
         run: npm test
 

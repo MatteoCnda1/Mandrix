@@ -35,6 +35,10 @@ export const users = pgTable('users', {
   notificationPrefs: jsonb('notification_prefs').$type<NotificationPrefs>().notNull().default({}),
   /** Compte suspendu par un admin : connexion refusée. */
   suspendedAt: ts('suspended_at'),
+  /** Dernière déconnexion de l'app (présence « actif il y a … »). */
+  lastSeenAt: ts('last_seen_at'),
+  /** Montrer sa présence (sinon, on ne voit pas non plus celle des autres). */
+  showPresence: boolean('show_presence').notNull().default(true),
   createdAt: created(),
 });
 

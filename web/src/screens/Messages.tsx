@@ -5,6 +5,7 @@ import {
   BellSlash,
   CaretDown,
   CaretLeft,
+  CloudArrowUp,
   CaretRight,
   ChatCircleDots,
   CheckCircle,
@@ -26,7 +27,7 @@ import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/Cha
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { openReport } from '../components/Report';
 import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
-import { api, errMsg, upload } from '../lib/api';
+import { api, ApiError, errMsg, upload } from '../lib/api';
 import { useSwipeX } from '../lib/gestures';
 import { useLongPress, useObjectUrl, type Point } from '../lib/hooks';
 import { useVoiceRecorder, voiceFileName, voiceSupported, VOICE_MAX_SECONDS } from '../lib/recorder';
@@ -35,6 +36,8 @@ import { shortTime } from '../lib/format';
 import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
 import { useGoBack } from '../lib/nav';
+import { discardPending, queueMessage, retryPending, useOutbox } from '../lib/outbox';
+import { presenceLabel, seedPresence, usePresence } from '../lib/presence';
 import { sendTyping, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
@@ -65,6 +68,10 @@ export function Messages() {
   const { data, isLoading } = useConversations();
   const now = useNow(60_000);
   const typing = useTyping();
+  const presences = usePresence();
+  useEffect(() => {
+    if (data) seedPresence(data.filter((c) => !c.isGroup && c.user).map((c) => [c.user!.id, c.presence]));
+  }, [data]);
   const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['conversations'] }));
   if (isLoading) return <ScreenLoader />;
   return (
@@ -100,7 +107,12 @@ export function Messages() {
                 : `${c.last.mine ? 'Toi : ' : c.last.sender ? `${c.last.sender} : ` : ''}${c.last.text}`;
             return (
               <ConvRow key={c.id} onOpen={() => nav(`/messages/${c.id}`)} actions={muteActions}>
-                <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
+                <span className="relative flex-none">
+                  <ConvAvatar isGroup={c.isGroup} user={c.user} members={c.members} />
+                  {!c.isGroup && c.user && (presences[c.user.id] ?? c.presence)?.online && (
+                    <span aria-label="En ligne" className="absolute right-0 bottom-0 h-3.5 w-3.5 rounded-full border-[2.5px] border-solid border-card bg-[#30c463]" />
+                  )}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className={cx('block truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
                   {typing[c.id]?.length ? (
@@ -187,6 +199,16 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
     }
   };
 
+  const removeMember = async (m: UserLite) => {
+    if (!(await confirmAction({ title: `Retirer ${m.displayName} ?`, message: 'Cette personne ne verra plus les messages du groupe.', confirmLabel: 'Retirer', destructive: true }))) return;
+    try {
+      refresh(await api<ConversationDetail>(`/api/conversations/${conv.id}/members/${m.id}`, { method: 'DELETE' }));
+      toast(`${m.displayName.split(' ')[0]} a été retiré·e du groupe`);
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+
   const add = async () => {
     setBusy(true);
     try {
@@ -253,6 +275,21 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
               <span className="block truncate text-[0.8125rem] text-mute">@{m.username}</span>
             </span>
             {conv.createdBy === m.id && <span className="rounded-full bg-soft px-2.5 py-1 text-xs font-bold text-mute">Créateur</span>}
+            {conv.createdBy === me?.id && m.id !== me?.id && (
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label={`Retirer ${m.displayName} du groupe`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void removeMember(m);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && void removeMember(m)}
+                className="tap rounded-full bg-soft px-3 py-1.5 text-xs font-bold text-heart"
+              >
+                Retirer
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -400,6 +437,9 @@ function ChatView({ id }: { id: string }) {
     el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 900, iterations: 2 });
   };
   const typingIds = useTyping((s) => s[id]) ?? [];
+  const outbox = useOutbox((s) => s.items);
+  const pending = outbox.filter((p) => p.conversationId === id);
+  const presences = usePresence();
   const list = useRef<HTMLDivElement | null>(null);
 
   // On quitte la conversation : on n'écrit plus.
@@ -545,9 +585,17 @@ function ChatView({ id }: { id: string }) {
     sendTyping(id, false);
     setDraft('');
     setFile(null);
+    // Sans réseau, un message texte attend dans la conversation et part au retour du réseau.
+    const queue = () => {
+      queueMessage(id, text, replyTo?.id);
+      setReplyTo(null);
+      requestAnimationFrame(() => toBottom(true));
+    };
+    if (!attachment && !navigator.onLine) return queue();
     try {
       await sendMessage(text, attachment, attachment?.name);
     } catch (e) {
+      if (!attachment && e instanceof ApiError && e.status === 0) return queue();
       setDraft(text);
       setFile(attachment);
       toast(errMsg(e), 'error');
@@ -657,6 +705,12 @@ function ChatView({ id }: { id: string }) {
       <span className="min-w-0">
         <span className="block truncate text-[1.0625rem] leading-tight font-extrabold">{conversationName(conv, me.id)}</span>
         {group && <span className="block truncate text-xs font-semibold text-mute">{conv.members.length} membres · infos du groupe</span>}
+        {!group && conv.user && presenceLabel(presences[conv.user.id] ?? conv.presence) && (
+          <span className="flex items-center gap-1.5 truncate text-xs font-semibold text-mute">
+            {(presences[conv.user.id] ?? conv.presence)?.online && <span className="h-2 w-2 flex-none rounded-full bg-[#30c463]" />}
+            {presenceLabel(presences[conv.user.id] ?? conv.presence)}
+          </span>
+        )}
       </span>
       {group && <CaretRight size={16} className="ml-auto flex-none text-mute" />}
     </button>
@@ -787,6 +841,26 @@ function ChatView({ id }: { id: string }) {
           </div>
         );
       })}
+      {pending.map((p) => (
+        <div key={p.tempId} className="flex max-w-[82%] flex-none flex-col items-end gap-1 self-end">
+          <div className={cx('rounded-[22px] bg-brand px-3.5 py-2.5 text-base leading-[1.4] break-words text-white', p.status === 'pending' ? 'opacity-60' : 'opacity-80')}>{p.text}</div>
+          {p.status === 'pending' ? (
+            <span className="flex items-center gap-1 px-1 text-[0.75rem] font-semibold text-mute">
+              <CloudArrowUp size={14} /> En attente du réseau…
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 px-1 text-[0.75rem] font-semibold text-heart">
+              Non envoyé
+              <button type="button" onClick={() => retryPending(p.tempId)} className="tap border-0 bg-transparent p-0 font-bold text-acc">
+                Réessayer
+              </button>
+              <button type="button" onClick={() => discardPending(p.tempId)} className="tap border-0 bg-transparent p-0 font-bold text-mute">
+                Supprimer
+              </button>
+            </span>
+          )}
+        </div>
+      ))}
       {typers.length > 0 && (
         <div className="flex flex-none items-end gap-1.5 self-start" aria-live="polite">
           {group && <Avatar user={typers[0]} size={24} />}

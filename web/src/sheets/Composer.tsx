@@ -1,6 +1,6 @@
 import { POLL_DURATIONS, POLL_MAX_OPTIONS, type MediaRef, type PollKind, type Post } from '@mandrix/shared';
 import { Eye, Image as ImageIcon, Plus, Sticker, X } from '@phosphor-icons/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MentionSuggestions } from '../components/RichText';
 import { Seg, Sheet, Switch, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
@@ -53,17 +53,49 @@ function DropZone({ file, accept, label, onPick, onClear, aspect = '16 / 9' }: {
   );
 }
 
+interface Draft {
+  text: string;
+  q: string;
+  opts: string[];
+  pollKind: PollKind;
+  duration: number | null;
+  isPublic: boolean;
+}
+const DRAFT_KEY = 'mandrix.draft.post';
+function loadDraft(): Draft | null {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
+  } catch {
+    return null;
+  }
+}
+function saveDraft(d: Draft | null) {
+  try {
+    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
 export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2; initialPool?: boolean }) {
   const { data: config } = useConfig();
-  const [kind, setKind] = useState<0 | 1 | 2>(initialKind ?? 0);
+  const [kind, setKind] = useState<0 | 1 | 2>(() => initialKind ?? (mode === 'post' && loadDraft()?.q ? 2 : 0));
   const [file, setFile] = useState<File | null>(null);
-  const [text, setText] = useState('');
+  // Brouillon gardé si l'on ferme la feuille par erreur (texte et sondage ; les fichiers ne sont pas gardés).
+  const draft = mode === 'post' ? loadDraft() : null;
+  const [text, setText] = useState(draft?.text ?? '');
   const [pool, setPool] = useState(!!initialPool);
-  const [pollKind, setPollKind] = useState<PollKind>('text');
-  const [q, setQ] = useState('');
-  const [opts, setOpts] = useState(['', '', '']);
-  const [duration, setDuration] = useState<number | null>(24);
-  const [isPublic, setIsPublic] = useState(false);
+  const [pollKind, setPollKind] = useState<PollKind>(draft?.pollKind ?? 'text');
+  const [q, setQ] = useState(draft?.q ?? '');
+  const [opts, setOpts] = useState(draft?.opts ?? ['', '', '']);
+  const [duration, setDuration] = useState<number | null>(draft ? draft.duration : 24);
+  const [isPublic, setIsPublic] = useState(draft?.isPublic ?? false);
+  useEffect(() => {
+    if (mode !== 'post') return;
+    const empty = !text.trim() && !q.trim() && opts.every((o) => !o.trim());
+    saveDraft(empty ? null : { text, q, opts, pollKind, duration, isPublic });
+  }, [mode, text, q, opts, pollKind, duration, isPublic]);
   const textRef = useRef<HTMLInputElement | null>(null);
   const qRef = useRef<HTMLInputElement | null>(null);
   const [imgOpts, setImgOpts] = useState<(File | null)[]>([null, null]);
@@ -122,6 +154,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         // On reste sur l'écran d'où l'on publiait (jeu, profil…) ; sur le fil, on remonte voir le post.
         if (window.location.pathname === '/') window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      if (mode === 'post') saveDraft(null);
       close();
     } catch (e) {
       toast(errMsg(e), 'error');

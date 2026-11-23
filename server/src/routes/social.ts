@@ -12,13 +12,15 @@ import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
-import { requireUser, type AuthUser } from '../lib/auth.js';
+import { env } from '../env.js';
+import { randomToken, requireUser, sha256, type AuthUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
 import { mediaRef } from '../lib/media.js';
 import { emitBadges } from '../lib/notify.js';
 import { notBlocked, selectPosts } from '../lib/posts.js';
 import { sendPush } from '../lib/push.js';
 import { friendIds, toLite, usersByIds, uuidArray } from '../lib/users.js';
+import { perMinute } from '../lib/limits.js';
 
 const { users, friendships, blocks, reports } = schema;
 
@@ -201,7 +203,7 @@ export default async function socialRoutes(app: FastifyInstance) {
 
   // ——— Signalements ———
 
-  app.post('/api/reports', async (req) => {
+  app.post('/api/reports', perMinute(10), async (req) => {
     const me = requireUser(req);
     const body = parse(
       z.object({
@@ -294,6 +296,18 @@ export default async function socialRoutes(app: FastifyInstance) {
       .set({ resolvedAt: new Date() })
       .where(and(eq(reports.targetType, body.targetType), eq(reports.targetId, body.targetId), isNull(reports.resolvedAt)));
     return { ok: true };
+  });
+
+  /** Lien de réinitialisation du mot de passe (1 h, usage unique), à transmettre à la personne. */
+  app.post('/api/admin/users/:id/reset-link', async (req) => {
+    requireAdmin(req);
+    const id = uuidParam(req.params);
+    const [u] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+    if (!u) fail(404, 'Utilisateur introuvable');
+    const token = randomToken();
+    const expiresAt = new Date(Date.now() + 3600_000);
+    await db.insert(schema.passwordResets).values({ id: sha256(token), userId: id, expiresAt });
+    return { link: `${env.appUrl}/reinitialiser?token=${token}`, expiresAt: expiresAt.toISOString() };
   });
 
   /** Suspendre un compte : connexion refusée et sessions fermées. */

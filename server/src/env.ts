@@ -21,6 +21,8 @@ export const env = {
   inviteCode: process.env.INVITE_CODE?.trim() || null,
   /** Jeton des alertes de supervision du homelab (POST /api/internal/alert). Vide : route désactivée. */
   alertToken: process.env.ALERT_TOKEN?.trim() || null,
+  /** Limites anti-spam par compte (désactivées en test sauf exception, et avec SPAM_LIMITS=0). */
+  spamLimits: process.env.SPAM_LIMITS !== '0' && process.env.NODE_ENV !== 'test',
   adminEmails: (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
