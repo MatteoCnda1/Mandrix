@@ -10,17 +10,17 @@ PWA sociale auto-hébergée (homelab Proxmox + NAS), installable sur téléphone
 | --- | --- |
 | **Fil** | Stories 24 h, photos, vidéos, sondages (choix, photos, curseur emoji), j'aime, commentaires, republication |
 | **Reels** | Vidéos verticales en plein écran, défilement tactile / molette / clavier |
-| **La Pellicule** | Appareil photo intégré : les photos restent scellées (même pour leur auteur) jusqu'au dimanche 20h, série de semaines |
-| **Déballage** | Ouverture des photos de la semaine (cartes qui se retournent), récap du top 3, envoi dans le pool |
+| **La Pellicule** | Appareil photo intégré : photos scellées (même pour leur auteur) jusqu'au dimanche 20h, série de semaines, « Moment Mandrix » quotidien à heure aléatoire, envoi différé des photos prises hors ligne |
+| **Déballage** | Ouverture des photos de la semaine (cartes qui se retournent), badge « pile à l'heure », récap du top 3, rétrospective animée, album à télécharger (zip) |
 | **Make It Friends** | Jeu multijoueur temps réel (2 à 8) : une image tirée du pool, une légende, tout le monde vote |
 | **Galerie des mèmes** | Podium des mèmes les plus aimés |
 | **Profil** | Statistiques, série, amis, code de parrainage, mode sombre, notifications push, installation, modération (admin) |
-| **Messages** | Discussions privées entre amis, réponses aux stories, invitations aux salons |
+| **Messages** | Discussions privées et groupes entre amis, réponses aux stories (avec la photo), invitations aux salons |
 
 ## Stack
 
 - **Front** : React 19, Vite 7, TypeScript, Tailwind CSS 4, TanStack Query, Zustand, `vite-plugin-pwa` (Workbox)
-- **Back** : Node 24, Fastify 5, Socket.io 4, Drizzle ORM, PostgreSQL 17, sharp (images), web-push
+- **Back** : Node 24, Fastify 5, Socket.io 4, Drizzle ORM, PostgreSQL 17, sharp (images), ffmpeg (vidéos), web-push
 - **Déploiement** : Docker Compose sur une VM Proxmox, médias et sauvegardes sur le NAS (NFS), Cloudflare Tunnel
 
 ## Structure

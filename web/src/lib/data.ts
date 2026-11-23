@@ -4,6 +4,7 @@ import type {
   Badges,
   Comment,
   Conversation,
+  ConversationDetail,
   FriendsList,
   InviteInfo,
   Me,
@@ -88,7 +89,7 @@ export const useUserSearch = (q: string) =>
   });
 export const useConversations = () => useQuery({ queryKey: ['conversations'], queryFn: () => api<Conversation[]>('/api/conversations') });
 export const useConversation = (id: string) =>
-  useQuery({ queryKey: ['conversation', id], queryFn: () => api<{ id: string; user: UserLite }>(`/api/conversations/${id}`) });
+  useQuery({ queryKey: ['conversation', id], queryFn: () => api<ConversationDetail>(`/api/conversations/${id}`) });
 export const useMessages = (id: string) =>
   useQuery({ queryKey: ['messages', id], queryFn: () => api<Message[]>(`/api/conversations/${id}/messages`) });
 export const useNotifications = (enabled = true) =>

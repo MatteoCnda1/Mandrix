@@ -10,6 +10,7 @@ import { startJobs } from './jobs.js';
 import { authHook } from './lib/auth.js';
 import { HttpError } from './lib/http.js';
 import { initPush } from './lib/push.js';
+import { resumeVideoQueue } from './lib/video.js';
 import { attachSocket } from './realtime/socket.js';
 import authRoutes from './routes/auth.js';
 import mediaRoutes from './routes/media.js';
@@ -88,6 +89,7 @@ async function main() {
 
   attachSocket(app);
   startJobs();
+  resumeVideoQueue().catch((e) => console.error('[video] reprise', e));
 
   await app.listen({ port: env.port, host: env.host });
   console.log(`Mandrix prêt sur http://${env.host}:${env.port} (${hasWeb ? 'PWA servie' : 'API seule'})`);

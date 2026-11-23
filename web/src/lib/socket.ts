@@ -41,10 +41,19 @@ export function connectSocket() {
       for (const k of [['friends'], ['feed'], ['stories'], ['profile']]) qc.invalidateQueries({ queryKey: k });
     }
     if (n.type === 'unpack') qc.invalidateQueries({ queryKey: ['unpack'] });
+    if (n.type === 'moment') {
+      qc.invalidateQueries({ queryKey: ['pellicule'] });
+      toast('C’est le moment Mandrix : 10 minutes pour ta photo 📸');
+    }
+  });
+  socket.on('media:ready', () => {
+    for (const k of [['feed'], ['reels'], ['stories'], ['user-posts'], ['post'], ['memes']]) qc.invalidateQueries({ queryKey: k });
   });
   socket.on('dm:new', (m: Message) => {
     qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => (old && !old.some((x) => x.id === m.id) ? [...old, m] : old));
     qc.invalidateQueries({ queryKey: ['conversations'] });
+    // Évènement de groupe (ajout, départ, nouveau nom) : on recharge la fiche du groupe.
+    if (m.meta?.type === 'system') qc.invalidateQueries({ queryKey: ['conversation', m.conversationId] });
   });
   return socket;
 }

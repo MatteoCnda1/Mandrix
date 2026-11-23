@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db, schema } from '../db/index.js';
 import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
-import { mediaRef } from '../lib/media.js';
+import { MEDIA_SQL_COLUMNS, mediaRef } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
 
@@ -54,12 +54,12 @@ export async function drawPool(opts: {
       const circle = new Set([...opts.playerIds, ...(await friendIds(opts.hostId))]);
       filter = sql`pi.owner_id = any(${uuidArray([...circle])})`;
     }
-    return db.execute<{ id: string; mediaId: string; kind: string; width: number | null; height: number | null; username: string; ownerId: string; draws: number }>(sql`
-      select pi.id, pi.media_id as "mediaId", m.kind, m.width, m.height, u.username, pi.owner_id as "ownerId", pi.draws
+    return db.execute<{ id: string; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; username: string; ownerId: string; draws: number }>(sql`
+      select pi.id, pi.media_id as "mediaId", m.kind, m.width, m.height, ${sql.raw(MEDIA_SQL_COLUMNS)}, u.username, pi.owner_id as "ownerId", pi.draws
       from pool_items pi
       join media m on m.id = pi.media_id
       join users u on u.id = pi.owner_id
-      where pi.status = 'active' and (m.sealed_until is null or m.sealed_until <= now())
+      where pi.status = 'active' and m.status <> 'processing' and (m.sealed_until is null or m.sealed_until <= now())
         and ${filter} and not (pi.id = any(${uuidArray(opts.exclude)}))
       order by random() limit ${opts.count}`);
   };
@@ -75,7 +75,7 @@ export async function drawPool(opts: {
   }
   return rows.map((r) => ({
     itemId: r.id,
-    media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height })!,
+    media: mediaRef({ id: r.mediaId, kind: r.kind, width: r.width, height: r.height, duration: r.mediaDuration, hasPoster: r.mediaPoster })!,
     by: `@${r.username}`,
   }));
 }

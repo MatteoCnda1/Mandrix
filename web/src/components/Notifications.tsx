@@ -4,6 +4,7 @@ import {
   Fire,
   GameController,
   Heart,
+  Lightning,
   LockSimple,
   Package,
   Repeat,
@@ -67,6 +68,12 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
       return {
         icon: <Fire size={18} weight="fill" className="text-heart" />,
         text: <>Ta série est en jeu : pense à ta photo avant dimanche</>,
+        action: { label: 'Photo', run: () => nav('/pellicule') },
+      };
+    case 'moment':
+      return {
+        icon: <Lightning size={18} weight="fill" className="text-ember" />,
+        text: <>C’est le moment Mandrix : 10 minutes pour ta photo</>,
         action: { label: 'Photo', run: () => nav('/pellicule') },
       };
     case 'invite_joined':

@@ -102,6 +102,16 @@ html[data-theme='dark'] {
   --animate-drop: mxDrop 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
   --animate-grow: mxGrow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-spin-slow: spin 1.2s linear infinite;
+  --animate-ken: mxKen 3.2s ease-out both;
+
+  @keyframes mxKen {
+    from {
+      transform: scale(1.14);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
 
   @keyframes mxIn {
     from {
@@ -275,6 +285,16 @@ html[data-theme='dark'] {
 
 /* ——— Base (dans la couche « base » pour que les utilitaires Tailwind gardent la priorité) ——— */
 @layer base {
+  :root {
+    --safe-b: env(safe-area-inset-bottom);
+  }
+  /* Clavier ouvert : il recouvre déjà la zone de l'indicateur d'accueil, et la barre d'onglets se masque. */
+  .kb-open {
+    --safe-b: 0px;
+  }
+  .kb-open .kb-hide {
+    display: none !important;
+  }
   /* Le fond est porté par <html> (canevas) : un fond sur <body> masquerait l'aurore en z-index négatif. */
   html {
     background: var(--page);

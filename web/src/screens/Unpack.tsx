@@ -1,8 +1,22 @@
 import type { Shot } from '@mandrix/shared';
-import { ArrowCounterClockwise, CaretLeft, CaretRight, CheckCircle, Heart, LockSimple, Package, Sticker, X } from '@phosphor-icons/react';
+import {
+  ArrowClockwise,
+  ArrowCounterClockwise,
+  CaretLeft,
+  CaretRight,
+  CheckCircle,
+  DownloadSimple,
+  Heart,
+  Lightning,
+  LockSimple,
+  Package,
+  Play,
+  Sticker,
+  X,
+} from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
-import { Avatar, MediaView, ScreenLoader, cx } from '../components/ui';
-import { removeFromPool, sendToPool, toggleShotLike, useUnpack } from '../lib/data';
+import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
+import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { openPool } from '../lib/store';
@@ -34,6 +48,7 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
             <div className="truncate text-[15px] font-bold">{shot.author.displayName}</div>
             <div className="text-[13px] text-fog">
               {shot.day} · {new Date(shot.takenAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              {shot.onTime && <span className="ml-1.5 font-bold text-ember">· ⚡ pile à l’heure</span>}
             </div>
           </div>
           <button type="button" aria-label="Fermer" onClick={onClose} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
@@ -79,8 +94,125 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
   );
 }
 
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+/** Rétrospective de la semaine : diaporama plein écran façon stories, puis le top 3. */
+function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; label: string; onClose: () => void }) {
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const last = photos.length; // dernière diapositive : le top 3
+  const go = (d: number) => setI((x) => Math.max(0, Math.min(last, x + d)));
+
+  useEffect(() => {
+    if (paused || i >= last) return;
+    const t = setTimeout(() => go(1), 2800);
+    return () => clearTimeout(t);
+  }, [i, paused, last]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') go(-1);
+      if (e.key === ' ') setPaused((p) => !p);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const shot = photos[i];
+  const next = photos[i + 1];
+  return (
+    <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.94)] p-3" role="dialog" aria-modal="true" aria-label={`Rétrospective : ${label}`}>
+      <div className="relative h-[min(88vh,820px)] w-full max-w-[460px] animate-drop overflow-hidden rounded-[36px] bg-night">
+        {shot ? (
+          <>
+            <div key={shot.id} className="absolute inset-0 overflow-hidden">
+              <img src={shot.media.url} alt="" className="h-full w-full animate-ken object-cover" />
+            </div>
+            {next && <link rel="prefetch" href={next.media.url} />}
+            <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/75 to-transparent" />
+            <div className="absolute right-5 bottom-6 left-5 flex items-center gap-3 text-white">
+              <Avatar user={shot.author} size={44} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[17px] font-extrabold">{shot.author.displayName}</div>
+                <div className="text-[13px] text-fog">
+                  {shot.day} · {timeOf(shot.takenAt)}
+                  {shot.onTime && <span className="ml-1.5 font-bold text-ember">⚡ pile à l’heure</span>}
+                </div>
+              </div>
+              <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-bold backdrop-blur">
+                <Heart size={14} weight="fill" className="text-heartlite" /> {fmtCount(shot.likes)}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-5 bg-gradient-to-b from-[#0E2A47] to-night px-6 text-center text-white">
+            <div className="text-[13px] font-bold tracking-wide text-ice uppercase">{label}</div>
+            <div className="text-[28px] leading-tight font-extrabold tracking-[-.03em]">Le top de la semaine</div>
+            <div className="grid w-full grid-cols-3 gap-2.5">
+              {top.map((t, k) => (
+                <div key={t.id} className="relative aspect-[3/4] overflow-hidden rounded-[20px] bg-white/10">
+                  <img src={t.media.url} alt="" className="h-full w-full object-cover" />
+                  <span className={cx('absolute top-2 left-2 grid h-8 w-8 place-items-center rounded-full text-sm font-extrabold', k === 0 ? 'bg-brand text-white' : 'bg-white text-night')}>
+                    {k + 1}
+                  </span>
+                  <span className="absolute inset-x-1.5 bottom-1.5 truncate rounded-full bg-black/55 px-2 py-1 text-[11px] font-bold">@{t.author.username}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-sm text-fog">{plural(photos.length, 'photo', 'photos')} cette semaine. Rendez-vous dimanche prochain !</div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setI(0)} className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-5 text-[15px] font-bold text-white">
+                <ArrowClockwise size={18} /> Revoir
+              </button>
+              <button type="button" onClick={onClose} className="tap h-12 rounded-3xl border-0 bg-white px-6 text-[15px] font-bold text-night">
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="absolute top-3.5 right-[18px] left-[18px] h-1 overflow-hidden rounded-sm bg-white/20">
+          <div className="h-full rounded-sm bg-white transition-[width] duration-300" style={{ width: `${((i + 1) / (last + 1)) * 100}%` }} />
+        </div>
+        <div className="absolute top-7 right-3.5 left-5 flex items-center gap-2 text-white">
+          <span className="text-[13px] font-bold tabular-nums [text-shadow:0_1px_8px_rgba(0,0,0,.5)]">
+            {Math.min(i + 1, last)}/{last}
+          </span>
+          {paused && shot && <span className="rounded-full bg-black/40 px-2.5 py-1 text-xs font-bold">En pause</span>}
+          <button type="button" aria-label="Fermer la rétrospective" onClick={onClose} className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur">
+            <X size={20} />
+          </button>
+        </div>
+        {shot && (
+          <>
+            <button type="button" aria-label="Photo précédente" onClick={() => go(-1)} className="absolute top-20 bottom-28 left-0 w-[30%] cursor-pointer border-0 bg-transparent" />
+            <button
+              type="button"
+              aria-label="Photo suivante (maintenir pour mettre en pause)"
+              onClick={() => go(1)}
+              onPointerDown={() => setPaused(true)}
+              onPointerUp={() => setPaused(false)}
+              onPointerLeave={() => setPaused(false)}
+              className="absolute top-20 right-0 bottom-28 w-[70%] cursor-pointer border-0 bg-transparent"
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function Unpack() {
   const { data, isLoading } = useUnpack();
+  const { data: me } = useMe();
+  const [retro, setRetro] = useState(false);
   const now = useNow(1000);
   const [revealed, setRevealed] = useState(false);
   const [viewer, setViewer] = useState<number | null>(null);
@@ -173,6 +305,35 @@ export function Unpack() {
           </div>
           <button
             type="button"
+            onClick={() => setRetro(true)}
+            className="tap flex h-[52px] items-center justify-center gap-2 rounded-[26px] border-0 bg-brand text-[15px] font-bold text-white shadow-blue transition-transform active:scale-[.97]"
+          >
+            <Play size={20} weight="fill" />
+            <span>Rétrospective de la semaine</span>
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            {r.photos.some((p) => p.author.id === me?.id) && (
+              <a
+                href={`/api/pellicule/archive?revealAt=${encodeURIComponent(r.revealAt)}&scope=mine`}
+                download
+                className="tap flex h-12 items-center justify-center gap-2 rounded-3xl bg-soft text-sm font-bold text-ink no-underline hover:text-ink active:scale-[.97]"
+              >
+                <DownloadSimple size={18} /> Mes photos
+              </a>
+            )}
+            <a
+              href={`/api/pellicule/archive?revealAt=${encodeURIComponent(r.revealAt)}&scope=all`}
+              download
+              className={cx(
+                'tap flex h-12 items-center justify-center gap-2 rounded-3xl bg-soft text-sm font-bold text-ink no-underline hover:text-ink active:scale-[.97]',
+                !r.photos.some((p) => p.author.id === me?.id) && 'col-span-2',
+              )}
+            >
+              <DownloadSimple size={18} /> Tout l’album
+            </a>
+          </div>
+          <button
+            type="button"
             onClick={sendTop}
             disabled={topSending}
             className={cx(
@@ -209,6 +370,11 @@ export function Unpack() {
                     onClick={() => open && setViewer(i)}
                   >
                     {open && <MediaView media={ph.media} className="absolute inset-0" />}
+                    {open && ph.onTime && (
+                      <span className="absolute top-2 left-2 flex h-7 items-center gap-1 rounded-full bg-gradient-to-r from-ember to-heart px-2.5 text-[11px] font-extrabold text-white shadow-[0_4px_12px_rgba(229,72,77,.35)]">
+                        <Lightning size={12} weight="fill" /> Pile à l’heure
+                      </span>
+                    )}
                     <div className="relative flex items-center gap-1.5">
                       <span className="flex h-9 min-w-0 flex-1 items-center truncate rounded-[18px] bg-card px-3 text-xs font-bold">
                         @{ph.author.username} · {ph.day}
@@ -239,7 +405,16 @@ export function Unpack() {
           Cette semaine : {plural(data.current.count, 'photo scellée', 'photos scellées')} par {plural(data.current.people, 'personne', 'personnes')}
         </div>
       )}
-      {viewer !== null && r && <ShotViewer photos={r.photos} index={viewer} onClose={() => setViewer(null)} />}
+      {viewer !== null && r && (
+        <Portal>
+          <ShotViewer photos={r.photos} index={viewer} onClose={() => setViewer(null)} />
+        </Portal>
+      )}
+      {retro && r && (
+        <Portal>
+          <Retro photos={r.photos} top={r.top} label={r.weekLabel} onClose={() => setRetro(false)} />
+        </Portal>
+      )}
     </div>
   );
 }

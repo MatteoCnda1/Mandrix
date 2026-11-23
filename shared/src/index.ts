@@ -55,6 +55,12 @@ export interface MediaRef {
   kind: 'image' | 'video';
   width: number | null;
   height: number | null;
+  /** Miniature (vidéos). */
+  poster: string | null;
+  /** Durée en secondes (vidéos). */
+  duration: number | null;
+  /** Vidéo en cours de transcodage. */
+  processing: boolean;
 }
 
 export type PostKind = 'photo' | 'video' | 'poll' | 'meme';
@@ -132,9 +138,16 @@ export interface PoolStats {
 
 // ——— Pellicule ———
 
+export interface MomentInfo {
+  at: string;
+  endsAt: string;
+}
+
 export interface PelliculeState {
   nextRevealAt: string;
   weekLabel: string;
+  /** « Moment Mandrix » en cours (10 minutes pour prendre sa photo). */
+  moment: MomentInfo | null;
   mine: { total: number; days: number[] };
   current: { count: number; people: number };
   streak: StreakInfo;
@@ -149,6 +162,8 @@ export interface Shot {
   likes: number;
   liked: boolean;
   pool: PoolScope | null;
+  /** Prise pendant le « Moment Mandrix ». */
+  onTime: boolean;
 }
 
 export interface UnpackState {
@@ -170,7 +185,10 @@ export interface UnpackState {
 
 export type MessageMeta =
   | { type: 'game_invite'; code: string }
-  | { type: 'story_reply'; storyId: ID }
+  /** Réponse à une story : la photo (ou vidéo) concernée est gardée pour l'afficher dans la conversation. */
+  | { type: 'story_reply'; storyId: ID; media?: MediaRef | null }
+  /** Évènement de groupe (création, ajout, départ, renommage), affiché au centre. */
+  | { type: 'system' }
   | null;
 
 export interface Message {
@@ -184,9 +202,35 @@ export interface Message {
 
 export interface Conversation {
   id: ID;
-  user: UserLite;
-  last: { text: string; at: string; mine: boolean } | null;
+  isGroup: boolean;
+  /** Nom du groupe (null : on affiche les prénoms des membres). */
+  title: string | null;
+  /** Interlocuteur d'une conversation à deux. */
+  user: UserLite | null;
+  /** Autres membres (sans moi). */
+  members: UserLite[];
+  last: { text: string; at: string; mine: boolean; sender: string | null; system: boolean } | null;
   unread: boolean;
+}
+
+export interface ConversationDetail {
+  id: ID;
+  isGroup: boolean;
+  title: string | null;
+  user: UserLite | null;
+  /** Tous les membres, moi compris. */
+  members: UserLite[];
+  createdBy: ID | null;
+}
+
+export const GROUP_MAX_MEMBERS = 20;
+
+/** Nom affiché d'une conversation : titre du groupe, sinon prénoms des membres. */
+export function conversationName(c: { isGroup: boolean; title: string | null; user: UserLite | null; members: UserLite[] }, meId?: ID): string {
+  if (!c.isGroup) return c.user?.displayName ?? 'Conversation';
+  if (c.title) return c.title;
+  const names = c.members.filter((m) => m.id !== meId).map((m) => m.displayName.split(' ')[0]);
+  return names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', ') || 'Groupe';
 }
 
 // ——— Notifications ———
@@ -203,7 +247,8 @@ export type NotificationType =
   | 'pool_drawn'
   | 'streak'
   | 'shot_like'
-  | 'invite_joined';
+  | 'invite_joined'
+  | 'moment';
 
 export interface AppNotification {
   id: ID;
@@ -311,6 +356,7 @@ export interface ServerToClientEvents {
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
   badges: (b: Badges) => void;
+  'media:ready': (mediaId: ID) => void;
 }
 
 export interface ClientToServerEvents {

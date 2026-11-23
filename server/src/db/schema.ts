@@ -5,6 +5,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -58,9 +59,17 @@ export const media = pgTable(
     size: integer('size').notNull(),
     /** Média scellé (photo de la Pellicule) : inaccessible avant cette date. */
     sealedUntil: ts('sealed_until'),
+    /** Vidéos : « processing » pendant le transcodage, puis « ready » (ou « failed »). */
+    status: text('status').$type<'ready' | 'processing' | 'failed'>().notNull().default('ready'),
+    /** Fichier d'origine en attente de transcodage. */
+    sourcePath: text('source_path'),
+    /** Miniature WebP d'une vidéo. */
+    posterPath: text('poster_path'),
+    /** Durée d'une vidéo, en secondes. */
+    duration: real('duration'),
     createdAt: created(),
   },
-  (t) => [index('media_owner_idx').on(t.ownerId)],
+  (t) => [index('media_owner_idx').on(t.ownerId), index('media_status_idx').on(t.status)],
 );
 
 export const friendships = pgTable(
@@ -183,8 +192,16 @@ export const shots = pgTable(
     mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
     takenAt: ts('taken_at').defaultNow().notNull(),
     revealAt: ts('reveal_at').notNull(),
+    /** Identifiant généré par l'appareil : évite les doublons lors des envois différés. */
+    clientId: text('client_id'),
+    /** Photo prise dans les 10 minutes du « Moment Mandrix ». */
+    onTime: boolean('on_time').notNull().default(false),
   },
-  (t) => [index('shots_reveal_idx').on(t.revealAt), index('shots_user_idx').on(t.userId, t.revealAt)],
+  (t) => [
+    index('shots_reveal_idx').on(t.revealAt),
+    index('shots_user_idx').on(t.userId, t.revealAt),
+    uniqueIndex('shots_client_idx').on(t.userId, t.clientId),
+  ],
 );
 
 export const shotLikes = pgTable(
@@ -242,12 +259,26 @@ export const conversations = pgTable(
   'conversations',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userA: uuid('user_a').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    userB: uuid('user_b').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    /** Conversations à deux uniquement (paire triée) ; null pour les groupes. */
+    userA: uuid('user_a').references(() => users.id, { onDelete: 'cascade' }),
+    userB: uuid('user_b').references(() => users.id, { onDelete: 'cascade' }),
+    isGroup: boolean('is_group').notNull().default(false),
+    title: text('title'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     lastMessageAt: ts('last_message_at').defaultNow().notNull(),
     createdAt: created(),
   },
   (t) => [uniqueIndex('conversations_pair_idx').on(t.userA, t.userB), index('conversations_b_idx').on(t.userB)],
+);
+
+export const conversationMembers = pgTable(
+  'conversation_members',
+  {
+    conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    joinedAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.conversationId, t.userId] }), index('conversation_members_user_idx').on(t.userId)],
 );
 
 export const conversationReads = pgTable(

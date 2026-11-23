@@ -33,6 +33,7 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
         <video
           ref={ref}
           src={post.media.url}
+          poster={post.media.poster ?? undefined}
           muted={muted}
           loop
           playsInline

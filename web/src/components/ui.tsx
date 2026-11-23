@@ -1,6 +1,7 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
-import { X } from '@phosphor-icons/react';
+import { CircleNotch, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { twMerge } from 'tailwind-merge';
 import { useUI } from '../lib/store';
 
@@ -111,8 +112,13 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
     else setDragY(0);
   };
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal="true">
+  return createPortal(
+    <div
+      className="fixed inset-x-0 z-40 flex items-end justify-center"
+      style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
+      role="dialog"
+      aria-modal="true"
+    >
       <div
         onClick={dismiss}
         className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.5)] transition-opacity duration-200"
@@ -120,13 +126,13 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
       />
       <div
         className={cx(
-          'relative flex max-h-[86vh] w-full flex-col gap-3 overflow-auto rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
+          'relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
           wide ? 'max-w-[640px]' : 'max-w-[560px]',
         )}
         style={{
           // « backwards » : l'animation d'entrée ne bloque pas la transformation du glisser.
           animation: 'mxSheet .45s cubic-bezier(.2,.9,.2,1) backwards',
-          paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+          paddingBottom: 'calc(18px + var(--safe-b))',
           transform: closing ? 'translateY(100%)' : dragY ? `translateY(${dragY}px)` : undefined,
           transition: drag.current ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
         }}
@@ -148,8 +154,15 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
+}
+
+/** Affiche un calque plein écran à la racine du document : il reste au-dessus de tout
+ * (barre d'onglets comprise), même si l'écran parent est animé. */
+export function Portal({ children }: { children: ReactNode }) {
+  return createPortal(children, document.body);
 }
 
 // ——— Feuille d'actions de confirmation (remplace window.confirm, HIG) ———
@@ -268,11 +281,13 @@ export function MediaView({ media, className, style, controls, autoPlay, muted =
   videoRef?: React.Ref<HTMLVideoElement>;
 }) {
   const fitCls = fit === 'cover' ? 'object-cover' : 'object-contain';
+  if (media.kind === 'video' && media.processing) return <VideoProcessing className={className} style={style} />;
   if (media.kind === 'video') {
     return (
       <video
         ref={videoRef}
         src={media.url}
+        poster={media.poster ?? undefined}
         className={cx('h-full w-full', fitCls, className)}
         style={style}
         controls={controls}
@@ -286,6 +301,22 @@ export function MediaView({ media, className, style, controls, autoPlay, muted =
     );
   }
   return <img src={media.url} alt="" loading="lazy" decoding="async" className={cx('h-full w-full', fitCls, className)} style={style} onClick={onClick} />;
+}
+
+/** Vidéo en cours de transcodage sur le serveur. */
+export function VideoProcessing({ className, style }: { className?: string; style?: CSSProperties }) {
+  return (
+    <div className={cx('phdark flex h-full w-full flex-col items-center justify-center gap-2 text-center text-[13px] font-bold text-white/85', className)} style={style}>
+      <CircleNotch size={28} className="animate-spin" />
+      <span>Vidéo en cours de préparation…</span>
+    </div>
+  );
+}
+
+export function fmtDuration(sec: number | null | undefined) {
+  if (!sec || !Number.isFinite(sec)) return null;
+  const s = Math.round(sec);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 /** Ratio d'affichage d'un média, borné pour rester lisible dans le fil. */

@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router';
 import { deletePost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
 import { fmtCount, plural, timeAgo } from '../lib/format';
 import { openPool, useUI } from '../lib/store';
-import { Avatar, confirmAction, cx, MediaView, ratioOf } from './ui';
+import { Avatar, confirmAction, cx, fmtDuration, MediaView, ratioOf, VideoProcessing } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -169,7 +169,15 @@ function PollSlider({ post }: { post: Post }) {
 
 function VideoTeaser({ post }: { post: Post }) {
   const nav = useNavigate();
-  const [dur, setDur] = useState<string | null>(null);
+  const media = post.media!;
+  const [dur, setDur] = useState<string | null>(fmtDuration(media.duration));
+  if (media.processing) {
+    return (
+      <div className="overflow-hidden rounded-3xl" style={{ aspectRatio: ratioOf(media, '4 / 5') }}>
+        <VideoProcessing />
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -178,17 +186,18 @@ function VideoTeaser({ post }: { post: Post }) {
       className="tap phdark relative grid w-full place-items-center overflow-hidden rounded-3xl border-0 p-0"
       style={{ aspectRatio: ratioOf(post.media, '4 / 5') }}
     >
-      <video
-        src={`${post.media!.url}#t=0.1`}
-        muted
-        playsInline
-        preload="metadata"
-        className="absolute inset-0 h-full w-full object-cover"
-        onLoadedMetadata={(e) => {
-          const d = Math.round(e.currentTarget.duration);
-          if (Number.isFinite(d)) setDur(`${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}`);
-        }}
-      />
+      {media.poster ? (
+        <img src={media.poster} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <video
+          src={`${media.url}#t=0.1`}
+          muted
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover"
+          onLoadedMetadata={(e) => setDur(fmtDuration(e.currentTarget.duration))}
+        />
+      )}
       <span className="relative grid h-[68px] w-[68px] place-items-center rounded-full bg-white text-night transition-transform duration-[250ms] ease-spring hover:scale-110">
         <Play size={26} weight="fill" />
       </span>

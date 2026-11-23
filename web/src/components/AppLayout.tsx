@@ -75,7 +75,7 @@ function BottomNav() {
   const { pathname } = useLocation();
   return (
     <nav
-      className="glass-bar fixed left-1/2 z-20 flex w-[min(440px,calc(100vw-20px))] -translate-x-1/2 gap-0.5 rounded-[34px] p-1.5"
+      className="glass-bar kb-hide fixed left-1/2 z-20 flex w-[min(440px,calc(100vw-20px))] -translate-x-1/2 gap-0.5 rounded-[34px] p-1.5"
       style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))' }}
       aria-label="Navigation principale"
     >
@@ -260,6 +260,8 @@ export function AppLayout() {
   const { isPhone, isDesktop } = useViewport();
   const { pathname } = useLocation();
   const wide = pathname.startsWith('/deballage') || pathname.startsWith('/jeu/galerie');
+  // Conversation sur téléphone : plein écran comme Messages d'iOS (sans en-tête ni onglets).
+  const immersive = isPhone && /^\/messages\/[^/]+/.test(pathname);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -273,12 +275,12 @@ export function AppLayout() {
       >
         {!isPhone && <SideNav desktop={isDesktop} />}
         <main className="min-w-0 flex-1 pb-[110px]" style={{ maxWidth: wide ? 860 : 620 }}>
-          <Header isPhone={isPhone} />
+          {!immersive && <Header isPhone={isPhone} />}
           <Outlet />
         </main>
         {isDesktop && <Aside />}
       </div>
-      {isPhone && <BottomNav />}
+      {isPhone && !immersive && <BottomNav />}
       <Overlays />
       <Toast />
     </div>

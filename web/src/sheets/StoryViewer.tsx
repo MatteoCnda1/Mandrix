@@ -100,8 +100,14 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   };
 
   return (
-    <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.92)] p-3" role="dialog" aria-modal="true" aria-label={`Story de ${group.user.displayName}`}>
-      <div className="phdark relative grid h-[min(86vh,760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]">
+    <div
+      className="fixed inset-x-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.92)] p-3"
+      style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Story de ${group.user.displayName}`}
+    >
+      <div className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-24px),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]">
         <MediaView
           key={story.id}
           media={story.media}

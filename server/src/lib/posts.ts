@@ -1,7 +1,7 @@
 import type { Poll, PollKind, PoolScope, Post, PostKind } from '@mandrix/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { mediaRef } from './media.js';
+import { MEDIA_SQL_COLUMNS, mediaRef } from './media.js';
 import { usersByIds, uuidArray } from './users.js';
 
 interface PostRow extends Record<string, unknown> {
@@ -16,6 +16,9 @@ interface PostRow extends Record<string, unknown> {
   mediaKind: string | null;
   mediaW: number | null;
   mediaH: number | null;
+  mediaStatus: string | null;
+  mediaDuration: number | null;
+  mediaPoster: boolean | null;
   likes: number;
   comments: number;
   reposts: number;
@@ -48,7 +51,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
   const rows = await db.execute<PostRow>(sql`
     select p.id, p.kind, p.poll_kind as "pollKind", p.text, p.location, p.created_at as "createdAt",
       p.author_id as "authorId", p.media_id as "mediaId",
-      m.kind as "mediaKind", m.width as "mediaW", m.height as "mediaH",
+      m.kind as "mediaKind", m.width as "mediaW", m.height as "mediaH", ${sql.raw(MEDIA_SQL_COLUMNS)},
       (select count(*)::int from likes l where l.post_id = p.id) as likes,
       (select count(*)::int from comments c where c.post_id = p.id) as comments,
       (select count(*)::int from reposts r where r.post_id = p.id) as reposts,
@@ -76,7 +79,9 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     kind: r.kind,
     author: usersMap.get(r.authorId)!,
     text: r.text,
-    media: r.mediaId ? mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH }) : null,
+    media: r.mediaId
+      ? mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH, status: r.mediaStatus, duration: r.mediaDuration, hasPoster: r.mediaPoster })
+      : null,
     location: r.location,
     createdAt: new Date(r.createdAt).toISOString(),
     likes: r.likes,

@@ -5,6 +5,7 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { CacheFirst } from 'workbox-strategies';
+import { flushQueue, SYNC_TAG } from './lib/pelliculeQueue';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | { url: string; revision: string | null })[] };
 
@@ -32,6 +33,12 @@ registerRoute(
     plugins: [new CacheableResponsePlugin({ statuses: [200] }), new ExpirationPlugin({ maxEntries: 500, maxAgeSeconds: 30 * 24 * 3600 })],
   }),
 );
+
+// Photos de la Pellicule prises hors ligne : envoyées dès que le réseau revient, même app fermée.
+self.addEventListener('sync', (event) => {
+  const e = event as Event & { tag?: string; waitUntil(p: Promise<unknown>): void };
+  if (e.tag === SYNC_TAG) e.waitUntil(flushQueue());
+});
 
 interface PushData {
   title?: string;
