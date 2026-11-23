@@ -48,7 +48,11 @@ describe('conversation en temps réel', () => {
     c.on('dm:typing', () => (leaked = true));
     const got = next<TypingEvent>(b, 'dm:typing');
     a.emit('dm:typing', convId, true);
-    expect(await got).toEqual({ conversationId: convId, userId: lea.id, typing: true });
+    expect(await got).toEqual({ conversationId: convId, userId: lea.id, typing: true, activity: 'text' });
+    // Enregistrement d'un vocal : l'activité suit.
+    const voice = next<TypingEvent>(b, 'dm:typing');
+    a.emit('dm:typing', convId, true, 'voice');
+    expect((await voice).activity).toBe('voice');
     // Maya n'est pas dans la conversation : même en essayant, rien ne part.
     c.emit('dm:typing', convId, true);
     await wait(150);
