@@ -179,6 +179,8 @@ export async function createRoom(userId: string) {
   };
   rooms.set(room.code, room);
   userRoom.set(userId, room.code);
+  // Diffuse l'état (tous les onglets du créateur), en plus de la réponse à la demande.
+  broadcast(room);
   return viewFor(room, userId);
 }
 

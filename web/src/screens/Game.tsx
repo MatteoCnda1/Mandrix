@@ -1,12 +1,12 @@
 import { GAME, type GameRoom } from '@mandrix/shared';
-import { ArrowRight, CheckCircle, Copy, Crown, Flag, HourglassMedium, Images, Play, Plus, Shuffle, SignOut, Timer, Trophy } from '@phosphor-icons/react';
+import { ArrowRight, CheckCircle, CircleNotch, Copy, Crown, Flag, HourglassMedium, Images, Play, Plus, Shuffle, SignOut, Timer, Trophy } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Avatar, MediaView, Podium, PrimaryBtn, Seg, confirmAction, cx } from '../components/ui';
 import { qc, useMe, usePoolStats } from '../lib/data';
 import { useNow } from '../lib/hooks';
 import { gameEmit, useGame } from '../lib/socket';
-import { openSheet, toast } from '../lib/store';
+import { openSheet, toast, useUI } from '../lib/store';
 
 function Hero({ room }: { room?: GameRoom | null }) {
   const { data: pool } = usePoolStats();
@@ -46,29 +46,72 @@ function GalleryButton() {
   );
 }
 
+/** Entre dans un salon (création ou code) et affiche aussitôt son état. */
+async function enterRoom(event: 'game:create' | 'game:join', code?: string) {
+  const room = await (code ? gameEmit<GameRoom>(event, code) : gameEmit<GameRoom>(event));
+  if (room) useGame.setState({ room });
+  return room;
+}
+
+/** Pool vide : on explique et on propose d'y ajouter une photo. */
+function EmptyPoolCard() {
+  return (
+    <div className="card flex flex-col gap-3 p-[18px]">
+      <div className="flex items-center gap-3">
+        <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-tint">
+          <Images size={22} weight="fill" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-[17px] font-extrabold">Le pool est vide</div>
+          <div className="text-sm text-mute">Il faut au moins une photo ou une vidéo dans le pool pour jouer.</div>
+        </div>
+      </div>
+      <PrimaryBtn onClick={() => useUI.getState().openComposer('post', 0, { pool: true })}>
+        <Plus size={18} weight="bold" /> Ajouter une photo au pool
+      </PrimaryBtn>
+      <p className="m-0 px-1 text-[13px] text-mute">Tu peux aussi envoyer un post existant ou une photo du déballage avec le bouton « Pool ».</p>
+    </div>
+  );
+}
+
 function NoRoom() {
   const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const connected = useGame((s) => s.connected);
+  const { data: pool } = usePoolStats();
+  const run = async (event: 'game:create' | 'game:join', c?: string) => {
+    setBusy(true);
+    await enterRoom(event, c);
+    setBusy(false);
+  };
   return (
     <div className="flex animate-in flex-col gap-3.5">
       <Hero />
       <div className="card flex flex-col gap-3 p-[18px]">
         <div className="text-[17px] font-extrabold">Jouer avec tes amis</div>
-        <PrimaryBtn tone="brand" className="h-[60px] rounded-[30px] text-[17px] font-extrabold" onClick={() => gameEmit('game:create')}>
-          <Plus size={20} weight="bold" /> Créer un salon
+        <PrimaryBtn
+          tone="brand"
+          className="h-[60px] rounded-[30px] text-[17px] font-extrabold"
+          disabled={busy || !connected}
+          onClick={() => run('game:create')}
+        >
+          {connected ? <Plus size={20} weight="bold" /> : <CircleNotch size={20} className="animate-spin" />}
+          {connected ? 'Créer un salon' : 'Connexion…'}
         </PrimaryBtn>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (code.trim()) gameEmit('game:join', code.trim());
+            if (code.trim()) run('game:join', code.trim());
           }}
         >
           <input className="field flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code du salon (MDRX-482)" maxLength={8} autoCapitalize="characters" />
-          <button type="submit" className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95">
+          <button type="submit" disabled={busy || !connected || !code.trim()} className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95 disabled:bg-line disabled:text-mute">
             Rejoindre
           </button>
         </form>
       </div>
+      {pool && pool.publicCount === 0 && <EmptyPoolCard />}
       <GalleryButton />
     </div>
   );
@@ -77,10 +120,16 @@ function NoRoom() {
 function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
   const host = room.hostId === meId;
   const enough = room.players.length >= GAME.minPlayers;
+  const { data: pool } = usePoolStats();
+  const emptyPool = (!!room.error && /pool est vide/.test(room.error)) || (room.source === 'public' && pool?.publicCount === 0);
   return (
     <div className="flex animate-in flex-col gap-3.5">
       <Hero />
-      {room.error && <div className="rounded-3xl bg-card px-4 py-3 text-sm font-semibold text-heart shadow-pill">{room.error}</div>}
+      {emptyPool ? (
+        <EmptyPoolCard />
+      ) : (
+        room.error && <div className="rounded-3xl bg-card px-4 py-3 text-sm font-semibold text-heart shadow-pill">{room.error}</div>
+      )}
       <div className="card flex flex-col gap-3.5 p-[18px]">
         <div className="flex items-center gap-2.5">
           <div className="text-[17px] font-extrabold">
@@ -316,7 +365,11 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
   const nav = useNavigate();
   const host = room.hostId === meId;
   const final = room.stage === 'final';
-  const ranking = [...room.players].sort((a, b) => (final ? b.score - a.score : b.roundScore - a.roundScore));
+  // En cas d'égalité, l'auteur du mème gagnant passe devant (podium cohérent avec le mème affiché).
+  const winnerId = room.winner?.author.id;
+  const ranking = [...room.players].sort(
+    (a, b) => (final ? b.score - a.score : b.roundScore - a.roundScore) || Number(b.user.id === winnerId) - Number(a.user.id === winnerId),
+  );
   const lastRound = room.round >= room.rounds;
   const [publishing, setPublishing] = useState(false);
 
@@ -404,7 +457,7 @@ export function Game() {
   useEffect(() => {
     if (!code || !synced || joined.current) return;
     joined.current = true;
-    if (room?.code !== code.toUpperCase()) gameEmit('game:join', code);
+    if (room?.code !== code.toUpperCase()) void enterRoom('game:join', code);
     setParams({}, { replace: true });
   }, [code, synced]); // eslint-disable-line react-hooks/exhaustive-deps
 

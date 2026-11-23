@@ -55,6 +55,10 @@ describe('Make It Friends', () => {
     expect(created.ok).toBe(true);
     const code = created.data!.code;
     expect(code).toMatch(/^MDRX-\d{3}$/);
+    // Le créateur reçoit aussi l'état du salon en temps réel (l'écran s'appuie dessus).
+    await wait(100);
+    expect(state[mathis.username]?.code).toBe(code);
+    expect(state[mathis.username]?.stage).toBe('lobby');
 
     // Le code se tape aussi sans préfixe.
     expect((await emit(b, 'game:join', code.slice(5))).ok).toBe(true);

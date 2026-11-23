@@ -9,7 +9,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 interface UIState {
-  composer: null | { mode: 'post' | 'story'; kind?: 0 | 1 | 2 };
+  composer: null | { mode: 'post' | 'story'; kind?: 0 | 1 | 2; pool?: boolean };
   commentsFor: string | null;
   poolFor: null | { postId?: string; shotId?: string };
   story: null | { group: number; index: number };
@@ -19,7 +19,7 @@ interface UIState {
   /** Une nouvelle version de l'app est prête (service worker en attente). */
   updateReady: boolean;
   applyUpdate: (() => void) | null;
-  openComposer: (mode?: 'post' | 'story', kind?: 0 | 1 | 2) => void;
+  openComposer: (mode?: 'post' | 'story', kind?: 0 | 1 | 2, opts?: { pool?: boolean }) => void;
   closeAll: () => void;
 }
 
@@ -33,7 +33,7 @@ export const useUI = create<UIState>((set) => ({
   installEvent: null,
   updateReady: false,
   applyUpdate: null,
-  openComposer: (mode = 'post', kind) => set({ composer: { mode, kind }, sheet: null }),
+  openComposer: (mode = 'post', kind, opts) => set({ composer: { mode, kind, pool: opts?.pool }, sheet: null }),
   closeAll: () => set({ composer: null, commentsFor: null, poolFor: null, story: null, sheet: null }),
 }));
 
