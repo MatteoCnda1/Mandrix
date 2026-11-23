@@ -23,7 +23,15 @@ const pool = z.enum(['public', 'friends']).nullable().optional();
 const location = z.string().trim().max(60).nullable().optional();
 
 const createSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('photo'), mediaId: uuid, text: z.string().trim().max(280).default(''), location, pool }),
+  z.object({
+    kind: z.literal('photo'),
+    mediaId: uuid,
+    /** Carrousel : jusqu'à 9 photos en plus de la première. */
+    extraMediaIds: z.array(uuid).max(9).default([]),
+    text: z.string().trim().max(280).default(''),
+    location,
+    pool,
+  }),
   z.object({ kind: z.literal('video'), mediaId: uuid, text: z.string().trim().max(280).default(''), location, pool }),
   z.object({
     kind: z.literal('poll'),
@@ -125,10 +133,16 @@ export default async function postRoutes(app: FastifyInstance) {
       const [m] = await db.select().from(media).where(eq(media.id, body.mediaId)).limit(1);
       if (!m || m.ownerId !== me.id) fail(400, 'Média introuvable');
       if (m!.kind !== (body.kind === 'photo' ? 'image' : 'video')) fail(400, body.kind === 'photo' ? 'Ce fichier n’est pas une photo' : 'Ce fichier n’est pas une vidéo');
+      const extra = body.kind === 'photo' ? [...new Set(body.extraMediaIds.filter((id) => id !== body.mediaId))] : [];
+      if (extra.length) {
+        const owned = await db.select({ id: media.id, kind: media.kind }).from(media).where(and(inArray(media.id, extra), eq(media.ownerId, me.id)));
+        if (owned.length !== extra.length || owned.some((o) => o.kind !== 'image')) fail(400, 'Seules tes photos peuvent rejoindre le carrousel');
+      }
       const [p] = await db
         .insert(posts)
         .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null })
         .returning();
+      if (extra.length) await db.insert(schema.postMedia).values(extra.map((mediaId, i) => ({ postId: p.id, mediaId, position: i + 1 })));
       if (body.pool) await upsertPoolItem({ mediaId: body.mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
       await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id });
       await announcePost(me.id, p.id);

@@ -1,5 +1,7 @@
+import fs from 'node:fs/promises';
 import {
   REPORT_HIDE_THRESHOLD,
+  type AdminStats,
   REPORT_REASONS,
   type BlockedUser,
   type FriendSuggestion,
@@ -12,7 +14,7 @@ import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db, schema } from '../db/index.js';
-import { env } from '../env.js';
+import { env, mediaDir } from '../env.js';
 import { randomToken, requireUser, sha256, type AuthUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
 import { mediaRef } from '../lib/media.js';
@@ -296,6 +298,38 @@ export default async function socialRoutes(app: FastifyInstance) {
       .set({ resolvedAt: new Date() })
       .where(and(eq(reports.targetType, body.targetType), eq(reports.targetId, body.targetId), isNull(reports.resolvedAt)));
     return { ok: true };
+  });
+
+  /** Tableau de bord : membres, activité, contenus, stockage. */
+  app.get('/api/admin/stats', async (req): Promise<AdminStats> => {
+    requireAdmin(req);
+    const [r] = await db.execute<{ users: number; active: number; posts: number; messages: number; shots: number; media: string; dbsize: string }>(sql`
+      select
+        (select count(*)::int from users where suspended_at is null) as users,
+        (select count(distinct user_id)::int from sessions where last_seen_at > now() - interval '7 days') as active,
+        (select count(*)::int from posts) as posts,
+        (select count(*)::int from messages where deleted_at is null) as messages,
+        (select count(*)::int from shots) as shots,
+        (select coalesce(sum(size), 0)::bigint from media) as media,
+        pg_database_size(current_database()) as dbsize`);
+    let disk: AdminStats['disk'] = null;
+    try {
+      // Un partage NAS figé ne doit pas bloquer la page : 3 s au plus.
+      const s = await Promise.race([fs.statfs(mediaDir), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('délai')), 3000))]);
+      disk = { totalBytes: s.blocks * s.bsize, freeBytes: s.bavail * s.bsize };
+    } catch {
+      /* stockage indisponible (NAS éteint) */
+    }
+    return {
+      users: r.users,
+      activeWeek: r.active,
+      posts: r.posts,
+      messages: r.messages,
+      shots: r.shots,
+      mediaBytes: Number(r.media),
+      databaseBytes: Number(r.dbsize),
+      disk,
+    };
   });
 
   /** Lien de réinitialisation du mot de passe (1 h, usage unique), à transmettre à la personne. */

@@ -1,4 +1,4 @@
-import type { Poll, PollKind, PoolScope, Post, PostKind, ReactionCount, UserLite } from '@mandrix/shared';
+import type { MediaRef, Poll, PollKind, PoolScope, Post, PostKind, ReactionCount, UserLite } from '@mandrix/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from './media.js';
@@ -114,6 +114,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
 
   const list = [...rows];
   const usersMap = await usersByIds(list.flatMap((r) => [r.authorId, r.repostedById]));
+  const galleries = await loadGalleries(list.filter((r) => r.kind === 'photo').map((r) => r.id));
   const polls = await loadPolls(
     viewerId,
     list.filter((r) => r.kind === 'poll').map((r) => ({ id: r.id, kind: r.pollKind ?? 'text', endsAt: r.pollEndsAt, isPublic: r.pollPublic })),
@@ -141,7 +142,30 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
     myReaction: r.myReaction,
     edited: r.edited,
     sortAt: new Date(r.sortAt).toISOString(),
+    gallery: (() => {
+      const extra = galleries.get(r.id);
+      if (!extra?.length || !r.mediaId) return null;
+      const cover = mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH, status: r.mediaStatus, duration: r.mediaDuration, hasPoster: r.mediaPoster, variants: r.mediaVariants })!;
+      return [cover, ...extra];
+    })(),
   }));
+}
+
+/** Photos supplémentaires des posts « carrousel », dans l'ordre. */
+async function loadGalleries(postIds: string[]) {
+  const map = new Map<string, MediaRef[]>();
+  if (postIds.length === 0) return map;
+  const rows = await db.execute<{ postId: string; id: string; kind: string; width: number | null; height: number | null; variants: number[] | null }>(sql`
+    select pm.post_id as "postId", m.id, m.kind, m.width, m.height, m.variants
+    from post_media pm join media m on m.id = pm.media_id
+    where pm.post_id = any(${uuidArray(postIds)})
+    order by pm.post_id, pm.position`);
+  for (const r of rows) {
+    const list = map.get(r.postId) ?? [];
+    list.push(mediaRef({ id: r.id, kind: r.kind, width: r.width, height: r.height, variants: r.variants })!);
+    map.set(r.postId, list);
+  }
+  return map;
 }
 
 export interface PollRef {

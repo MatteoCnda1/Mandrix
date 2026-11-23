@@ -39,6 +39,8 @@ export const users = pgTable('users', {
   lastSeenAt: ts('last_seen_at'),
   /** Montrer sa présence (sinon, on ne voit pas non plus celle des autres). */
   showPresence: boolean('show_presence').notNull().default(true),
+  /** Anniversaire « MM-JJ » (l'année n'est pas demandée). */
+  birthday: text('birthday'),
   createdAt: created(),
 });
 
@@ -154,6 +156,17 @@ export const likes = pgTable(
     createdAt: created(),
   },
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
+);
+
+/** Photos supplémentaires d'un post (carrousel) ; la première reste dans posts.media_id. */
+export const postMedia = pgTable(
+  'post_media',
+  {
+    postId: uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+    mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.position] }), index('post_media_media_idx').on(t.mediaId)],
 );
 
 export const postReactions = pgTable(
@@ -317,6 +330,8 @@ export const conversationMembers = pgTable(
     joinedAt: created(),
     /** Conversation en sourdine : pas de notification push. */
     muted: boolean('muted').notNull().default(false),
+    /** Épinglée en haut de la liste (date d'épinglage). */
+    pinnedAt: ts('pinned_at'),
   },
   (t) => [primaryKey({ columns: [t.conversationId, t.userId] }), index('conversation_members_user_idx').on(t.userId)],
 );

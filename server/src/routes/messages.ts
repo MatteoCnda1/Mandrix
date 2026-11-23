@@ -117,7 +117,7 @@ async function markRead(conversationId: string, userId: string, announce = true)
 // « En train d'écrire » : relayé aux autres membres, sans passer par la base à chaque frappe.
 const membersCache = new Map<string, { ids: string[]; at: number }>();
 
-export async function relayTyping(userId: string, conversationId: string, typing: boolean) {
+export async function relayTyping(userId: string, conversationId: string, typing: boolean, activity: 'text' | 'voice' = 'text') {
   if (typeof conversationId !== 'string' || !/^[0-9a-f-]{36}$/i.test(conversationId)) return;
   let cached = membersCache.get(conversationId);
   if (!cached || Date.now() - cached.at > 30_000) {
@@ -126,7 +126,8 @@ export async function relayTyping(userId: string, conversationId: string, typing
     if (membersCache.size > 2000) membersCache.clear();
   }
   if (!cached.ids.includes(userId)) return;
-  for (const uid of cached.ids) if (uid !== userId) emitToUser(uid, 'dm:typing', { conversationId, userId, typing: !!typing });
+  const act = activity === 'voice' ? 'voice' : 'text';
+  for (const uid of cached.ids) if (uid !== userId) emitToUser(uid, 'dm:typing', { conversationId, userId, typing: !!typing, activity: act });
 }
 
 /** Publie un message dans une conversation et prévient tous ses membres. */
@@ -250,12 +251,13 @@ export default async function messageRoutes(app: FastifyInstance) {
       mediaDuration: number | null;
       deleted: boolean;
       muted: boolean;
+      pinned: boolean;
       unread: boolean;
     }>(sql`
       select c.id, c.is_group as "isGroup", c.title,
         array(select cm.user_id from conversation_members cm where cm.conversation_id = c.id and cm.user_id <> ${me.id} order by cm.created_at) as members,
         lm.text, lm.created_at as at, lm.sender_id as "senderId", lm.meta,
-        lmm.kind as "mediaKind", lmm.duration as "mediaDuration", (lm.deleted_at is not null) as deleted, mine.muted,
+        lmm.kind as "mediaKind", lmm.duration as "mediaDuration", (lm.deleted_at is not null) as deleted, mine.muted, (mine.pinned_at is not null) as pinned,
         exists(
           select 1 from messages msg where msg.conversation_id = c.id and msg.sender_id <> ${me.id}
             and msg.created_at > coalesce((select r.last_read_at from conversation_reads r where r.conversation_id = c.id and r.user_id = ${me.id}), 'epoch'::timestamptz)
@@ -266,7 +268,7 @@ export default async function messageRoutes(app: FastifyInstance) {
         select m.text, m.created_at, m.sender_id, m.meta, m.media_id, m.deleted_at from messages m where m.conversation_id = c.id order by m.created_at desc limit 1
       ) lm on true
       left join media lmm on lmm.id = lm.media_id
-      order by c.last_message_at desc limit 100`);
+      order by mine.pinned_at desc nulls last, c.last_message_at desc limit 100`);
     const list = [...rows];
     const users = await usersByIds(list.flatMap((r) => [...r.members, r.senderId]));
     const presence = await presenceOf(me, list.filter((r) => !r.isGroup && r.members[0]).map((r) => r.members[0]));
@@ -293,6 +295,7 @@ export default async function messageRoutes(app: FastifyInstance) {
           unread: r.unread,
           muted: r.muted,
           presence: r.isGroup ? null : (presence.get(r.members[0]) ?? null),
+          pinned: r.pinned,
         };
       });
   });
@@ -480,6 +483,25 @@ export default async function messageRoutes(app: FastifyInstance) {
     const changed = await toMessages([updated, ...quoting]);
     for (const uid of await memberIds(m.conversationId)) for (const x of changed) emitToUser(uid, 'dm:update', x);
     return changed[0];
+  });
+
+  /** Épingler en haut de la liste (5 au plus). */
+  app.patch('/api/conversations/:id/pin', async (req) => {
+    const me = requireUser(req);
+    const c = await ownConversation(uuidParam(req.params), me.id);
+    const { pinned } = parse(z.object({ pinned: z.boolean() }), req.body);
+    if (pinned) {
+      const [{ n }] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(conversationMembers)
+        .where(and(eq(conversationMembers.userId, me.id), sql`${conversationMembers.pinnedAt} is not null`, ne(conversationMembers.conversationId, c.id)));
+      if (n >= 5) fail(400, 'Tu peux épingler 5 conversations au plus');
+    }
+    await db
+      .update(conversationMembers)
+      .set({ pinnedAt: pinned ? new Date() : null })
+      .where(and(eq(conversationMembers.conversationId, c.id), eq(conversationMembers.userId, me.id)));
+    return { pinned };
   });
 
   /** Sourdine : plus de notification push pour cette conversation. */

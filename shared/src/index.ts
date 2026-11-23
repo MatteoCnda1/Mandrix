@@ -12,6 +12,8 @@ export interface UserLite {
   avatarUrl: string | null;
   initials: string;
   tone: AvatarTone;
+  /** C'est son anniversaire aujourd'hui (🎂). */
+  birthdayToday?: boolean;
 }
 
 export interface Me extends UserLite {
@@ -22,6 +24,8 @@ export interface Me extends UserLite {
   createdAt: string;
   notificationPrefs: NotificationPrefs;
   showPresence: boolean;
+  /** Anniversaire « MM-JJ ». */
+  birthday: string | null;
 }
 
 /** Présence d'un ami : en ligne, ou dernière activité. */
@@ -47,6 +51,8 @@ export interface UserProfile extends UserLite {
   friendship: Friendship;
   /** Je bloque cette personne. */
   blockedByMe: boolean;
+  /** Anniversaire « MM-JJ » (visible par ses amis). */
+  birthday: string | null;
 }
 
 export interface UserSearchResult extends UserLite {
@@ -152,6 +158,8 @@ export interface Post {
   myReaction: string | null;
   /** Légende modifiée après publication. */
   edited: boolean;
+  /** Carrousel : toutes les photos du post (la première = media), null s'il n'y en a qu'une. */
+  gallery: MediaRef[] | null;
   /** Date de tri dans le fil (curseur de pagination). */
   sortAt?: string;
 }
@@ -181,10 +189,37 @@ export function extractHashtags(text: string): string[] {
   return [...new Set([...text.matchAll(HASHTAG_RE)].map((m) => m[2].toLowerCase()))];
 }
 
-export type TextPart = { type: 'text'; value: string } | { type: 'mention'; username: string; value: string } | { type: 'hashtag'; tag: string; value: string };
+export type TextPart =
+  | { type: 'text'; value: string }
+  | { type: 'mention'; username: string; value: string }
+  | { type: 'hashtag'; tag: string; value: string }
+  | { type: 'url'; href: string; value: string };
 
-/** Découpe un texte en morceaux (texte, @mention, #hashtag) pour un rendu sans HTML injecté. */
+const URL_RE = /\bhttps?:\/\/[^\s<>"']+/gi;
+
+/** Découpe un texte en morceaux (texte, lien, @mention, #hashtag) pour un rendu sans HTML injecté. */
 export function splitRichText(text: string): TextPart[] {
+  const parts: TextPart[] = [];
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    let url = m[0];
+    // Ponctuation finale (fin de phrase) et parenthèse fermante orpheline : hors du lien.
+    while (/[.,;:!?…]$/.test(url) || (url.endsWith(')') && (url.match(/\(/g)?.length ?? 0) < (url.match(/\)/g)?.length ?? 0))) url = url.slice(0, -1);
+    const start = m.index!;
+    if (start > last) parts.push(...splitTags(text.slice(last, start)));
+    try {
+      const href = new URL(url).href;
+      parts.push({ type: 'url', href, value: url });
+    } catch {
+      parts.push({ type: 'text', value: url });
+    }
+    last = start + url.length;
+  }
+  if (last < text.length) parts.push(...splitTags(text.slice(last)));
+  return parts;
+}
+
+function splitTags(text: string): TextPart[] {
   const re = new RegExp(`${MENTION_RE.source}|${HASHTAG_RE.source}`, 'giu');
   const parts: TextPart[] = [];
   let last = 0;
@@ -356,6 +391,8 @@ export interface Conversation {
   muted: boolean;
   /** Conversation à deux : présence de l'autre (null si masquée). */
   presence: Presence | null;
+  /** Épinglée en haut de la liste. */
+  pinned: boolean;
 }
 
 export interface ConversationDetail {
@@ -381,6 +418,8 @@ export interface TypingEvent {
   conversationId: ID;
   userId: ID;
   typing: boolean;
+  /** Ce qu'il fait : écrire, ou enregistrer un vocal. */
+  activity?: 'text' | 'voice';
 }
 
 export const GROUP_MAX_MEMBERS = 20;
@@ -413,13 +452,14 @@ export type NotificationType =
   | 'mention'
   | 'poll_ended'
   | 'daily_meme'
-  | 'alert';
+  | 'alert'
+  | 'birthday';
 
 /** Catégories réglables dans « Notifications » (profil). */
 export const NOTIF_CATEGORIES = [
   { key: 'social', label: 'J’aime et réactions', types: ['like', 'reaction', 'repost', 'shot_like'] },
   { key: 'comments', label: 'Commentaires et mentions', types: ['comment', 'mention'] },
-  { key: 'friends', label: 'Amis et parrainages', types: ['friend_request', 'friend_accept', 'invite_joined'] },
+  { key: 'friends', label: 'Amis, parrainages et anniversaires', types: ['friend_request', 'friend_accept', 'invite_joined', 'birthday'] },
   { key: 'messages', label: 'Messages', types: [] },
   { key: 'game', label: 'Make It Friends et mème du jour', types: ['game_invite', 'pool_added', 'pool_drawn', 'daily_meme'] },
   { key: 'pellicule', label: 'Pellicule et déballage', types: ['unpack', 'streak', 'moment'] },
@@ -450,6 +490,18 @@ export interface AppNotification {
   data: Record<string, unknown>;
   createdAt: string;
   read: boolean;
+}
+
+/** Tableau de bord de l'admin. */
+export interface AdminStats {
+  users: number;
+  activeWeek: number;
+  posts: number;
+  messages: number;
+  shots: number;
+  mediaBytes: number;
+  databaseBytes: number;
+  disk: { totalBytes: number; freeBytes: number } | null;
 }
 
 export interface Badges {
@@ -649,7 +701,7 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  'dm:typing': (conversationId: ID, typing: boolean) => void;
+  'dm:typing': (conversationId: ID, typing: boolean, activity?: 'text' | 'voice') => void;
   'game:create': (ack: Ack<GameRoom>) => void;
   'game:join': (code: string, ack: Ack<GameRoom>) => void;
   'game:leave': (ack: Ack) => void;

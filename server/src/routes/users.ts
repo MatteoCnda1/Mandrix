@@ -27,6 +27,13 @@ const profileSchema = z.object({
     .optional(),
   city: z.string().trim().max(60).nullable().optional(),
   bio: z.string().trim().max(160).nullable().optional(),
+  /** « MM-JJ » ou null pour l'effacer. */
+  birthday: z
+    .string()
+    .regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, 'Date d’anniversaire invalide')
+    .refine((v) => !Number.isNaN(Date.parse(`2024-${v}T12:00:00Z`)) && new Date(`2024-${v}T12:00:00Z`).toISOString().slice(5, 10) === v, 'Date d’anniversaire invalide')
+    .nullable()
+    .optional(),
 });
 
 export default async function userRoutes(app: FastifyInstance) {
@@ -44,6 +51,7 @@ export default async function userRoutes(app: FastifyInstance) {
         username: body.username ?? me.username,
         city: body.city === undefined ? me.city : body.city || null,
         bio: body.bio === undefined ? me.bio : body.bio || null,
+        birthday: body.birthday === undefined ? me.birthday : body.birthday,
       })
       .where(eq(users.id, me.id))
       .returning();
@@ -111,6 +119,8 @@ export default async function userRoutes(app: FastifyInstance) {
       streak: await streakFor(u.id),
       friendship: fm.get(u.id) ?? 'none',
       blockedByMe: !!blockRow,
+      // Anniversaire visible par soi-même et ses amis seulement.
+      birthday: u.id === me.id || fm.get(u.id) === 'friends' ? u.birthday : null,
     };
   });
 
