@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/dev-dist
+data
+.git
+.env
+.claude
+*.log
+uploads
+support.js
+Mandrix.dc.html
+.thumbnail

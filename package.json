@@ -1,0 +1,27 @@
+{
+  "name": "mandrix",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mandrix — poste, vote et joue avec tes amis. PWA auto-hébergée.",
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "db:up": "docker compose -f docker-compose.dev.yml up -d",
+    "db:generate": "npm run db:generate -w server",
+    "icons": "node web/scripts/gen-icons.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

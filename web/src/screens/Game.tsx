@@ -1,0 +1,421 @@
+import { GAME, type GameRoom } from '@mandrix/shared';
+import { ArrowRight, CheckCircle, Copy, Crown, Flag, HourglassMedium, Images, Play, Plus, Shuffle, SignOut, Timer, Trophy } from '@phosphor-icons/react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { Avatar, MediaView, Podium, PrimaryBtn, Seg, cx } from '../components/ui';
+import { qc, useMe, usePoolStats } from '../lib/data';
+import { useNow } from '../lib/hooks';
+import { gameEmit, useGame } from '../lib/socket';
+import { openSheet, toast } from '../lib/store';
+
+function Hero({ room }: { room?: GameRoom | null }) {
+  const { data: pool } = usePoolStats();
+  return (
+    <div className="flex flex-col gap-3.5 rounded-[32px] bg-hero p-6 text-white shadow-hero">
+      <div className="text-[clamp(36px,8vw,56px)] leading-none font-extrabold tracking-[-.05em]">Make It Friends</div>
+      <p className="m-0 max-w-[420px] text-base leading-[1.45] text-fog">Une image tirée du pool, une légende à écrire, et tout le monde vote.</p>
+      <div className="flex flex-wrap gap-2">
+        <span className="flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-sm font-bold">
+          <Images size={18} />
+          <span>{(pool?.publicCount ?? 0).toLocaleString('fr-FR')} dans le pool public</span>
+        </span>
+        {!!pool?.mine && <span className="flex h-10 animate-pop items-center rounded-[20px] bg-brand px-3.5 text-sm font-bold">+{pool.mine} de toi</span>}
+        {room && <span className="flex h-10 items-center rounded-[20px] bg-white/15 px-3.5 font-mono text-sm font-semibold">{room.code}</span>}
+      </div>
+    </div>
+  );
+}
+
+function GalleryButton() {
+  const nav = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => nav('/jeu/galerie')}
+      className="tap card flex items-center gap-3.5 border-0 py-3.5 pr-[18px] pl-3.5 text-left text-ink transition-transform duration-200 hover:-translate-y-0.5 active:scale-[.98]"
+    >
+      <span className="grid h-[52px] w-[52px] flex-none place-items-center rounded-full bg-tint">
+        <Trophy size={24} weight="fill" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[17px] font-extrabold">Galerie des mèmes</span>
+        <span className="block text-sm text-mute">Le podium des plus aimés</span>
+      </span>
+      <ArrowRight size={20} />
+    </button>
+  );
+}
+
+function NoRoom() {
+  const [code, setCode] = useState('');
+  return (
+    <div className="flex animate-in flex-col gap-3.5">
+      <Hero />
+      <div className="card flex flex-col gap-3 p-[18px]">
+        <div className="text-[17px] font-extrabold">Jouer avec tes amis</div>
+        <PrimaryBtn tone="brand" className="h-[60px] rounded-[30px] text-[17px] font-extrabold" onClick={() => gameEmit('game:create')}>
+          <Plus size={20} weight="bold" /> Créer un salon
+        </PrimaryBtn>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (code.trim()) gameEmit('game:join', code.trim());
+          }}
+        >
+          <input className="field flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code du salon (MDRX-482)" maxLength={8} autoCapitalize="characters" />
+          <button type="submit" className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95">
+            Rejoindre
+          </button>
+        </form>
+      </div>
+      <GalleryButton />
+    </div>
+  );
+}
+
+function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
+  const host = room.hostId === meId;
+  const enough = room.players.length >= GAME.minPlayers;
+  return (
+    <div className="flex animate-in flex-col gap-3.5">
+      <Hero />
+      {room.error && <div className="rounded-3xl bg-card px-4 py-3 text-sm font-semibold text-heart shadow-pill">{room.error}</div>}
+      <div className="card flex flex-col gap-3.5 p-[18px]">
+        <div className="flex items-center gap-2.5">
+          <div className="text-[17px] font-extrabold">
+            Joueurs · {room.players.length}/{GAME.maxPlayers}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(room.code).then(() => toast('Code copié'))}
+            className="tap ml-auto flex items-center gap-1.5 rounded-[14px] border-0 bg-soft px-3 py-2 font-mono text-[13px] font-semibold text-ink"
+            aria-label="Copier le code du salon"
+          >
+            {room.code} <Copy size={14} />
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-3.5">
+          {room.players.map((p) => (
+            <div key={p.user.id} className="relative flex w-[60px] flex-col items-center gap-1.5" style={{ opacity: p.connected ? 1 : 0.45 }}>
+              <Avatar user={p.user} size={54} />
+              {p.user.id === room.hostId && <Crown size={18} weight="fill" className="absolute -top-2 right-0 text-acc" />}
+              <span className="max-w-full truncate text-[13px] font-semibold">{p.user.id === meId ? 'Toi' : p.user.displayName.split(' ')[0]}</span>
+            </div>
+          ))}
+          {room.players.length < GAME.maxPlayers && (
+            <div className="flex w-[60px] flex-col items-center gap-1.5">
+              <button type="button" aria-label="Inviter" onClick={() => openSheet('invite')} className="tap grid h-[54px] w-[54px] place-items-center rounded-full border-2 border-dashed border-[#8FA3B5] bg-transparent text-ink">
+                <Plus size={20} />
+              </button>
+              <span className="text-[13px] font-semibold">Inviter</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="card flex flex-wrap items-center gap-3 p-[18px]">
+        <div className="mr-auto text-[17px] font-extrabold">Manches</div>
+        <Seg
+          className={cx(!host && 'pointer-events-none opacity-70')}
+          value={room.rounds}
+          onChange={(rounds) => gameEmit('game:settings', { rounds })}
+          options={GAME.roundOptions.map((n) => ({ value: n as number, label: n }))}
+        />
+      </div>
+      <div className="card flex flex-wrap items-center gap-3 p-[18px]">
+        <div className="mr-auto text-[17px] font-extrabold">Images tirées du</div>
+        <Seg
+          className={cx(!host && 'pointer-events-none opacity-70')}
+          value={room.source}
+          onChange={(source) => gameEmit('game:settings', { source })}
+          options={[
+            { value: 'public' as const, label: 'Pool public' },
+            { value: 'friends' as const, label: 'Pool amis' },
+          ]}
+        />
+      </div>
+      <GalleryButton />
+      {host ? (
+        <button
+          type="button"
+          disabled={!enough}
+          onClick={() => gameEmit('game:start')}
+          className={cx(
+            'tap flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] border-0 text-[17px] font-extrabold transition-transform duration-200',
+            enough ? 'bg-brand text-white shadow-blue hover:-translate-y-0.5 active:scale-[.97]' : 'cursor-not-allowed bg-line text-mute',
+          )}
+        >
+          <Play size={20} weight="fill" />
+          <span>{enough ? 'Lancer la partie' : 'Invite au moins un ami'}</span>
+        </button>
+      ) : (
+        <div className="flex h-[60px] items-center justify-center gap-2.5 rounded-[30px] bg-glass text-[15px] font-bold text-mute">
+          <HourglassMedium size={20} /> En attente de l’hôte…
+        </div>
+      )}
+      <LeaveLink />
+    </div>
+  );
+}
+
+function LeaveLink() {
+  return (
+    <button
+      type="button"
+      onClick={() => gameEmit('game:leave')}
+      className="tap flex items-center gap-1.5 self-center border-0 bg-transparent px-2 py-2 text-sm font-semibold text-mute underline underline-offset-4"
+    >
+      <SignOut size={16} /> Quitter le salon
+    </button>
+  );
+}
+
+function useLeft(deadline: string | null) {
+  const now = useNow(250);
+  return deadline ? Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000)) : 0;
+}
+
+function Caption({ room }: { room: GameRoom }) {
+  const left = useLeft(room.deadline);
+  const [text, setText] = useState('');
+  const submitted = room.me.caption !== null;
+  const done = room.players.filter((p) => p.submitted).length;
+  const shown = submitted ? room.me.caption! : text;
+
+  return (
+    <div className="flex animate-in flex-col gap-3">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-10 items-center rounded-[20px] bg-ink px-3.5 text-sm font-bold text-inv">
+          Manche {room.round}/{room.rounds}
+        </span>
+        <span className="ml-auto flex h-10 items-center gap-1.5 rounded-[20px] bg-card px-3.5 text-[15px] font-extrabold tabular-nums">
+          <Timer size={18} />
+          <span>{left} s</span>
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded bg-glass">
+        <div className="h-full rounded bg-brand transition-[width] duration-1000 ease-linear" style={{ width: `${(left / room.seconds) * 100}%` }} />
+      </div>
+      <div className="card flex flex-col gap-2.5 p-3.5">
+        <div className={cx('grid min-h-[66px] place-items-center px-2.5 py-1.5 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance', shown ? 'text-ink' : 'text-mute')}>
+          {shown || 'Ta légende apparaît ici'}
+        </div>
+        <div className="ph relative grid aspect-[4/3] place-items-center overflow-hidden rounded-3xl">
+          {room.me.image ? <MediaView media={room.me.image.media} autoPlay /> : <span className="font-mono text-xs text-phink">aucune image</span>}
+          {room.me.image && (
+            <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[13px] font-bold text-ink">du pool · {room.me.image.by}</span>
+          )}
+          {!submitted && (
+            <>
+              <button
+                type="button"
+                aria-label="Signaler cette image"
+                onClick={async () => {
+                  if (confirm('Signaler cette image ? Elle sera retirée du pool en attendant vérification.')) {
+                    await gameEmit('game:report');
+                    toast('Signalement envoyé, image retirée');
+                  }
+                }}
+                className="tap absolute right-[62px] bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-card text-ink active:scale-90"
+              >
+                <Flag size={20} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Changer d’image (${room.me.shufflesLeft} restants)`}
+                disabled={room.me.shufflesLeft <= 0}
+                onClick={() => gameEmit('game:shuffle')}
+                className={cx(
+                  'tap absolute right-2.5 bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-ink text-inv transition-transform duration-[400ms] ease-spring active:rotate-180',
+                  room.me.shufflesLeft <= 0 && 'opacity-40',
+                )}
+              >
+                <Shuffle size={20} />
+                <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[11px] font-extrabold text-white">{room.me.shufflesLeft}</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      {submitted ? (
+        <div className="flex h-16 items-center justify-center gap-2 rounded-[32px] bg-card text-[15px] font-bold text-mute shadow-card">
+          <CheckCircle size={20} weight="fill" className="text-brand" /> Légende envoyée · {done}/{room.players.length}
+        </div>
+      ) : (
+        <form
+          className="card flex gap-2 p-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (text.trim()) gameEmit('game:caption', text.trim());
+          }}
+        >
+          <input className="field flex-1" value={text} onChange={(e) => setText(e.target.value)} maxLength={GAME.captionMax} placeholder="Écris ta légende…" autoFocus />
+          <button type="submit" className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[15px] font-bold text-inv active:scale-95">
+            Valider
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function Vote({ room }: { room: GameRoom }) {
+  const left = useLeft(room.deadline);
+  const pending = room.memes.filter((m) => m.myRating === null);
+  const current = pending[0];
+  const idx = room.memes.length - pending.length + 1;
+  const tones = ['bg-card text-ink shadow-pill', 'bg-brand text-white shadow-[0_6px_18px_rgba(14,118,198,.25)]', 'bg-ink text-inv shadow-[0_6px_18px_rgba(11,15,20,.2)]'];
+
+  if (!current) {
+    const voted = room.players.filter((p) => p.voted).length;
+    return (
+      <div className="card flex animate-in flex-col items-center gap-3 px-6 py-10 text-center">
+        <HourglassMedium size={34} className="text-acc" />
+        <div className="text-xl font-extrabold">Votes envoyés</div>
+        <div className="text-[15px] text-mute">
+          En attente des autres joueurs · {voted}/{room.players.length} · {left} s
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2.5">
+        <div className="text-[17px] font-extrabold">
+          Mème {idx}/{room.memes.length} · note la légende
+        </div>
+        <span className="ml-auto flex h-9 items-center gap-1.5 rounded-[18px] bg-card px-3 text-sm font-extrabold tabular-nums">
+          <Timer size={16} /> {left} s
+        </span>
+      </div>
+      <div key={current.id} className="card flex animate-in flex-col gap-2.5 p-3.5">
+        <div className="px-2.5 py-2 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{current.caption}</div>
+        <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
+          <MediaView media={current.image.media} autoPlay />
+        </div>
+        <div className="px-1 text-[13px] text-mute">Légende de {current.author.displayName}</div>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {GAME.ratings.map((r) => (
+          <button
+            key={r.value}
+            type="button"
+            onClick={() => gameEmit('game:rate', current.id, r.value)}
+            className={cx('tap h-14 rounded-[28px] border-0 text-[15px] font-bold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[.94]', tones[r.value])}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Results({ room, meId }: { room: GameRoom; meId: string }) {
+  const nav = useNavigate();
+  const host = room.hostId === meId;
+  const final = room.stage === 'final';
+  const ranking = [...room.players].sort((a, b) => (final ? b.score - a.score : b.roundScore - a.roundScore));
+  const lastRound = room.round >= room.rounds;
+  const [publishing, setPublishing] = useState(false);
+
+  const publish = async () => {
+    setPublishing(true);
+    await gameEmit('game:publish');
+    setPublishing(false);
+    for (const k of [['feed'], ['memes']]) qc.invalidateQueries({ queryKey: k });
+    toast('Mème publié sur le fil et dans la galerie');
+  };
+
+  return (
+    <div className="flex animate-in flex-col gap-3.5">
+      <div className="card flex flex-col gap-4 p-5">
+        <div className="text-[22px] font-extrabold tracking-[-.02em]">{final ? 'Classement final' : `Résultats de la manche ${room.round}`}</div>
+        <Podium
+          entries={ranking.slice(0, 3).map((p, i) => ({
+            key: p.user.id,
+            top: (
+              <>
+                {i === 0 && <Crown size={24} weight="fill" className="text-acc" />}
+                <Avatar user={p.user} size={46} />
+              </>
+            ),
+            label: `${p.user.id === meId ? 'Toi' : p.user.displayName.split(' ')[0]} · ${final ? p.score : p.roundScore}`,
+          }))}
+        />
+        {ranking.length > 3 && (
+          <div className="flex flex-col gap-1">
+            {ranking.slice(3).map((p, i) => (
+              <div key={p.user.id} className="flex items-center gap-2.5 rounded-[20px] bg-soft px-3 py-2 text-sm font-semibold">
+                <span className="w-5 text-mute">{i + 4}</span>
+                <Avatar user={p.user} size={30} />
+                <span className="flex-1 truncate">{p.user.id === meId ? 'Toi' : p.user.displayName}</span>
+                <span className="font-extrabold">{final ? p.score : p.roundScore}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {room.winner && (
+        <div className="card flex flex-col gap-2.5 p-3.5">
+          <div className="px-1 text-[13px] font-bold text-acc">Mème gagnant · {room.winner.author.id === meId ? 'toi' : room.winner.author.displayName}</div>
+          <div className="px-2.5 py-1 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{room.winner.caption}</div>
+          <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
+            <MediaView media={room.winner.image.media} autoPlay />
+          </div>
+        </div>
+      )}
+      {!room.winner && <div className="card p-5 text-center text-[15px] text-mute">Personne n’a écrit de légende cette manche.</div>}
+      <div className="flex flex-wrap gap-2">
+        {room.me.memeId && (
+          <PrimaryBtn className="h-14 flex-[1_1_160px] rounded-[28px]" disabled={room.me.published || publishing} onClick={publish}>
+            {room.me.published ? 'Mème publié ✓' : 'Publier mon mème'}
+          </PrimaryBtn>
+        )}
+        {host ? (
+          <PrimaryBtn tone="brand" className="h-14 flex-[1_1_160px] rounded-[28px]" onClick={() => gameEmit('game:next')}>
+            {final ? 'Rejouer' : lastRound ? 'Voir le classement' : 'Manche suivante'}
+          </PrimaryBtn>
+        ) : (
+          <div className="flex h-14 flex-[1_1_160px] items-center justify-center gap-2 rounded-[28px] bg-glass text-sm font-bold text-mute">
+            <HourglassMedium size={18} /> En attente de l’hôte…
+          </div>
+        )}
+      </div>
+      {final && (
+        <button type="button" onClick={() => nav('/jeu/galerie')} className="tap self-center border-0 bg-transparent text-sm font-bold text-acc underline underline-offset-4">
+          Voir la galerie des mèmes
+        </button>
+      )}
+      <LeaveLink />
+    </div>
+  );
+}
+
+export function Game() {
+  const { data: me } = useMe();
+  const room = useGame((s) => s.room);
+  const synced = useGame((s) => s.synced);
+  const [params, setParams] = useSearchParams();
+  const joined = useRef(false);
+  const code = params.get('code');
+
+  useEffect(() => {
+    if (!code || !synced || joined.current) return;
+    joined.current = true;
+    if (room?.code !== code.toUpperCase()) gameEmit('game:join', code);
+    setParams({}, { replace: true });
+  }, [code, synced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!me) return null;
+  if (!room) return <NoRoom />;
+  return (
+    <div data-screen-label="Make It Friends">
+      {room.stage === 'lobby' && <Lobby room={room} meId={me.id} />}
+      {room.stage === 'caption' && <Caption key={room.round} room={room} />}
+      {room.stage === 'vote' && <Vote room={room} />}
+      {(room.stage === 'results' || room.stage === 'final') && <Results room={room} meId={me.id} />}
+    </div>
+  );
+}

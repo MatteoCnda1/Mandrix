@@ -1,0 +1,74 @@
+# Mandrix — déploiement homelab (VM ou LXC Proxmox avec Docker).
+# 1. cp .env.example .env  puis remplis-le
+# 2. docker compose up -d --build                 (accès réseau local sur le port APP_PORT)
+#    docker compose --profile tunnel up -d --build (avec Cloudflare Tunnel)
+name: mandrix
+
+services:
+  app:
+    build: .
+    image: mandrix:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://mandrix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}@db:5432/mandrix
+      DATA_DIR: /data
+    # Doit correspondre au propriétaire du dossier des médias sur le NAS.
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    volumes:
+      - ${MEDIA_PATH:-./data/media}:/data/media
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mandrix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: mandrix
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      - ${PG_DATA_PATH:-./data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mandrix -d mandrix"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Sauvegarde quotidienne de la base (comptes, posts, messages…) vers le NAS.
+  backup:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ${BACKUP_PATH:-./data/backups}:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          f=/backups/mandrix-$$(date +%F).dump
+          if pg_dump -h db -U mandrix -Fc mandrix > "$$f.tmp"; then mv "$$f.tmp" "$$f"; echo "sauvegarde $$f"; else rm -f "$$f.tmp"; fi
+          find /backups -name 'mandrix-*.dump' -mtime +$$KEEP_DAYS -delete
+          sleep 86400
+        done
+
+  # Accès public en HTTPS sans ouvrir de port sur la box (optionnel : --profile tunnel).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+    profiles: ["tunnel"]

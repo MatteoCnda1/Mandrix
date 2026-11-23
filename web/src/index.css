@@ -1,0 +1,298 @@
+@import 'tailwindcss';
+@import '@fontsource/plus-jakarta-sans/latin-400.css';
+@import '@fontsource/plus-jakarta-sans/latin-500.css';
+@import '@fontsource/plus-jakarta-sans/latin-600.css';
+@import '@fontsource/plus-jakarta-sans/latin-700.css';
+@import '@fontsource/plus-jakarta-sans/latin-800.css';
+@import '@fontsource/yesteryear/latin-400.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ——— Jetons de la maquette Mandrix ——— */
+:root {
+  --sky: linear-gradient(180deg, #86c5f4 0%, #c9e5fa 38%, #edf6fd 100%);
+  --page: #c9e5fa;
+  --card: #fff;
+  --ink: #0b0f14;
+  --inv: #fff;
+  --soft: #f1f5f9;
+  --mute: #5c6b7a;
+  --body: #1d2b38;
+  --tint: #bfe0fa;
+  --glass: rgba(255, 255, 255, 0.75);
+  --hero: #0b0f14;
+  --acc: #0e76c6;
+  --line: #d5dee7;
+  --ph: repeating-linear-gradient(135deg, #d6e9f8 0 12px, #e3f0fa 12px 24px);
+  --ph2: repeating-linear-gradient(45deg, #dce6ee 0 12px, #e8eff5 12px 24px);
+  --phdark: repeating-linear-gradient(135deg, #101a24 0 12px, #15222f 12px 24px);
+  --phink: #3d5a73;
+  --skel: #e3edf6;
+  color-scheme: light;
+}
+
+html[data-theme='dark'] {
+  --sky: linear-gradient(180deg, #0e2a47 0%, #0b1622 45%, #080c11 100%);
+  --page: #0b1622;
+  --card: #16212d;
+  --ink: #eef4fa;
+  --inv: #0b0f14;
+  --soft: #223141;
+  --mute: #a3b4c5;
+  --body: #c6d3df;
+  --tint: #1f4f7a;
+  --glass: rgba(22, 33, 45, 0.78);
+  --hero: #1e2d3d;
+  --acc: #6fc0ff;
+  --line: #2c3c4d;
+  --ph: repeating-linear-gradient(135deg, #1b2a3a 0 12px, #213244 12px 24px);
+  --ph2: repeating-linear-gradient(45deg, #1f2b37 0 12px, #263442 12px 24px);
+  --phink: #9fb6ca;
+  --skel: #1b2836;
+  color-scheme: dark;
+}
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-script: 'Yesteryear', cursive;
+  --font-mono: ui-monospace, Menlo, monospace;
+
+  --color-brand: #0e76c6;
+  --color-brand2: #2a9df4;
+  --color-azure: #1a8de6;
+  --color-heart: #e5484d;
+  --color-heartlite: #ff6b70;
+  --color-ice: #6fc0ff;
+  --color-ember: #ff8a5c;
+  --color-night: #0b0f14;
+  --color-fog: #c6d3df;
+  --color-steel: #9fb6ca;
+
+  --shadow-card: 0 10px 30px rgba(20, 90, 160, 0.1);
+  --shadow-pill: 0 6px 18px rgba(20, 90, 160, 0.1);
+  --shadow-float: 0 14px 34px rgba(20, 90, 160, 0.16);
+  --shadow-nav: 0 14px 34px rgba(20, 90, 160, 0.22);
+  --shadow-blue: 0 10px 26px rgba(14, 118, 198, 0.3);
+  --shadow-hero: 0 14px 34px rgba(11, 15, 20, 0.25);
+  --shadow-deep: 0 20px 50px rgba(11, 15, 20, 0.3);
+  --shadow-menu: 0 20px 50px rgba(11, 15, 20, 0.25);
+
+  --ease-spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-in: mxIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-pop: mxPop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+  --animate-float: mxFloat 6s ease-in-out infinite;
+  --animate-breath: mxBreath 1.4s ease-in-out infinite;
+  --animate-shimmer: mxShimmer 1.4s linear infinite;
+  --animate-fade: mxFade 0.3s both;
+  --animate-sheet: mxSheet 0.45s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  --animate-drop: mxDrop 0.35s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  --animate-grow: mxGrow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-spin-slow: spin 1.2s linear infinite;
+
+  @keyframes mxIn {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes mxPop {
+    0% {
+      transform: scale(0.6);
+    }
+    60% {
+      transform: scale(1.25);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes mxFloat {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes mxBreath {
+    0%,
+    100% {
+      opacity: 0.14;
+    }
+    50% {
+      opacity: 0.42;
+    }
+  }
+  @keyframes mxShimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes mxFade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes mxSheet {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes mxDrop {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes mxGrow {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-inv: var(--inv);
+  --color-soft: var(--soft);
+  --color-mute: var(--mute);
+  --color-body: var(--body);
+  --color-tint: var(--tint);
+  --color-glass: var(--glass);
+  --color-hero: var(--hero);
+  --color-acc: var(--acc);
+  --color-line: var(--line);
+  --color-phink: var(--phink);
+  --color-skel: var(--skel);
+}
+
+/* ——— Utilitaires maison ——— */
+@utility card {
+  background: var(--card);
+  border-radius: 32px;
+  box-shadow: var(--shadow-card);
+}
+
+@utility field {
+  height: 48px;
+  min-width: 0;
+  border: 0;
+  border-radius: 24px;
+  background: var(--soft);
+  padding: 0 18px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  outline: none;
+  transition: box-shadow 0.2s;
+  &::placeholder {
+    color: var(--mute);
+  }
+  &:focus {
+    box-shadow: inset 0 0 0 2px #0e76c6;
+  }
+}
+
+@utility skel {
+  background: linear-gradient(90deg, var(--skel) 25%, var(--soft) 50%, var(--skel) 75%);
+  background-size: 200% 100%;
+  animation: mxShimmer 1.4s linear infinite;
+}
+
+@utility ph {
+  background: var(--ph);
+}
+@utility ph2 {
+  background: var(--ph2);
+}
+@utility phdark {
+  background: var(--phdark);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility tap {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* ——— Base ——— */
+html,
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--sky);
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+a {
+  color: var(--acc);
+}
+a:hover {
+  color: var(--ink);
+}
+img,
+video {
+  display: block;
+}
+:focus-visible {
+  outline: 2px solid #0e76c6;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

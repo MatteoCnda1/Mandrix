@@ -1,0 +1,14 @@
+# Base PostgreSQL pour le développement local (npm run db:up).
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: mandrix
+      POSTGRES_PASSWORD: mandrix
+      POSTGRES_DB: mandrix
+    ports:
+      - "5433:5432"
+    volumes:
+      - mandrix-dev-db:/var/lib/postgresql/data
+volumes:
+  mandrix-dev-db:

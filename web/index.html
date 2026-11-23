@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#86C5F4" />
+    <meta name="description" content="Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Mandrix" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>Mandrix</title>
+    <script>
+      (function () {
+        try {
+          var d = localStorage.getItem('mandrix.dark');
+          var dark = d === null ? window.matchMedia('(prefers-color-scheme: dark)').matches : d === '1';
+          document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+          if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0E2A47');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
