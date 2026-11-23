@@ -1,7 +1,7 @@
 import type { Comment } from '@mandrix/shared';
 import { Heart, PaperPlaneRight } from '@phosphor-icons/react';
 import { useState } from 'react';
-import { Avatar, Sheet, cx } from '../components/ui';
+import { Avatar, Sheet, confirmAction, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { patchPost, qc, useComments, useMe } from '../lib/data';
 import { fmtCount, timeAgo } from '../lib/format';
@@ -45,7 +45,7 @@ export function CommentsSheet({ postId }: { postId: string }) {
   };
 
   const remove = async (c: Comment) => {
-    if (!confirm('Supprimer ce commentaire ?')) return;
+    if (!(await confirmAction({ title: 'Supprimer ce commentaire ?', confirmLabel: 'Supprimer', destructive: true }))) return;
     try {
       await api(`/api/comments/${c.id}`, { method: 'DELETE' });
       setList((l) => l.filter((x) => x.id !== c.id));
@@ -73,7 +73,7 @@ export function CommentsSheet({ postId }: { postId: string }) {
                   </button>
                 )}
               </div>
-              <div className="text-[15px] leading-[1.4] break-words">{c.text}</div>
+              <div className="text-base leading-[1.4] break-words">{c.text}</div>
             </div>
             <button type="button" aria-label="Aimer le commentaire" onClick={() => like(c)} className="tap flex h-11 min-w-11 flex-none flex-col items-center justify-center border-0 bg-transparent">
               <Heart size={20} weight={c.liked ? 'fill' : 'regular'} className={cx(c.liked ? 'animate-pop text-heart' : 'text-mute')} />

@@ -1,4 +1,4 @@
-import { Bell, Camera, ChatCircleDots, GameController, House, LockSimple, Moon, Package, Play, Plus, Sun, User } from '@phosphor-icons/react';
+import { Bell, CaretLeft, Camera, ChatCircleDots, GameController, House, LockSimple, Moon, Package, Play, Plus, Sun, User } from '@phosphor-icons/react';
 import { useEffect, useState, type ComponentType } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { api } from '../lib/api';
@@ -21,19 +21,23 @@ const NAV: { to: string; icon: IconC; label: string; long: string; match: string
   { to: '/profil', icon: User, label: 'Profil', long: 'Profil', match: ['/profil', '/u/', '/moderation'] },
 ];
 
-const TITLES: [string, string][] = [
-  ['/reels', 'Reels'],
-  ['/pellicule', 'La Pellicule'],
-  ['/deballage', 'Déballage'],
-  ['/jeu/galerie', 'Galerie des mèmes'],
-  ['/jeu', 'Make It Friends'],
-  ['/profil', 'Profil'],
-  ['/u/', 'Profil'],
-  ['/messages', 'Messages'],
-  ['/notifications', 'Notifications'],
-  ['/moderation', 'Modération'],
-  ['/p/', 'Post'],
+/** Titre de l'écran et destination du bouton « retour » (navigation hiérarchique, HIG). */
+const ROUTES: { prefix: string; title: string; back?: string | -1; backLabel?: string }[] = [
+  { prefix: '/reels', title: 'Reels' },
+  { prefix: '/pellicule', title: 'La Pellicule' },
+  { prefix: '/deballage', title: 'Déballage', back: '/pellicule', backLabel: 'Pellicule' },
+  { prefix: '/jeu/galerie', title: 'Galerie des mèmes', back: '/jeu', backLabel: 'Jeu' },
+  { prefix: '/jeu', title: 'Make It Friends' },
+  { prefix: '/profil', title: 'Profil' },
+  { prefix: '/u/', title: 'Profil', back: -1, backLabel: 'Retour' },
+  { prefix: '/messages/', title: 'Discussion', back: '/messages', backLabel: 'Messages' },
+  { prefix: '/messages', title: 'Messages', back: -1, backLabel: 'Retour' },
+  { prefix: '/notifications', title: 'Notifications', back: -1, backLabel: 'Retour' },
+  { prefix: '/moderation', title: 'Modération', back: '/profil', backLabel: 'Profil' },
+  { prefix: '/p/', title: 'Post', back: -1, backLabel: 'Retour' },
 ];
+
+const routeInfo = (path: string) => (path === '/' ? { prefix: '/', title: 'Pour toi' } : (ROUTES.find((r) => path.startsWith(r.prefix)) ?? { prefix: path, title: '' }));
 
 const isActive = (path: string, match: string[]) => match.some((m) => (m === '/' ? path === '/' : path.startsWith(m)));
 
@@ -71,32 +75,30 @@ function BottomNav() {
   const { pathname } = useLocation();
   return (
     <nav
-      className="fixed left-1/2 z-20 flex -translate-x-1/2 gap-2 rounded-[40px] bg-glass p-2 shadow-nav backdrop-blur-[18px]"
-      style={{ bottom: 'calc(14px + env(safe-area-inset-bottom))' }}
+      className="glass-bar fixed left-1/2 z-20 flex w-[min(440px,calc(100vw-20px))] -translate-x-1/2 gap-0.5 rounded-[34px] p-1.5"
+      style={{ bottom: 'calc(10px + env(safe-area-inset-bottom))' }}
       aria-label="Navigation principale"
     >
       {NAV.map((n) => {
         const active = isActive(pathname, n.match);
-        const blue = n.to === '/pellicule' && !active;
         const Icon = n.icon;
         return (
           <NavLink
             key={n.to}
             to={n.to}
             aria-label={n.long}
+            aria-current={active ? 'page' : undefined}
             className={cx(
-              'tap flex h-12 min-w-12 items-center justify-center rounded-3xl px-3.5 text-[13px] font-bold no-underline transition-[background,gap,transform] duration-[350ms] active:scale-[.92]',
-              blue ? 'bg-azure text-white hover:text-white' : 'bg-ink text-inv hover:text-inv',
+              'tap relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-[3px] rounded-[28px] no-underline transition-colors duration-300 active:scale-95',
+              active ? 'text-acc hover:text-acc' : n.to === '/pellicule' ? 'text-azure hover:text-azure' : 'text-ink hover:text-ink',
             )}
-            style={{ gap: active ? 6 : 0 }}
           >
-            <Icon size={20} weight={active ? 'fill' : 'regular'} />
             <span
-              className="overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-[400ms]"
-              style={{ maxWidth: active ? 90 : 0, opacity: active ? 1 : 0 }}
-            >
-              {n.label}
-            </span>
+              className="absolute inset-0 rounded-[28px] bg-ink/[.08] transition-opacity duration-300 dark:bg-white/10"
+              style={{ opacity: active ? 1 : 0 }}
+            />
+            <Icon size={24} weight={active ? 'fill' : 'regular'} />
+            <span className="relative text-[11px] leading-none font-bold">{n.label}</span>
           </NavLink>
         );
       })}
@@ -110,7 +112,13 @@ function Header({ isPhone }: { isPhone: boolean }) {
   const [open, setOpen] = useState(false);
   const [dark, toggleDark] = useDark();
   const { data: badges } = useBadges();
-  const title = pathname === '/' ? 'Pour toi' : (TITLES.find(([p]) => pathname.startsWith(p))?.[1] ?? '');
+  const info = routeInfo(pathname);
+  const goBack = () => {
+    if (info.back === -1) {
+      if ((window.history.state as { idx?: number } | null)?.idx) nav(-1);
+      else nav('/');
+    } else if (info.back) nav(info.back);
+  };
   const round = 'tap grid h-[46px] w-[46px] place-items-center rounded-full border-0 transition-transform duration-200 active:scale-[.94]';
 
   useEffect(() => setOpen(false), [pathname]);
@@ -128,15 +136,29 @@ function Header({ isPhone }: { isPhone: boolean }) {
 
   return (
     <header className="relative z-[25] mb-3.5 flex h-14 items-center gap-2.5">
-      {isPhone ? (
-        <button type="button" onClick={() => nav('/')} className="tap flex items-center gap-1 border-0 bg-transparent p-0 text-ink" aria-label="Accueil">
+      {info.back ? (
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label={`Retour : ${info.backLabel}`}
+            className="tap flex h-11 flex-none items-center gap-0.5 rounded-[22px] border-0 bg-card/70 pr-3.5 pl-2 text-[15px] font-bold text-acc shadow-pill backdrop-blur active:scale-95"
+          >
+            <CaretLeft size={20} weight="bold" />
+            {!isPhone && <span>{info.backLabel}</span>}
+          </button>
+          <h1 className="m-0 truncate text-[22px] font-extrabold tracking-[-.03em] sm:text-[28px]">{info.title}</h1>
+        </div>
+      ) : isPhone && pathname === '/' ? (
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="tap flex items-center gap-1 border-0 bg-transparent p-0 text-ink" aria-label="Mandrix, revenir en haut">
           <Logo size={40} />
           <div className="ml-1 font-script text-4xl leading-none">Mandrix</div>
         </button>
       ) : (
-        <h1 className="m-0 text-[28px] font-extrabold tracking-[-.03em]">{title}</h1>
+        <h1 className="m-0 min-w-0 truncate text-[26px] font-extrabold tracking-[-.03em] sm:text-[28px]">{info.title}</h1>
       )}
       <div className="ml-auto flex gap-2">
+        {!(isPhone && info.back) && (
         <button
           type="button"
           aria-label="Créer un post"
@@ -145,6 +167,7 @@ function Header({ isPhone }: { isPhone: boolean }) {
         >
           <Plus size={22} />
         </button>
+        )}
         <button type="button" aria-label="Messages" onClick={() => nav('/messages')} className={cx(round, 'relative bg-card text-ink shadow-pill')}>
           <ChatCircleDots size={20} />
           {!!badges?.messages && <span className="absolute top-[9px] right-[9px] h-2.5 w-2.5 rounded-full bg-heart shadow-[0_0_0_2px_var(--card)]" />}
@@ -243,7 +266,7 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-dvh font-sans text-ink" style={{ ['--toast-bottom' as string]: isPhone ? '88px' : '28px' }}>
+    <div className="min-h-dvh font-sans text-ink" style={{ ['--toast-bottom' as string]: isPhone ? '92px' : '28px' }}>
       <div
         className="mx-auto flex max-w-[1320px] justify-center gap-7"
         style={{ padding: 'clamp(12px,2.4vw,24px)', paddingTop: 'calc(clamp(12px,2.4vw,24px) + env(safe-area-inset-top))' }}

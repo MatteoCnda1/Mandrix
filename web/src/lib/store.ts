@@ -16,6 +16,9 @@ interface UIState {
   sheet: SheetName | null;
   toast: { msg: string; id: number; tone: 'ok' | 'error' } | null;
   installEvent: BeforeInstallPromptEvent | null;
+  /** Une nouvelle version de l'app est prête (service worker en attente). */
+  updateReady: boolean;
+  applyUpdate: (() => void) | null;
   openComposer: (mode?: 'post' | 'story', kind?: 0 | 1 | 2) => void;
   closeAll: () => void;
 }
@@ -28,6 +31,8 @@ export const useUI = create<UIState>((set) => ({
   sheet: null,
   toast: null,
   installEvent: null,
+  updateReady: false,
+  applyUpdate: null,
   openComposer: (mode = 'post', kind) => set({ composer: { mode, kind }, sheet: null }),
   closeAll: () => set({ composer: null, commentsFor: null, poolFor: null, story: null, sheet: null }),
 }));

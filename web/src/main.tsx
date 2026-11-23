@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, Navigate, RouterProvider, useLocation } from 'react-router';
 import { registerSW } from 'virtual:pwa-register';
 import { AppLayout } from './components/AppLayout';
-import { Logo } from './components/ui';
+import { ConfirmHost, Logo } from './components/ui';
+import { UpdateBanner } from './components/UpdateBanner';
 import './index.css';
 import { qc, useMe } from './lib/data';
 import { connectSocket, disconnectSocket } from './lib/socket';
@@ -42,9 +43,17 @@ function Root() {
     else if (me === null) disconnectSocket();
   }, [me]);
 
-  if (isLoading) return <Splash />;
-  if (!me) return pathname === '/' ? <Landing /> : <Navigate to={`/?next=${encodeURIComponent(pathname)}`} replace />;
-  return <AppLayout />;
+  let screen;
+  if (isLoading) screen = <Splash />;
+  else if (!me) screen = pathname === '/' ? <Landing /> : <Navigate to={`/?next=${encodeURIComponent(pathname)}`} replace />;
+  else screen = <AppLayout />;
+  return (
+    <>
+      {screen}
+      <UpdateBanner />
+      <ConfirmHost />
+    </>
+  );
 }
 
 function RedirectAfterLogin() {
@@ -83,10 +92,32 @@ window.addEventListener('beforeinstallprompt', (e) => {
   useUI.setState({ installEvent: e as never });
 });
 
-if (import.meta.env.PROD) registerSW({ immediate: true });
+if (import.meta.env.PROD) {
+  const updateSW = registerSW({
+    immediate: true,
+    // Une nouvelle version est téléchargée et attend : on affiche le bouton « Mettre à jour ».
+    onNeedRefresh: () => useUI.setState({ updateReady: true }),
+    onRegisteredSW: (_url, reg) => {
+      if (!reg) return;
+      const check = () => {
+        if (navigator.onLine) reg.update().catch(() => {});
+      };
+      setInterval(check, 30 * 60_000);
+      document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check());
+    },
+  });
+  // Active la version en attente puis recharge la page.
+  useUI.setState({ applyUpdate: () => void updateSW(true) });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <div className="aurora" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </div>
     <QueryClientProvider client={qc}>
       <RouterProvider router={router} />
     </QueryClientProvider>

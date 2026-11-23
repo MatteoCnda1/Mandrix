@@ -51,7 +51,7 @@ export function Seg<T extends string | number>({ options, value, onChange, class
           onClick={() => onChange(o.value)}
           className={cx(
             'tap flex-1 border-0 font-bold transition-colors duration-300',
-            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-9 rounded-[18px] px-3 text-[13px]',
+            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-10 rounded-[20px] px-3 text-[13px]',
             o.value === value ? 'bg-ink text-inv' : 'bg-transparent text-ink',
           )}
         >
@@ -73,7 +73,12 @@ export function Switch({ on }: { on: boolean }) {
   );
 }
 
+/** Feuille du bas (HIG) : poignée, fermeture par glissement vers le bas, Échap ou tap sur le fond. */
 export function Sheet({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  const [dragY, setDragY] = useState(0);
+  const [closing, setClosing] = useState(false);
+  const drag = useRef<{ y: number; t: number } | null>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -84,24 +89,124 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
       document.body.style.overflow = prev;
     };
   }, [onClose]);
+
+  const dismiss = () => {
+    setClosing(true);
+    setTimeout(onClose, 220);
+  };
+  const onPointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    drag.current = { y: e.clientY, t: Date.now() };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (drag.current) setDragY(Math.max(0, e.clientY - drag.current.y));
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!drag.current) return;
+    const dy = e.clientY - drag.current.y;
+    const speed = dy / Math.max(1, Date.now() - drag.current.t);
+    drag.current = null;
+    if (dy > 110 || (dy > 30 && speed > 0.6)) dismiss();
+    else setDragY(0);
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" role="dialog" aria-modal="true">
-      <div onClick={onClose} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.5)]" />
+      <div
+        onClick={dismiss}
+        className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.5)] transition-opacity duration-200"
+        style={{ opacity: closing ? 0 : Math.max(0.3, 1 - dragY / 500) }}
+      />
       <div
         className={cx(
-          'relative flex max-h-[86vh] w-full animate-sheet flex-col gap-3 overflow-auto rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
+          'relative flex max-h-[86vh] w-full flex-col gap-3 overflow-auto rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
           wide ? 'max-w-[640px]' : 'max-w-[560px]',
         )}
-        style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}
+        style={{
+          // « backwards » : l'animation d'entrée ne bloque pas la transformation du glisser.
+          animation: 'mxSheet .45s cubic-bezier(.2,.9,.2,1) backwards',
+          paddingBottom: 'calc(18px + env(safe-area-inset-bottom))',
+          transform: closing ? 'translateY(100%)' : dragY ? `translateY(${dragY}px)` : undefined,
+          transition: drag.current ? 'none' : 'transform .22s cubic-bezier(.2,.9,.2,1)',
+        }}
       >
-        <div className="h-[5px] w-11 flex-none self-center rounded-[3px] bg-line" />
-        <div className="flex items-center gap-2.5">
-          <div className="mr-auto text-xl font-extrabold tracking-[-.02em]">{title}</div>
-          <IconBtn label="Fermer" onClick={onClose}>
-            <X size={20} />
-          </IconBtn>
+        <div
+          className="-mx-4 -mt-2.5 flex cursor-grab touch-none flex-col gap-3 px-4 pt-2.5 active:cursor-grabbing"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          <div className="h-[5px] w-11 flex-none self-center rounded-[3px] bg-line" />
+          <div className="flex items-center gap-2.5">
+            <div className="mr-auto text-xl font-extrabold tracking-[-.02em]">{title}</div>
+            <IconBtn label="Fermer" onClick={dismiss}>
+              <X size={20} />
+            </IconBtn>
+          </div>
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+// ——— Feuille d'actions de confirmation (remplace window.confirm, HIG) ———
+
+interface ConfirmReq {
+  title: string;
+  message?: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  resolve: (ok: boolean) => void;
+}
+
+let confirmSetter: ((r: ConfirmReq | null) => void) | null = null;
+
+export function confirmAction(opts: Omit<ConfirmReq, 'resolve'>): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!confirmSetter) return resolve(window.confirm(opts.title));
+    confirmSetter({ ...opts, resolve });
+  });
+}
+
+export function ConfirmHost() {
+  const [req, setReq] = useState<ConfirmReq | null>(null);
+  useEffect(() => {
+    confirmSetter = setReq;
+    return () => {
+      confirmSetter = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!req) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && answer(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  if (!req) return null;
+  const answer = (ok: boolean) => {
+    req.resolve(ok);
+    setReq(null);
+  };
+  const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[17px] transition-colors active:bg-soft';
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+      <div onClick={() => answer(false)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
+      <div className="relative flex w-full max-w-[420px] animate-sheet flex-col gap-2">
+        <div className="overflow-hidden rounded-[24px] bg-card text-center">
+          <div className="flex flex-col gap-1 px-5 pt-4 pb-3.5">
+            <div className="text-[13px] font-bold text-mute">{req.title}</div>
+            {req.message && <div className="text-[13px] leading-snug text-mute">{req.message}</div>}
+          </div>
+          <button type="button" autoFocus onClick={() => answer(true)} className={cx(row, 'border-t border-line font-semibold', req.destructive ? 'text-heart' : 'text-acc')}>
+            {req.confirmLabel}
+          </button>
+        </div>
+        <button type="button" onClick={() => answer(false)} className={cx(row, 'rounded-[24px] bg-card font-bold text-acc')}>
+          Annuler
+        </button>
       </div>
     </div>
   );

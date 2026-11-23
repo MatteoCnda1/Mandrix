@@ -8,7 +8,7 @@ function read(): boolean {
 
 export function setDark(dark: boolean) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0E2A47' : '#86C5F4');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#071120' : '#E8F2FC');
   try {
     localStorage.setItem('mandrix.dark', dark ? '1' : '0');
   } catch {

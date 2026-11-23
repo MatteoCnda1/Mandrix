@@ -1,10 +1,10 @@
-import { ArrowRight, LockSimple, Plus, UsersThree } from '@phosphor-icons/react';
+import { ArrowClockwise, ArrowRight, LockSimple, Plus, UsersThree } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
-import { useFeed, useMe, usePellicule, useStories } from '../lib/data';
+import { qc, useFeed, useMe, usePellicule, useStories } from '../lib/data';
 import { countdown } from '../lib/format';
-import { useNow, useSentinel } from '../lib/hooks';
+import { useNow, usePullToRefresh, useSentinel } from '../lib/hooks';
 import { openSheet, useUI } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
@@ -35,7 +35,7 @@ function Stories() {
                 e.stopPropagation();
                 useUI.getState().openComposer('story');
               }}
-              className="absolute -right-1 -bottom-1 grid h-7 w-7 place-items-center rounded-full bg-brand text-white shadow-[0_0_0_3px_var(--card)]"
+              className="absolute -right-1.5 -bottom-1.5 grid h-8 w-8 place-items-center rounded-full bg-brand text-white shadow-[0_0_0_3px_var(--card)] after:absolute after:-inset-2 after:content-['']"
             >
               <Plus size={14} weight="bold" />
             </span>
@@ -78,11 +78,28 @@ export function Feed() {
   const cd = countdown(pel?.nextRevealAt, now);
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
   const sentinel = useSentinel(() => feed.hasNextPage && !feed.isFetchingNextPage && feed.fetchNextPage(), !!feed.hasNextPage);
+  const { pull, refreshing } = usePullToRefresh(() =>
+    Promise.all([feed.refetch(), qc.invalidateQueries({ queryKey: ['stories'] }), qc.invalidateQueries({ queryKey: ['pellicule'] })]),
+  );
 
   if (feed.isLoading) return <ScreenLoader />;
 
   return (
     <div className="flex flex-col gap-3.5">
+      <div
+        className="-mb-3.5 flex items-end justify-center overflow-hidden"
+        style={{ height: pull, transition: pull && !refreshing ? 'none' : 'height .3s cubic-bezier(.2,.9,.2,1)' }}
+        aria-hidden={!refreshing}
+      >
+        <span className="mb-2 grid h-10 w-10 place-items-center rounded-full bg-card text-acc shadow-pill">
+          <ArrowClockwise
+            size={20}
+            weight="bold"
+            className={refreshing ? 'animate-spin' : undefined}
+            style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)`, opacity: Math.min(1, pull / 60) }}
+          />
+        </span>
+      </div>
       <Stories />
       {!isDesktop && (
         <button

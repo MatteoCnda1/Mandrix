@@ -58,7 +58,7 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
           <Avatar user={post.author} size={40} className="[text-shadow:none]" />
           <span className="text-[15px] font-bold">{post.author.displayName}</span>
         </button>
-        {post.text && <div className="text-[15px] leading-[1.4]">{post.text}</div>}
+        {post.text && <div className="text-base leading-[1.4]">{post.text}</div>}
       </div>
       <div className="absolute right-3.5 bottom-5 flex flex-col items-center gap-2.5 text-xs font-bold text-white">
         <button type="button" aria-label="Aimer" className={side} onClick={() => toggleLike(post)}>

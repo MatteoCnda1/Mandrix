@@ -1,5 +1,5 @@
 import type { Message } from '@mandrix/shared';
-import { ArrowLeft, ChatCircleDots, PaperPlaneRight, PencilSimple } from '@phosphor-icons/react';
+import { ChatCircleDots, PaperPlaneRight, PencilSimple } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
@@ -94,9 +94,6 @@ export function Chat() {
   return (
     <div className="card flex min-h-[62vh] animate-in flex-col gap-3 p-3" style={{ animationDuration: '.4s' }}>
       <div className="flex items-center gap-2.5">
-        <button type="button" aria-label="Retour" onClick={() => nav('/messages')} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-ink">
-          <ArrowLeft size={20} />
-        </button>
         {conv && (
           <button type="button" onClick={() => nav(`/u/${conv.user.username}`)} className="tap flex items-center gap-2.5 border-0 bg-transparent p-0 text-ink">
             <Avatar user={conv.user} size={40} />
@@ -112,7 +109,7 @@ export function Chat() {
             <div
               key={m.id}
               className={cx(
-                'max-w-[80%] animate-in rounded-[22px] px-3.5 py-2.5 text-[15px] leading-[1.4] break-words',
+                'max-w-[80%] animate-in rounded-[22px] px-3.5 py-2.5 text-base leading-[1.4] break-words',
                 mine ? 'self-end bg-brand text-white' : 'self-start bg-soft text-ink',
               )}
               style={{ animationDuration: '.35s' }}

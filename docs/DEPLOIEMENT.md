@@ -126,6 +126,8 @@ docker compose up -d --build
 ```
 
 Les migrations de base de données s'appliquent automatiquement au démarrage.
+Côté utilisateurs, l'app détecte la nouvelle version (au retour dans l'app, puis toutes les 30 min)
+et affiche un bandeau « Nouvelle version disponible » : un clic sur « Mettre à jour » recharge l'app.
 
 ## 8. Notifications push
 

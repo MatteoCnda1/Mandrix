@@ -68,7 +68,7 @@ export function Landing() {
           <p className="m-0 max-w-[440px] text-lg leading-normal text-pretty text-body">
             Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine.
           </p>
-          <form onSubmit={submit} className="flex max-w-[440px] flex-col gap-2.5 rounded-[32px] bg-card p-3.5 shadow-[0_10px_30px_rgba(20,90,160,.12)]">
+          <form onSubmit={submit} className="card flex max-w-[440px] flex-col gap-2.5 p-3.5">
             {mode === 'signup' && (
               <input
                 className={field}

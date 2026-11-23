@@ -2,7 +2,7 @@ import { GAME, type GameRoom } from '@mandrix/shared';
 import { ArrowRight, CheckCircle, Copy, Crown, Flag, HourglassMedium, Images, Play, Plus, Shuffle, SignOut, Timer, Trophy } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Avatar, MediaView, Podium, PrimaryBtn, Seg, cx } from '../components/ui';
+import { Avatar, MediaView, Podium, PrimaryBtn, Seg, confirmAction, cx } from '../components/ui';
 import { qc, useMe, usePoolStats } from '../lib/data';
 import { useNow } from '../lib/hooks';
 import { gameEmit, useGame } from '../lib/socket';
@@ -211,7 +211,7 @@ function Caption({ room }: { room: GameRoom }) {
                 type="button"
                 aria-label="Signaler cette image"
                 onClick={async () => {
-                  if (confirm('Signaler cette image ? Elle sera retirée du pool en attendant vérification.')) {
+                  if (await confirmAction({ title: 'Signaler cette image ?', message: 'Elle sera retirée du pool en attendant vérification.', confirmLabel: 'Signaler', destructive: true })) {
                     await gameEmit('game:report');
                     toast('Signalement envoyé, image retirée');
                   }

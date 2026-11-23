@@ -10,8 +10,15 @@
 
 /* ——— Jetons de la maquette Mandrix ——— */
 :root {
-  --sky: linear-gradient(180deg, #86c5f4 0%, #c9e5fa 38%, #edf6fd 100%);
-  --page: #c9e5fa;
+  --page: #e8f2fc;
+  /* Ambiance « Aurore » : taches de couleur floues sur fond clair */
+  --aurora-1: rgba(42, 157, 244, 0.55);
+  --aurora-2: rgba(255, 138, 92, 0.42);
+  --aurora-3: rgba(139, 124, 246, 0.38);
+  --aurora-4: rgba(111, 192, 255, 0.5);
+  /* Verre dépoli des cartes */
+  --glass-card: rgba(255, 255, 255, 0.66);
+  --glass-edge: rgba(255, 255, 255, 0.75);
   --card: #fff;
   --ink: #0b0f14;
   --inv: #fff;
@@ -32,8 +39,13 @@
 }
 
 html[data-theme='dark'] {
-  --sky: linear-gradient(180deg, #0e2a47 0%, #0b1622 45%, #080c11 100%);
-  --page: #0b1622;
+  --page: #071120;
+  --aurora-1: rgba(42, 157, 244, 0.34);
+  --aurora-2: rgba(255, 138, 92, 0.17);
+  --aurora-3: rgba(139, 124, 246, 0.27);
+  --aurora-4: rgba(26, 141, 230, 0.24);
+  --glass-card: rgba(20, 31, 43, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.07);
   --card: #16212d;
   --ink: #eef4fa;
   --inv: #0b0f14;
@@ -193,9 +205,23 @@ html[data-theme='dark'] {
 
 /* ——— Utilitaires maison ——— */
 @utility card {
-  background: var(--card);
+  background: var(--glass-card);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
   border-radius: 32px;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-card);
+}
+
+/* Barre en verre (onglets, menus flottants) */
+@utility glass-bar {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow:
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-nav);
 }
 
 @utility field {
@@ -247,46 +273,114 @@ html[data-theme='dark'] {
   touch-action: manipulation;
 }
 
-/* ——— Base ——— */
-html,
-body {
-  margin: 0;
-  background: var(--page);
-  color: var(--ink);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%;
+/* ——— Base (dans la couche « base » pour que les utilitaires Tailwind gardent la priorité) ——— */
+@layer base {
+  /* Le fond est porté par <html> (canevas) : un fond sur <body> masquerait l'aurore en z-index négatif. */
+  html {
+    background: var(--page);
+  }
+  html,
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+  }
+  /* ——— Fond Aurore (dégradés radiaux animés, sans filtre de flou pour rester fluide) ——— */
+  .aurora {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--page);
+  }
+  .aurora i {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+    animation: mxAurora 24s ease-in-out infinite alternate;
+  }
+  .aurora i:nth-child(1) {
+    width: 80vmax;
+    height: 80vmax;
+    left: -30vmax;
+    top: -32vmax;
+    background: radial-gradient(circle, var(--aurora-1) 0%, transparent 62%);
+  }
+  .aurora i:nth-child(2) {
+    width: 70vmax;
+    height: 70vmax;
+    right: -32vmax;
+    top: 12vh;
+    background: radial-gradient(circle, var(--aurora-2) 0%, transparent 62%);
+    animation-duration: 28s;
+    animation-delay: -9s;
+  }
+  .aurora i:nth-child(3) {
+    width: 85vmax;
+    height: 85vmax;
+    left: -28vmax;
+    bottom: -40vmax;
+    background: radial-gradient(circle, var(--aurora-3) 0%, transparent 62%);
+    animation-duration: 32s;
+    animation-delay: -15s;
+  }
+  .aurora i:nth-child(4) {
+    width: 55vmax;
+    height: 55vmax;
+    right: -18vmax;
+    bottom: -14vmax;
+    background: radial-gradient(circle, var(--aurora-4) 0%, transparent 62%);
+    animation-duration: 26s;
+    animation-delay: -4s;
+  }
+  @keyframes mxAurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(7vmax, 5vmax, 0) scale(1.12);
+    }
+    100% {
+      transform: translate3d(-5vmax, 9vmax, 0) scale(0.94);
+    }
+  }
+
+  /* Accessibilité (HIG) : « Réduire la transparence » rend les surfaces opaques. */
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --glass-card: var(--card);
+      --glass: var(--card);
+    }
+  }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  button {
+    font: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a {
+    color: var(--acc);
+  }
+  a:hover {
+    color: var(--ink);
+  }
+  img,
+  video {
+    display: block;
+  }
+  :focus-visible {
+    outline: 2px solid #0e76c6;
+    outline-offset: 2px;
+  }
 }
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: var(--sky);
-}
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-button {
-  font: inherit;
-  -webkit-tap-highlight-color: transparent;
-}
-a {
-  color: var(--acc);
-}
-a:hover {
-  color: var(--ink);
-}
-img,
-video {
-  display: block;
-}
-:focus-visible {
-  outline: 2px solid #0e76c6;
-  outline-offset: 2px;
-}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

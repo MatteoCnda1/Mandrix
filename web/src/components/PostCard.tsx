@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router';
 import { deletePost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
 import { fmtCount, plural, timeAgo } from '../lib/format';
 import { openPool, useUI } from '../lib/store';
-import { Avatar, cx, MediaView, ratioOf } from './ui';
+import { Avatar, confirmAction, cx, MediaView, ratioOf } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -213,9 +213,9 @@ function PostMenu({ post, onClose }: { post: Post; onClose: () => void }) {
           <button
             type="button"
             className={cx(item, 'text-heart')}
-            onClick={() => {
+            onClick={async () => {
               onClose();
-              if (confirm('Supprimer ce post ?')) deletePost(post);
+              if (await confirmAction({ title: 'Supprimer ce post ?', message: 'Il disparaîtra du fil de tes amis.', confirmLabel: 'Supprimer le post', destructive: true })) deletePost(post);
             }}
           >
             <Trash size={20} /> Supprimer
@@ -257,7 +257,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
             type="button"
             aria-label="Options"
             onClick={() => setMenu(true)}
-            className={cx('tap grid place-items-center rounded-full border-0 bg-soft text-ink', post.kind === 'photo' ? 'h-11 w-11' : 'h-9 w-9')}
+            className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-soft text-ink"
           >
             <DotsThree size={22} />
           </button>
@@ -289,7 +289,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
         </>
       )}
 
-      {post.kind !== 'meme' && post.kind !== 'poll' && post.text && <p className="m-0 mx-1 text-[15px] leading-[1.45] whitespace-pre-line">{post.text}</p>}
+      {post.kind !== 'meme' && post.kind !== 'poll' && post.text && <p className="m-0 mx-1 text-base leading-[1.45] whitespace-pre-line">{post.text}</p>}
 
       {!isPoll ? <ActionBar post={post} /> : <PollFooter post={post} />}
     </article>

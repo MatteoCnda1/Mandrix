@@ -44,7 +44,7 @@ function DropZone({ file, accept, label, onPick, onClear, aspect = '16 / 9' }: {
           type="button"
           aria-label="Retirer"
           onClick={onClear}
-          className="tap absolute top-2.5 right-2.5 grid h-9 w-9 place-items-center rounded-full border-0 bg-card text-ink shadow-pill"
+          className="tap absolute top-2.5 right-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-card text-ink shadow-pill"
         >
           <X size={18} />
         </button>

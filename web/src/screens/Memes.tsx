@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, Trophy } from '@phosphor-icons/react';
+import { Heart, Trophy } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { Avatar, EmptyCard, MediaView, Podium, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
 import { toggleLike, useMemes } from '../lib/data';
@@ -14,12 +14,7 @@ export function Memes() {
   return (
     <div data-screen-label="Galerie des mèmes" className="flex animate-in flex-col gap-3.5">
       <div className="card flex flex-col gap-4 p-5">
-        <div className="flex items-center gap-3">
-          <button type="button" aria-label="Retour" onClick={() => nav('/jeu')} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-ink">
-            <ArrowLeft size={20} />
-          </button>
-          <div className="text-[22px] font-extrabold tracking-[-.02em]">Podium des plus aimés</div>
-        </div>
+        <div className="text-[22px] font-extrabold tracking-[-.02em]">Podium des plus aimés</div>
         {podium.length > 0 ? (
           <Podium
             height={260}

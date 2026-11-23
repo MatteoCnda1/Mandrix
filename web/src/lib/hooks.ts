@@ -37,6 +37,63 @@ export function useObjectUrl(file: Blob | null) {
   return url;
 }
 
+/** Tirer vers le bas en haut de page pour actualiser (écrans tactiles). */
+export function usePullToRefresh(onRefresh: () => Promise<unknown>) {
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const cb = useRef(onRefresh);
+  cb.current = onRefresh;
+  const busy = useRef(false);
+
+  useEffect(() => {
+    let startY = 0;
+    let active = false;
+    let dist = 0;
+    const onStart = (e: TouchEvent) => {
+      if (busy.current || window.scrollY > 0 || document.body.style.overflow === 'hidden') return;
+      startY = e.touches[0].clientY;
+      dist = 0;
+      active = true;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!active) return;
+      dist = e.touches[0].clientY - startY;
+      if (dist > 0 && window.scrollY <= 0) setPull(Math.min(120, dist * 0.45));
+      else {
+        active = false;
+        setPull(0);
+      }
+    };
+    const onEnd = async () => {
+      if (!active) return;
+      active = false;
+      if (dist * 0.45 < 72) return setPull(0);
+      busy.current = true;
+      setRefreshing(true);
+      setPull(56);
+      try {
+        await cb.current();
+      } finally {
+        busy.current = false;
+        setRefreshing(false);
+        setPull(0);
+      }
+    };
+    window.addEventListener('touchstart', onStart, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
+    return () => {
+      window.removeEventListener('touchstart', onStart);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+      window.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
+
+  return { pull, refreshing };
+}
+
 export function useDebounced<T>(value: T, ms = 300) {
   const [v, setV] = useState(value);
   useEffect(() => {

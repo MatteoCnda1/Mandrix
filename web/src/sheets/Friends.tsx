@@ -2,7 +2,7 @@ import type { Friendship, UserLite } from '@mandrix/shared';
 import { ChatCircleDots, MagnifyingGlass } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Avatar, Sheet, cx } from '../components/ui';
+import { Avatar, Sheet, confirmAction, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { friendAction, useFriends, useUserSearch } from '../lib/data';
 import { useDebounced } from '../lib/hooks';
@@ -32,8 +32,8 @@ export function FriendButton({ user, status, className }: { user: UserLite; stat
       type="button"
       disabled={busy}
       className={cx(small, m.cls, className)}
-      onClick={() => {
-        if (status === 'friends' && !confirm(`Retirer ${user.displayName} de tes amis ?`)) return;
+      onClick={async () => {
+        if (status === 'friends' && !(await confirmAction({ title: `Retirer ${user.displayName} de tes amis ?`, confirmLabel: 'Retirer', destructive: true }))) return;
         run(m.action);
       }}
     >

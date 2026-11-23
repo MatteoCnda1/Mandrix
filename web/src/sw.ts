@@ -8,7 +8,10 @@ import { CacheFirst } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | { url: string; revision: string | null })[] };
 
-self.skipWaiting();
+// Une nouvelle version reste en attente jusqu'au clic sur « Mettre à jour » dans l'app.
+self.addEventListener('message', (event) => {
+  if ((event.data as { type?: string } | null)?.type === 'SKIP_WAITING') self.skipWaiting();
+});
 clientsClaim();
 
 precacheAndRoute(self.__WB_MANIFEST);

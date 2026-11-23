@@ -13,7 +13,8 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
-      registerType: 'autoUpdate',
+      // La nouvelle version attend que l'utilisateur clique sur « Mettre à jour ».
+      registerType: 'prompt',
       injectRegister: false,
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
@@ -25,8 +26,8 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#C9E5FA',
-        theme_color: '#86C5F4',
+        background_color: '#E8F2FC',
+        theme_color: '#E8F2FC',
         categories: ['social', 'entertainment', 'photo'],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

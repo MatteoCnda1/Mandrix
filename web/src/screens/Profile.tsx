@@ -230,7 +230,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             </div>
           )}
         </div>
-        {profile.bio && <p className="m-0 text-[15px] leading-[1.45]">{profile.bio}</p>}
+        {profile.bio && <p className="m-0 text-base leading-[1.45]">{profile.bio}</p>}
         <div className="grid grid-cols-3 gap-2">
           {[
             [profile.stats.posts, 'Posts', undefined],

@@ -1,6 +1,6 @@
 import { PaperPlaneRight, Trash, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, MediaView } from '../components/ui';
+import { Avatar, MediaView, confirmAction } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
@@ -92,7 +92,8 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   };
 
   const remove = async () => {
-    if (!confirm('Supprimer cette story ?')) return;
+    setPaused(true);
+    if (!(await confirmAction({ title: 'Supprimer cette story ?', confirmLabel: 'Supprimer', destructive: true }))) return setPaused(false);
     await api(`/api/stories/${story.id}`, { method: 'DELETE' }).catch(() => {});
     toast('Story supprimée');
     close();
