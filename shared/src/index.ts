@@ -343,7 +343,40 @@ export interface UnpackState {
     busiestDay: string | null;
     photos: Shot[];
     top: Shot[];
+    /**
+     * « Qui a pris ça ? » : tant que le quiz est à faire (`todo`), les photos restent cachées
+     * (photos et top vides) ; `none` : pas de quiz cette semaine.
+     */
+    quiz: GuessStatus;
   } | null;
+}
+
+// ——— Qui a pris ça ? ———
+
+export const GUESS = { maxPhotos: 8, choices: 4, pointsPerHit: 20 } as const;
+
+export type GuessStatus = 'none' | 'todo' | 'done' | 'skipped';
+
+export interface GuessItem {
+  shotId: ID;
+  media: MediaRef;
+  /** Visages proposés (l'auteur et d'autres participants de la semaine). */
+  options: UserLite[];
+  /** Ma réponse (null tant que je n'ai pas répondu). */
+  myGuess: ID | null;
+  /** Auteur, révélé une fois que j'ai répondu ou passé le quiz. */
+  answer: UserLite | null;
+}
+
+export interface GuessState {
+  revealAt: string;
+  weekLabel: string;
+  status: GuessStatus;
+  items: GuessItem[];
+  /** Mes points de la semaine. */
+  score: number;
+  /** Classement de la semaine parmi ceux qui ont joué. */
+  ranking: { user: UserLite; score: number; hits: number }[];
 }
 
 // ——— Messages ———
@@ -488,7 +521,8 @@ export type NotificationType =
   | 'poll_ended'
   | 'daily_meme'
   | 'alert'
-  | 'birthday';
+  | 'birthday'
+  | 'retro';
 
 /** Catégories réglables dans « Notifications » (profil). */
 export const NOTIF_CATEGORIES = [
@@ -499,6 +533,7 @@ export const NOTIF_CATEGORIES = [
   { key: 'game', label: 'Make It Friends et mème du jour', types: ['game_invite', 'pool_added', 'pool_drawn', 'daily_meme'] },
   { key: 'pellicule', label: 'Pellicule et déballage', types: ['unpack', 'streak', 'moment'] },
   { key: 'polls', label: 'Fin de mes sondages', types: ['poll_ended'] },
+  { key: 'retro', label: 'Rétro de l’année', types: ['retro'] },
   { key: 'system', label: 'Alertes du serveur (admins)', types: ['alert'] },
 ] as const satisfies readonly { key: string; label: string; types: readonly NotificationType[] }[];
 
@@ -662,6 +697,8 @@ export interface SeasonEntry {
   points: number;
   memes: number;
   wins: number;
+  /** Bonnes réponses à « Qui a pris ça ? » ce mois-ci. */
+  hits: number;
 }
 
 export interface SeasonState {
@@ -717,10 +754,86 @@ export interface GameRoom {
   error: string | null;
 }
 
+// ——— Qui de nous… ? ———
+
+export const WHOIS = {
+  minPlayers: 3,
+  maxPlayers: 8,
+  roundOptions: [5, 8, 12] as const,
+  questionSeconds: 25,
+  questionMax: 120,
+  /** Points pour qui a voté comme la majorité. */
+  pointsMajority: 10,
+} as const;
+
+export type WhoisStage = 'lobby' | 'question' | 'reveal' | 'final';
+
+export interface WhoisPlayer {
+  user: UserLite;
+  score: number;
+  connected: boolean;
+  voted: boolean;
+}
+
+export interface WhoisRoom {
+  code: string;
+  hostId: ID;
+  players: WhoisPlayer[];
+  rounds: number;
+  stage: WhoisStage;
+  round: number;
+  deadline: string | null;
+  /** Question en cours (et son auteur si elle vient de la bande). */
+  question: { text: string; by: UserLite | null } | null;
+  myVote: ID | null;
+  /** Révélation : nombre de votes par joueur (anonymes), du plus au moins désigné. */
+  results: { user: UserLite; votes: number }[];
+  /** Fin de partie : questions « remportées » par chacun. */
+  titles: { user: UserLite; questions: string[] }[];
+  /** Questions de la bande disponibles pour ce salon. */
+  customCount: number;
+  error: string | null;
+}
+
+export interface WhoisQuestion {
+  id: ID;
+  text: string;
+  author: UserLite;
+  mine: boolean;
+  createdAt: string;
+}
+
+// ——— Rétro de l'année ———
+
+export interface RetroState {
+  year: number;
+  /** Assez d'activité pour une rétro (sinon on invite à revenir plus tard). */
+  enough: boolean;
+  posts: { total: number; photos: number; videos: number; polls: number; likes: number; reactions: number; comments: number };
+  topPost: Post | null;
+  pellicule: { shots: number; weeks: number; onTime: number; bestStreak: number; topShot: { media: MediaRef; likes: number } | null };
+  memes: { count: number; points: number; wins: number; best: { caption: string; media: MediaRef; score: number } | null };
+  guesses: { hits: number; played: number };
+  messages: { sent: number; topFriend: { user: UserLite; count: number } | null; emoji: string | null };
+  friends: { total: number; added: number };
+  busiestMonth: { month: string; label: string; count: number } | null;
+  /** Toute la bande, pour situer. */
+  circle: { members: number; posts: number; shots: number };
+}
+
+/** Rétro proposée sur le fil du 1er décembre au 31 janvier (heure de Paris). */
+export function retroYear(now = new Date()): number | null {
+  const [y, m] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(now).split('-').map(Number);
+  if (m === 12) return y;
+  if (m === 1) return y - 1;
+  return null;
+}
+
 export type Ack<T = undefined> = (res: { ok: true; data?: T } | { ok: false; error: string }) => void;
 
 export interface ServerToClientEvents {
   'game:state': (room: GameRoom | null) => void;
+  'whois:state': (room: WhoisRoom | null) => void;
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
   presence: (e: Presence & { userId: ID }) => void;
@@ -749,6 +862,14 @@ export interface ClientToServerEvents {
   'game:rate': (memeId: ID, rating: number, ack: Ack) => void;
   'game:next': (ack: Ack) => void;
   'game:publish': (ack: Ack) => void;
+  'whois:create': (ack: Ack<WhoisRoom>) => void;
+  'whois:join': (code: string, ack: Ack<WhoisRoom>) => void;
+  'whois:leave': (ack: Ack) => void;
+  'whois:sync': (ack: Ack<WhoisRoom | null>) => void;
+  'whois:settings': (s: { rounds?: number }, ack: Ack) => void;
+  'whois:start': (ack: Ack) => void;
+  'whois:vote': (userId: ID, ack: Ack) => void;
+  'whois:next': (ack: Ack) => void;
 }
 
 // ——— Utilitaires ———

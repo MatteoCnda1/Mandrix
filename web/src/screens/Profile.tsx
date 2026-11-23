@@ -1,9 +1,10 @@
-import type { Post, UserProfile } from '@mandrix/shared';
+import { retroYear, type Post, type UserProfile } from '@mandrix/shared';
 import {
   CaretRight,
   DotsThree,
   PushPin,
   Flag,
+  Confetti,
   GearSix,
   Prohibit,
   Key,
@@ -193,6 +194,7 @@ function Settings() {
         right={friends?.incoming.length ? <span className="rounded-full bg-brand px-2.5 py-1 text-xs font-extrabold text-white">{friends.incoming.length}</span> : undefined}
       />
       <Row icon={<GearSix size={20} />} label="Réglages" onClick={() => nav('/reglages')} />
+      <Row icon={<Confetti size={20} />} label={retroYear() ? `Ma rétro ${retroYear()}` : 'Mon année jusqu’ici'} onClick={() => nav('/retro')} />
       {!isStandalone() && <Row icon={<DownloadSimple size={20} />} label="Installer l’application" onClick={install} />}
       {me?.isAdmin && <Row icon={<ChartBar size={20} />} label="Administration" onClick={() => nav('/admin')} />}
       {me?.isAdmin && (

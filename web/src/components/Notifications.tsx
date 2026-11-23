@@ -126,6 +126,12 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         ),
         to: `/p/${d.postId}`,
       };
+    case 'retro':
+      return {
+        icon: <span className="text-[17px] leading-none">🎉</span>,
+        text: <>Ta rétro {String(d.year ?? '')} est prête : revois ton année sur Mandrix !</>,
+        to: '/retro',
+      };
     case 'birthday':
       return {
         icon: <span className="text-[17px] leading-none">🎂</span>,

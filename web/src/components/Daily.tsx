@@ -209,7 +209,7 @@ export function SeasonBoard() {
     <section className="card flex flex-col gap-4 p-5" aria-label={data.label}>
       <div>
         <div className="text-[1.375rem] font-extrabold tracking-[-.02em] first-letter:uppercase">{data.label}</div>
-        <div className="text-[0.8125rem] text-mute">Points des parties de Make It Friends et des mèmes du jour. Remise à zéro chaque mois.</div>
+        <div className="text-[0.8125rem] text-mute">Points des parties de Make It Friends, des mèmes du jour et de « Qui a pris ça ? ». Remise à zéro chaque mois.</div>
       </div>
       {data.ranking.length === 0 ? (
         <p className="m-0 text-[0.9375rem] text-mute">Personne n’a encore marqué de points ce mois-ci.</p>

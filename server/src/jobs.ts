@@ -23,6 +23,18 @@ export function startJobs() {
   new Cron(`0 ${DAILY.drawHour} * * *`, paris, async () => void (await drawDaily()));
   new Cron(`0 ${DAILY.voteHour} * * *`, paris, () => announceVote());
   new Cron('5 0 * * *', paris, () => closeDaily(shiftDay(parisDay(), -1)));
+  // Rétro de l'année : le 1er décembre à 10 h, tout le monde est prévenu.
+  new Cron('0 10 1 12 *', paris, async () => {
+    const year = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric' }).format(new Date()));
+    const users = await db.execute<{ id: string }>(sql`select id from users where suspended_at is null`);
+    await notifyMany(
+      [...users].map((u) => u.id),
+      'retro',
+      { year },
+      { title: `Ta rétro ${year} est prête 🎉`, body: 'Tes posts, ta Pellicule, tes mèmes et tes amis : revois ton année sur Mandrix.', url: '/retro', tag: 'retro' },
+      `retro:${year}`,
+    );
+  });
   // Anniversaires : 9 h, heure de Paris.
   new Cron('0 9 * * *', paris, async () => void (await announceBirthdays()));
   // Serveur redémarré dans la journée : rattrape le tirage (sans notification) et la clôture d'hier.
@@ -45,7 +57,7 @@ export function startJobs() {
       [...users].map((u) => u.id),
       'unpack',
       { count: c.count },
-      { title: 'Le déballage est ouvert 📦', body: `${c.count} photos de la semaine t'attendent.`, url: '/deballage', tag: 'unpack' },
+      { title: 'Le déballage est ouvert 📦', body: `${c.count} photos de la semaine t'attendent. Devine d'abord qui les a prises !`, url: '/deballage', tag: 'unpack' },
       `unpack:${revealAt.toISOString()}`,
     );
   });

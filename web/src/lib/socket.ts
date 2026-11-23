@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, ConversationDetail, GameRoom, Message, ServerToClientEvents } from '@mandrix/shared';
+import type { ClientToServerEvents, ConversationDetail, GameRoom, Message, ServerToClientEvents, WhoisRoom } from '@mandrix/shared';
 import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { qc } from './data';
@@ -15,6 +15,9 @@ export const useGame = create<{ room: GameRoom | null; connected: boolean; synce
   connected: false,
   synced: false,
 }));
+
+/** Salon « Qui de nous… ? » en cours (null hors salon). */
+export const useWhois = create<{ room: WhoisRoom | null }>(() => ({ room: null }));
 
 /** Nouveaux posts d'amis arrivés pendant qu'on est sur le fil (pastille). */
 export const useFeedFresh = create<{ count: number; authors: string[] }>(() => ({ count: 0, authors: [] }));
@@ -60,6 +63,9 @@ export function connectSocket() {
     socket!.emit('game:sync', (res) => {
       if (res.ok) useGame.setState({ room: res.data ?? null, synced: true });
     });
+    socket!.emit('whois:sync', (res) => {
+      if (res.ok) useWhois.setState({ room: res.data ?? null });
+    });
     qc.invalidateQueries({ queryKey: ['badges'] });
     // Pendant la coupure, des amis ont pu se connecter ou partir : on recharge la présence.
     resetPresence();
@@ -71,6 +77,7 @@ export function connectSocket() {
   });
   socket.on('disconnect', () => useGame.setState({ connected: false }));
   socket.on('game:state', (room) => useGame.setState({ room }));
+  socket.on('whois:state', (room) => useWhois.setState({ room }));
   socket.on('badges', (b) => qc.setQueryData(['badges'], b));
   socket.on('notif:new', (n) => {
     qc.invalidateQueries({ queryKey: ['notifications'] });
@@ -119,6 +126,7 @@ export function disconnectSocket() {
   socket?.disconnect();
   socket = null;
   useGame.setState({ room: null, connected: false, synced: false });
+  useWhois.setState({ room: null });
 }
 
 type Res<T> = { ok: true; data?: T } | { ok: false; error: string };

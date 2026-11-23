@@ -268,6 +268,44 @@ export const shotLikes = pgTable(
   (t) => [primaryKey({ columns: [t.shotId, t.userId] })],
 );
 
+/** « Qui a pris ça ? » : une réponse par photo et par joueur. */
+export const shotGuesses = pgTable(
+  'shot_guesses',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    shotId: uuid('shot_id').notNull().references(() => shots.id, { onDelete: 'cascade' }),
+    guessedId: uuid('guessed_id').references(() => users.id, { onDelete: 'set null' }),
+    correct: boolean('correct').notNull(),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.shotId] })],
+);
+
+/** « Qui a pris ça ? » : partie d'une semaine (finie ou passée) et ses points. */
+export const guessRounds = pgTable(
+  'guess_rounds',
+  {
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    revealAt: ts('reveal_at').notNull(),
+    status: text('status').$type<'done' | 'skipped'>().notNull(),
+    score: integer('score').notNull().default(0),
+    createdAt: created(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.revealAt] }), index('guess_rounds_created_idx').on(t.createdAt)],
+);
+
+/** « Qui de nous… ? » : questions écrites par les joueurs. */
+export const whoisQuestions = pgTable(
+  'whois_questions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    createdAt: created(),
+  },
+  (t) => [index('whois_questions_author_idx').on(t.authorId)],
+);
+
 export const poolItems = pgTable(
   'pool_items',
   {

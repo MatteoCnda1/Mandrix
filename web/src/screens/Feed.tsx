@@ -10,6 +10,7 @@ import { countdown } from '../lib/format';
 import { useNow, usePullToRefresh, useSentinel } from '../lib/hooks';
 import { openSheet, useUI } from '../lib/store';
 import { useViewport } from '../lib/theme';
+import { RetroBanner } from '../components/RetroBanner';
 
 /** Image d'aperçu d'une story : la photo, ou la miniature de la vidéo. */
 const storyPreview = (g: StoryGroup) => {
@@ -170,6 +171,7 @@ export function Feed() {
         Rechercher des posts, #hashtags, amis…
       </button>
       <Stories />
+      <RetroBanner />
       {!isDesktop && (
         <button
           type="button"

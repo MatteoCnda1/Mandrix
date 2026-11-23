@@ -1,4 +1,4 @@
-import type { DailyState, SeasonState } from '@mandrix/shared';
+import { GUESS, type DailyState, type SeasonState } from '@mandrix/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -67,17 +67,23 @@ export default async function dailyRoutes(app: FastifyInstance) {
     const current = parisDay().slice(0, 7);
     const q = String((req.query as { month?: string }).month ?? current);
     const month = /^\d{4}-\d{2}$/.test(q) ? q : current;
-    const rows = await db.execute<{ authorId: string; points: number; memes: number; wins: number }>(sql`
-      select author_id as "authorId", sum(score)::int as points, count(*)::int as memes, count(*) filter (where is_winner)::int as wins
-      from memes
+    // Points des mèmes (parties, mème du jour) et des bonnes réponses à « Qui a pris ça ? ».
+    const scored = sql`(
+      select author_id, score as points, 1 as memes, is_winner::int as wins, 0 as hits, created_at from memes
+      union all
+      select user_id, ${GUESS.pointsPerHit}::int, 0, 0, 1, created_at from shot_guesses where correct
+    )`;
+    const rows = await db.execute<{ authorId: string; points: number; memes: number; wins: number; hits: number }>(sql`
+      select author_id as "authorId", sum(points)::int as points, sum(memes)::int as memes, sum(wins)::int as wins, sum(hits)::int as hits
+      from ${scored} s
       where to_char(created_at at time zone 'Europe/Paris', 'YYYY-MM') = ${month}
-      group by author_id having sum(score) > 0
+      group by author_id having sum(points) > 0
       order by points desc, wins desc
       limit 50`);
     const past = await db.execute<{ month: string; authorId: string; points: number }>(sql`
       select distinct on (month) month, author_id as "authorId", points from (
-        select to_char(created_at at time zone 'Europe/Paris', 'YYYY-MM') as month, author_id, sum(score)::int as points
-        from memes group by 1, 2
+        select to_char(created_at at time zone 'Europe/Paris', 'YYYY-MM') as month, author_id, sum(points)::int as points
+        from ${scored} s group by 1, 2
       ) t
       where month < ${current} and points > 0
       order by month desc, points desc
@@ -88,7 +94,7 @@ export default async function dailyRoutes(app: FastifyInstance) {
       label: monthLabel(month),
       ranking: [...rows]
         .filter((r) => people.has(r.authorId))
-        .map((r) => ({ user: people.get(r.authorId)!, points: r.points, memes: r.memes, wins: r.wins })),
+        .map((r) => ({ user: people.get(r.authorId)!, points: r.points, memes: r.memes, wins: r.wins, hits: r.hits })),
       champions: [...past]
         .filter((r) => people.has(r.authorId))
         .map((r) => ({ month: r.month, label: monthLabel(r.month), user: people.get(r.authorId)!, points: r.points })),

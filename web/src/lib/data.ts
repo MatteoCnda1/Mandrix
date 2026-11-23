@@ -3,6 +3,9 @@ import type {
   AppNotification,
   Badges,
   Comment,
+  GuessState,
+  RetroState,
+  WhoisQuestion,
   Conversation,
   ConversationDetail,
   FriendsList,
@@ -75,6 +78,10 @@ export const useMemes = () =>
   useQuery({ queryKey: ['memes'], queryFn: () => api<{ podium: Post[]; items: Post[]; next: number | null }>('/api/memes?page=0') });
 export const usePellicule = () => useQuery({ queryKey: ['pellicule'], queryFn: () => api<PelliculeState>('/api/pellicule') });
 export const useUnpack = () => useQuery({ queryKey: ['unpack'], queryFn: () => api<UnpackState>('/api/pellicule/unpack') });
+export const useGuess = (enabled = true) => useQuery({ queryKey: ['guess'], queryFn: () => api<GuessState | null>('/api/pellicule/guess'), enabled });
+export const useRetro = (year?: number) =>
+  useQuery({ queryKey: ['retro', year ?? 'default'], queryFn: () => api<RetroState>(`/api/retro${year ? `?year=${year}` : ''}`), staleTime: 5 * 60_000 });
+export const useWhoisQuestions = () => useQuery({ queryKey: ['whois-questions'], queryFn: () => api<WhoisQuestion[]>('/api/whois/questions') });
 export const usePoolStats = () => useQuery({ queryKey: ['pool-stats'], queryFn: () => api<PoolStats>('/api/pool/stats') });
 export const useProfile = (username: string) =>
   useQuery({ queryKey: ['profile', username], queryFn: () => api<UserProfile>(`/api/users/${encodeURIComponent(username)}`), enabled: !!username });

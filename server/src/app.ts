@@ -21,6 +21,8 @@ import poolRoutes from './routes/pool.js';
 import postRoutes from './routes/posts.js';
 import storyRoutes from './routes/stories.js';
 import userRoutes from './routes/users.js';
+import whoisRoutes from './routes/whois.js';
+import retroRoutes from './routes/retro.js';
 import { securityHeaders } from './lib/security.js';
 
 /** Construit l'application (routes, temps réel) sans démarrer l'écoute ni les tâches planifiées. */
@@ -83,6 +85,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(dailyRoutes);
   await app.register(notificationRoutes);
   await app.register(mediaRoutes);
+  await app.register(whoisRoutes);
+  await app.register(retroRoutes);
 
   // Routage côté client : toute URL inconnue hors API renvoie la PWA.
   app.setNotFoundHandler((req, reply) => {
