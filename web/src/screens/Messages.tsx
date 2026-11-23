@@ -294,7 +294,7 @@ export function Chat() {
   );
 
   const bubbles = (
-    <div ref={list} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 py-2">
+    <div ref={list} className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-1 py-2">
       <div className="mt-auto" />
       {msgs?.length === 0 && <div className="py-8 text-center text-sm text-mute">Dis bonjour 👋</div>}
       {msgs?.map((m, i) => {

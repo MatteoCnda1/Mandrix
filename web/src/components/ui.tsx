@@ -127,7 +127,7 @@ export function Sheet({ title, onClose, children, wide }: { title: ReactNode; on
       />
       <div
         className={cx(
-          'relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
+          'no-scrollbar relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
           wide ? 'max-w-[640px]' : 'max-w-[560px]',
         )}
         style={{

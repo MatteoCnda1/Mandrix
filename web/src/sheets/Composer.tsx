@@ -53,13 +53,13 @@ function DropZone({ file, accept, label, onPick, onClear, aspect = '16 / 9' }: {
   );
 }
 
-export function Composer({ mode, initialKind }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2 }) {
+export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 'story'; initialKind?: 0 | 1 | 2; initialPool?: boolean }) {
   const nav = useNavigate();
   const { data: config } = useConfig();
   const [kind, setKind] = useState<0 | 1 | 2>(initialKind ?? 0);
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState('');
-  const [pool, setPool] = useState(false);
+  const [pool, setPool] = useState(!!initialPool);
   const [pollKind, setPollKind] = useState<PollKind>('text');
   const [q, setQ] = useState('');
   const [opts, setOpts] = useState(['', '', '', '']);
