@@ -371,7 +371,8 @@ export type NotificationType =
   | 'reaction'
   | 'mention'
   | 'poll_ended'
-  | 'daily_meme';
+  | 'daily_meme'
+  | 'alert';
 
 /** Catégories réglables dans « Notifications » (profil). */
 export const NOTIF_CATEGORIES = [
@@ -382,6 +383,7 @@ export const NOTIF_CATEGORIES = [
   { key: 'game', label: 'Make It Friends et mème du jour', types: ['game_invite', 'pool_added', 'pool_drawn', 'daily_meme'] },
   { key: 'pellicule', label: 'Pellicule et déballage', types: ['unpack', 'streak', 'moment'] },
   { key: 'polls', label: 'Fin de mes sondages', types: ['poll_ended'] },
+  { key: 'system', label: 'Alertes du serveur (admins)', types: ['alert'] },
 ] as const satisfies readonly { key: string; label: string; types: readonly NotificationType[] }[];
 
 export type NotifCategory = (typeof NOTIF_CATEGORIES)[number]['key'];

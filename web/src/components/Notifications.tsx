@@ -120,6 +120,15 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         ),
         to: `/p/${d.postId}`,
       };
+    case 'alert':
+      return {
+        icon: <Lightning size={18} weight="fill" className="text-heart" />,
+        text: (
+          <>
+            <b>{String(d.title ?? 'Alerte serveur')}</b> {String(d.body ?? '')}
+          </>
+        ),
+      };
     case 'daily_meme':
       return {
         icon: d.stage === 'won' ? <Trophy size={18} weight="fill" className="text-ember" /> : <Sticker size={18} weight="fill" className="text-acc" />,

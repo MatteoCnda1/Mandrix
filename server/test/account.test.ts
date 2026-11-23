@@ -108,3 +108,21 @@ describe('compte', () => {
     expect(n).toBe(0);
   });
 });
+
+describe('alertes de supervision', () => {
+  it('refuse sans le bon jeton et prévient les admins avec', async () => {
+    const { env } = await import('../src/env.js');
+    expect((await call(null, 'POST', '/api/internal/alert', { title: 'NAS' })).status).toBe(404);
+    env.alertToken = 'jeton-de-test-0123456789';
+    const bad = await app.inject({ method: 'POST', url: '/api/internal/alert', headers: { authorization: 'Bearer faux', 'content-type': 'application/json' }, payload: '{"title":"NAS"}' });
+    expect(bad.statusCode).toBe(401);
+    const good = await app.inject({
+      method: 'POST',
+      url: '/api/internal/alert',
+      headers: { authorization: `Bearer ${env.alertToken}`, 'content-type': 'application/json' },
+      payload: JSON.stringify({ key: 'nas', title: 'NAS injoignable', body: 'Réveil envoyé' }),
+    });
+    expect(good.json().sent).toBeGreaterThanOrEqual(1);
+    env.alertToken = null;
+  });
+});

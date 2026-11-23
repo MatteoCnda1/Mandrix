@@ -1,0 +1,7 @@
+[Unit]
+Description=Déploiement automatique de Mandrix (branche main)
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/mandrix/deploy/homelab/mandrix-auto-deploy.sh

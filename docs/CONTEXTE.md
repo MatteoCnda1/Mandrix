@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 23 novembre 2026.
+> Dernière mise à jour : 23 novembre 2026 (issues #5 à #18).
 
 ## 1. L'idée
 
@@ -57,7 +57,10 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 
 ### Fil, stories, sondages
 - Posts photo/vidéo/texte, j'aime, commentaires (avec j'aime), republication.
-- Sondages : choix, photos, curseur emoji.
+- **Réactions emoji** (#5) : tap sur le cœur = j'aime, appui long = 😂 😍 😮 😢 🔥 👏 (une par personne, notification regroupée par post).
+- **@mentions et #hashtags** (#6) : suggestions d'amis en tapant « @ », notification aux amis mentionnés qui voient le post, hashtags cliquables vers la recherche.
+- Sondages : choix (jusqu'à **6 options**), photos, curseur emoji ; **durée** (1 h, 24 h, 3 jours, sans fin), **votes publics** facultatifs, vote bloqué côté serveur à la fin et résultat envoyé à l'auteur (#7).
+- **Recherche** `/recherche` (#13) : légendes, options de sondage et mèmes du cercle, `#hashtag` exact, personnes ; « Tu les connais peut-être ? » (amis d'amis par amis en commun).
 - Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses.
 - Répondre à une story envoie un message privé qui **affiche la photo de la story** des deux côtés (instantané dans `messages.meta`).
 - Tirer pour rafraîchir.
@@ -83,12 +86,19 @@ Jeu temps réel 2 à 8 joueurs : une image tirée du pool, chacun écrit une lé
 Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images partagé (signalements, modération admin),
 podium avec départage par auteur en cas d'égalité. Correctif : la création de salon diffuse maintenant l'état (#20).
 
+**Mème du jour** (#9, onglet du jeu `/jeu?onglet=jour`) : une image du pool public tirée à 8 h (heure de Paris), une légende
+par personne modifiable jusqu'à 18 h, votes anonymes de 18 h à minuit, résultats le lendemain. Chaque vote vaut 50 points,
+le gagnant +100. Les légendes rejoignent la table `memes`.
+
 ### Galerie des mèmes
-Podium des mèmes les plus aimés.
+Classement de la **saison** (mois en cours : somme des `memes.score`, parties et mèmes du jour), champions des mois passés,
+puis podium des mèmes les plus aimés.
 
 ### Messages
 - Conversations privées et **groupes** (jusqu'à `GROUP_MAX_MEMBERS`) : création, renommage, ajout de membres, quitter ; messages système.
 - Non-lus, badges, push.
+- **« … écrit »** (socket `dm:typing`, expire après 6 s), **accusés « Vu » / « Vu par … »** (`dm:read`, table `conversation_reads`),
+  **réactions** par appui long sur une bulle (❤️ + les six emoji), avec « Copier » et « Signaler ».
 - Chat plein écran sur téléphone ; le clavier ne fait plus remonter tout l'écran (variables `--vvh`, `--kb` via `visualViewport`).
 - Barre de défilement masquée dans les conversations.
 - **Photos, vidéos et vocaux** (branche `feat/messages-media`) :
@@ -99,10 +109,24 @@ Podium des mèmes les plus aimés.
   - aperçu dans la liste et dans les push : « 📷 Photo », « 🎥 Vidéo », « 🎤 Message vocal (0:12) » (`attachmentLabel` dans `shared`).
 
 ### Profil et compte
-Statistiques, série, amis, code de parrainage (`InviteCard`), mode sombre, push, installation guidée, modération (admin).
+Statistiques, série, amis, code de parrainage (`InviteCard`), mode sombre, installation guidée, modération (admin).
+
+**Réglages** `/reglages` :
+- notifications par catégorie, en push et dans la cloche, et **heures calmes** (#12) ; appliquées côté serveur (`notify`, `sendPush(…, kind)`) ;
+- **ambiance** de fond (#14) : Aurore, Ciel vivant, Doodles & grain, Heure réelle (doré le dimanche 19 h–21 h), mémorisée par appareil, figée par « Réduire les animations » ;
+- **compte** (#11) : e-mail, mot de passe (ferme les autres sessions), appareils connectés, export zip (JSON + médias), suppression (cascade + fichiers) ;
+- comptes bloqués.
+
+**Blocage et signalements** (#10) : bloquer retire l'amitié et coupe profil, recherche, demandes et messages à deux.
+Signaler un post, commentaire, story, message ou compte ; trois signalements masquent le contenu. L'admin a une file
+de modération (classer, masquer, supprimer) et peut **suspendre** un compte (connexion refusée).
 Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli -w server -- make-admin <pseudo>`).
 
 ### PWA
+- Zoom au pincement et au double tap désactivés (Safari ignore `user-scalable=no` : les évènements de geste sont annulés).
+- Écrans et feuilles chargés à la demande (`React.lazy`) : JS initial ≈ 186 Ko compressés (#15).
+- Photos : variantes WebP 360/720/1280 générées à l'envoi (rattrapage au démarrage), servies en `?w=` via `srcset` (#15).
+- Accessibilité (#16) : tailles de texte en `rem`, texte secondaire et liens ≥ 4,5:1, focus gardé dans les feuilles.
 - Mise à jour sur demande : bannière « Mettre à jour » (`registerType: 'prompt'`, message `SKIP_WAITING`).
 - Overlays rendus dans un portail (`Portal`) pour passer au-dessus de la barre d'onglets.
 - Icônes générées depuis les masters du logo (`npm run icons`, logo « mandrill pensif low poly » de Solal, #19).
@@ -136,6 +160,9 @@ git archive --format=tar main | gzip | ssh pve 'cat > /tmp/mandrix-src.tgz \
 
 Puis vérifier : `/api/config` répond, les fichiers servis correspondent au build (comparaison md5), le NAS est joignable.
 
+**Supervision** (#18) : watchdog NAS/disque/site sur le Proxmox, restauration test hebdomadaire des sauvegardes,
+déploiement automatique facultatif (clé de déploiement GitHub), alertes en push chez les admins. Voir [SUPERVISION.md](SUPERVISION.md).
+
 ## 6. Qualité et flux de travail
 
 - **CI GitHub Actions** (`.github/workflows/ci.yml`) sur `main` et chaque PR : types (serveur + PWA), tests d'API Vitest sur PostgreSQL 17 + ffmpeg, build, image Docker.
@@ -154,6 +181,8 @@ Puis vérifier : `/api/config` répond, les fichiers servis correspondent au bui
 - `@fastify/static` : `cacheControl: false` puis en-têtes à la main (`/assets/` immuable, le reste `no-cache`) ; `HEAD /` doit répondre.
 - Le serveur de dev doit écouter sur 3000 (`PORT=3000 tsx watch …`), Vite sur 5173 avec proxy.
 - Tests d'auth : `env.inviteCode = null` pour tester le parrainage seul.
+- Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
+- Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block`.
 - `gh pr update-branch` n'existe pas ici : `gh api -X PUT repos/MatteoCnda1/Mandrix/pulls/<n>/update-branch`.
 
 ## 8. Migrations
@@ -165,10 +194,9 @@ Puis vérifier : `/api/config` répond, les fichiers servis correspondent au bui
 | `0002_video_offline_moment` | statut/miniature/durée des vidéos, `client_id`/`taken_at`/`on_time` des photos, Moment Mandrix |
 | `0003_group_chats` | groupes (`conversation_members`, `is_group`, `title`), rattrapage des membres existants |
 | `0004_message_media` | `messages.media_id` (pièce jointe, `ON DELETE SET NULL`) |
+| `0005_reactions_moderation_daily` | réactions (posts, messages), blocages, signalements, `hidden_at`, suspension, préférences de notifications, sessions (appareil, activité), sondages (fin, public), variantes de photos, mème du jour |
 
-## 9. Pistes ouvertes (issues GitHub)
+## 9. Pistes ouvertes
 
-#5 réactions emoji · #6 mentions et hashtags · #7 sondages avancés · #8 messages (reste : accusés « Vu », « en train d'écrire ») ·
-#9 mème du jour et saisons · #10 blocage/signalement · #11 gestion du compte · #12 préférences de notifications ·
-#13 suggestions d'amis et recherche · #14 choix de l'ambiance · #15 performance (découpage du bundle, images responsives) ·
-#16 accessibilité · #18 déploiement automatisé et supervision.
+Les issues #1 à #18 sont traitées. Restent à faire à la main : l'audit VoiceOver / TalkBack sur téléphone (#16) et,
+pour le déploiement automatique (#18), la clé de déploiement GitHub en lecture seule (voir SUPERVISION.md).

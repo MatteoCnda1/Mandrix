@@ -19,6 +19,8 @@ export const env = {
   webDist: path.resolve(process.env.WEB_DIST ?? path.join(here, '../../web/dist')),
   migrationsDir: path.resolve(process.env.MIGRATIONS_DIR ?? path.join(here, '../drizzle')),
   inviteCode: process.env.INVITE_CODE?.trim() || null,
+  /** Jeton des alertes de supervision du homelab (POST /api/internal/alert). Vide : route désactivée. */
+  alertToken: process.env.ALERT_TOKEN?.trim() || null,
   adminEmails: (process.env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
