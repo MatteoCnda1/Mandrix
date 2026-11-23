@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { MultipartFile } from '@fastify/multipart';
 import type { MediaRef } from '@mandrix/shared';
-import sharp from 'sharp';
+import sharp, { type OutputInfo } from 'sharp';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
@@ -130,7 +130,7 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
 
   if (isImage) {
     const buf = await file.toBuffer();
-    let out: { data: Buffer; info: sharp.OutputInfo };
+    let out: { data: Buffer; info: OutputInfo };
     try {
       const side = opts.maxSide ?? 2048;
       // rotate() applique l'orientation EXIF ; la sortie WebP ne conserve aucune métadonnée (GPS…).

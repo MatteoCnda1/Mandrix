@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { NOTIF_CATEGORIES, type NotificationPrefs, type SessionInfo } from '@mandrix/shared';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { and, desc, eq, like, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -35,7 +35,7 @@ function deviceOf(ua: string | null) {
 }
 
 const categoryKeys = NOTIF_CATEGORIES.map((c) => c.key) as [string, ...string[]];
-const toggles = z.record(z.enum(categoryKeys), z.boolean()).optional();
+const toggles = z.partialRecord(z.enum(categoryKeys), z.boolean()).optional();
 const prefsSchema = z.object({
   push: toggles,
   bell: toggles,
@@ -156,7 +156,7 @@ export default async function accountRoutes(app: FastifyInstance) {
     const files = await q<{ id: string; path: string }>(sql`
       select id, path from media where owner_id = ${me.id} and (sealed_until is null or sealed_until <= now()) and status <> 'processing'`);
 
-    const zip = archiver('zip', { zlib: { level: 6 } });
+    const zip = new ZipArchive({ zlib: { level: 6 } });
     const json = (v: unknown) => JSON.stringify(v, null, 2);
     zip.append(json(profile), { name: 'profil.json' });
     zip.append(json(friends), { name: 'amis.json' });
@@ -180,7 +180,7 @@ export default async function accountRoutes(app: FastifyInstance) {
   /** Supprime le compte, ses données (cascade) et ses fichiers. */
   app.delete('/api/me', async (req, reply) => {
     const me = requireUser(req);
-    const body = parse(z.object({ password: z.string().min(1), confirm: z.literal('SUPPRIMER', { errorMap: () => ({ message: 'Écris SUPPRIMER pour confirmer' }) }) }), req.body);
+    const body = parse(z.object({ password: z.string().min(1), confirm: z.literal('SUPPRIMER', { error: 'Écris SUPPRIMER pour confirmer' }) }), req.body);
     if (!(await verifyPassword(me.passwordHash, body.password))) fail(403, 'Mot de passe incorrect');
     const media = await db.select().from(schema.media).where(eq(schema.media.ownerId, me.id));
     await destroySession(req, reply);

@@ -43,9 +43,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     wildcard: false,
     index: false,
     cacheControl: false,
-    setHeaders: (res, filePath) => {
-      if (filePath.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      else res.setHeader('Cache-Control', 'no-cache');
+    setHeaders: (reply, filePath) => {
+      reply.header('Cache-Control', filePath.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache');
     },
   });
 

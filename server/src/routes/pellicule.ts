@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Multipart, MultipartFile } from '@fastify/multipart';
 import { DAY_SHORT, SHOT_UNDO_MINUTES, type PelliculeState, type Shot, type UnpackState } from '@mandrix/shared';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { and, desc, eq, gt, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db, schema } from '../db/index.js';
@@ -114,7 +114,7 @@ export default async function pelliculeRoutes(app: FastifyInstance) {
 
     const label = weekLabel(revealAt).replace(/^Semaine du /, '').replace(/\s+/g, '-');
     const name = `mandrix-${mineOnly ? 'mes-photos' : 'album'}-${label}.zip`.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const zip = archiver('zip', { store: true });
+    const zip = new ZipArchive({ store: true });
     const pad = (n: number) => String(n).padStart(2, '0');
     list.forEach((r, i) => {
       const t = new Date(r.takenAt);
