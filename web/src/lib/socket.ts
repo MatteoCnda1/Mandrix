@@ -25,9 +25,11 @@ export function getSocket() {
 
 /** « En train d'écrire » : conversation → membres qui écrivent. Expire seul après 6 s sans nouvelle. */
 export const useTyping = create<Record<string, string[]>>(() => ({}));
+/** Parmi eux, ceux qui enregistrent un vocal (clé « conversation:membre »). */
+export const useRecordingVoice = create<Record<string, boolean>>(() => ({}));
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function setTyping(conversationId: string, userId: string, typing: boolean) {
+function setTyping(conversationId: string, userId: string, typing: boolean, activity: 'text' | 'voice' = 'text') {
   const key = `${conversationId}:${userId}`;
   clearTimeout(typingTimers.get(key));
   typingTimers.delete(key);
@@ -35,17 +37,18 @@ function setTyping(conversationId: string, userId: string, typing: boolean) {
     const list = (s[conversationId] ?? []).filter((id) => id !== userId);
     return { [conversationId]: typing ? [...list, userId] : list };
   });
+  useRecordingVoice.setState({ [key]: typing && activity === 'voice' });
   if (typing) typingTimers.set(key, setTimeout(() => setTyping(conversationId, userId, false), 6000));
 }
 
-let lastTypingSent = 0;
-/** Prévient les autres membres que j'écris (au plus toutes les 3 s), ou que j'ai arrêté. */
-export function sendTyping(conversationId: string, typing: boolean) {
+const lastTypingSent: Record<string, number> = {};
+/** Prévient les autres membres que j'écris ou que j'enregistre un vocal (au plus toutes les 3 s), ou que j'ai arrêté. */
+export function sendTyping(conversationId: string, typing: boolean, activity: 'text' | 'voice' = 'text') {
   if (!socket?.connected) return;
   const now = Date.now();
-  if (typing && now - lastTypingSent < 3000) return;
-  lastTypingSent = typing ? now : 0;
-  socket.emit('dm:typing', conversationId, typing);
+  if (typing && now - (lastTypingSent[activity] ?? 0) < 3000) return;
+  lastTypingSent[activity] = typing ? now : 0;
+  socket.emit('dm:typing', conversationId, typing, activity);
 }
 
 export function connectSocket() {
@@ -81,7 +84,7 @@ export function connectSocket() {
   socket.on('media:ready', () => {
     for (const k of [['feed'], ['reels'], ['stories'], ['user-posts'], ['post'], ['memes'], ['messages']]) qc.invalidateQueries({ queryKey: k });
   });
-  socket.on('dm:typing', (e) => setTyping(e.conversationId, e.userId, e.typing));
+  socket.on('dm:typing', (e) => setTyping(e.conversationId, e.userId, e.typing, e.activity));
   socket.on('dm:read', (e) => {
     qc.setQueryData<ConversationDetail>(['conversation', e.conversationId], (old) =>
       old ? { ...old, reads: [...old.reads.filter((r) => r.userId !== e.userId), { userId: e.userId, at: e.at }] } : old,

@@ -7,6 +7,8 @@ import { api, errMsg, upload } from '../lib/api';
 import { qc, useMe } from '../lib/data';
 import { closeSheet, toast } from '../lib/store';
 
+const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
 export function EditProfileSheet() {
   const nav = useNavigate();
   const { data: me } = useMe();
@@ -14,6 +16,8 @@ export function EditProfileSheet() {
   const [username, setUsername] = useState(me?.username ?? '');
   const [city, setCity] = useState(me?.city ?? '');
   const [bio, setBio] = useState(me?.bio ?? '');
+  const [bDay, setBDay] = useState(me?.birthday?.slice(3) ?? '');
+  const [bMonth, setBMonth] = useState(me?.birthday?.slice(0, 2) ?? '');
   const [busy, setBusy] = useState(false);
 
   const refresh = (u: Me) => {
@@ -35,7 +39,8 @@ export function EditProfileSheet() {
   const save = async () => {
     setBusy(true);
     try {
-      const u = await api<Me>('/api/me', { method: 'PATCH', body: { displayName, username, city, bio } });
+      const birthday = bDay && bMonth ? `${bMonth}-${bDay}` : null;
+      const u = await api<Me>('/api/me', { method: 'PATCH', body: { displayName, username, city, bio, birthday } });
       refresh(u);
       toast('Profil enregistré');
       closeSheet();
@@ -63,6 +68,25 @@ export function EditProfileSheet() {
       <input className="field" value={username} maxLength={20} onChange={(e) => setUsername(e.target.value.toLowerCase())} autoCapitalize="none" />
       <span className={label}>Ville</span>
       <input className="field" value={city} maxLength={60} placeholder="Aix-en-Provence" onChange={(e) => setCity(e.target.value)} />
+      <span className={label}>Anniversaire (facultatif, l’année n’est pas demandée)</span>
+      <div className="flex gap-2">
+        <select className="field w-24 flex-none px-3" value={bDay} onChange={(e) => setBDay(e.target.value)} aria-label="Jour">
+          <option value="">Jour</option>
+          {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+            <option key={d} value={d}>
+              {Number(d)}
+            </option>
+          ))}
+        </select>
+        <select className="field min-w-0 flex-1 px-3" value={bMonth} onChange={(e) => setBMonth(e.target.value)} aria-label="Mois">
+          <option value="">Mois</option>
+          {MONTHS.map((m, i) => (
+            <option key={m} value={String(i + 1).padStart(2, '0')}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
       <span className={label}>Bio</span>
       <textarea
         className="field h-auto min-h-[88px] resize-none py-3 leading-snug"

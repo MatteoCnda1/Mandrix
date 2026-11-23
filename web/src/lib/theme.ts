@@ -6,15 +6,47 @@ function read(): boolean {
   return document.documentElement.getAttribute('data-theme') === 'dark';
 }
 
-export function setDark(dark: boolean) {
+/** Thème choisi : clair, sombre, ou automatique (suit le réglage du téléphone). */
+export type ThemePref = 'light' | 'dark' | 'auto';
+const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+export function getThemePref(): ThemePref {
+  try {
+    const d = localStorage.getItem('mandrix.dark');
+    return d === '1' ? 'dark' : d === '0' ? 'light' : 'auto';
+  } catch {
+    return 'auto';
+  }
+}
+
+function apply(dark: boolean) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#071120' : '#E8F2FC');
+  listeners.forEach((l) => l());
+}
+
+export function setThemePref(pref: ThemePref) {
   try {
-    localStorage.setItem('mandrix.dark', dark ? '1' : '0');
+    if (pref === 'auto') localStorage.removeItem('mandrix.dark');
+    else localStorage.setItem('mandrix.dark', pref === 'dark' ? '1' : '0');
   } catch {
     /* stockage indisponible */
   }
-  listeners.forEach((l) => l());
+  apply(pref === 'auto' ? systemDark() : pref === 'dark');
+}
+
+export function setDark(dark: boolean) {
+  setThemePref(dark ? 'dark' : 'light');
+}
+
+// En automatique, on suit le téléphone en direct (passage au mode sombre le soir…).
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (getThemePref() === 'auto') apply(e.matches);
+});
+
+export function useThemePref(): [ThemePref, (p: ThemePref) => void] {
+  useDark();
+  return [getThemePref(), setThemePref];
 }
 
 export function useDark(): [boolean, () => void] {

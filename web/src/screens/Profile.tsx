@@ -7,6 +7,7 @@ import {
   Prohibit,
   Key,
   QrCode,
+  Stack,
   ChatCircleDots,
   ChartBar,
   Copy,
@@ -54,6 +55,11 @@ function Tile({ post, ratio }: { post: Post; ratio: string }) {
       style={{ aspectRatio: ratio }}
     >
       {post.media?.kind === 'image' && <img src={post.media.url} srcSet={post.media.srcSet ?? undefined} sizes="(max-width: 700px) 34vw, 220px" alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+      {post.gallery && (
+        <span className="absolute top-2 right-2 grid h-7 w-7 place-items-center rounded-full bg-black/45 text-white" aria-label={`${post.gallery.length} photos`}>
+          <Stack size={15} weight="fill" />
+        </span>
+      )}
       {post.media?.kind === 'video' && (
         <>
           {post.media.poster ? (
@@ -182,6 +188,7 @@ function Settings() {
       />
       <Row icon={<GearSix size={20} />} label="Réglages" onClick={() => nav('/reglages')} />
       {!isStandalone() && <Row icon={<DownloadSimple size={20} />} label="Installer l’application" onClick={install} />}
+      {me?.isAdmin && <Row icon={<ChartBar size={20} />} label="Administration" onClick={() => nav('/admin')} />}
       {me?.isAdmin && (
         <Row
           icon={<ShieldCheck size={20} />}

@@ -32,9 +32,20 @@ export function Logo({ size = 42, className }: { size?: number; className?: stri
 
 const TONES = ['bg-tint text-ink', 'bg-ink text-inv', 'bg-azure text-white'];
 
-export function Avatar({ user, size = 44, ring, className }: { user: Pick<UserLite, 'initials' | 'tone' | 'avatarUrl' | 'displayName'>; size?: number; ring?: boolean; className?: string }) {
+export function Avatar({ user, size = 44, ring, className }: { user: Pick<UserLite, 'initials' | 'tone' | 'avatarUrl' | 'displayName' | 'birthdayToday'>; size?: number; ring?: boolean; className?: string }) {
   const style: CSSProperties = { width: size, height: size, fontSize: Math.round(size * 0.34) };
   if (ring) style.boxShadow = '0 0 0 4px var(--card), 0 0 0 7px #2A9DF4';
+  // 🎂 le jour de son anniversaire (à partir d'une taille lisible).
+  if (user.birthdayToday && size >= 36) {
+    return (
+      <span className={cx('relative inline-grid flex-none', className)} style={{ width: size, height: size }}>
+        <Avatar user={{ ...user, birthdayToday: false }} size={size} ring={ring} />
+        <span aria-label="Anniversaire aujourd’hui" className="absolute -right-1 -bottom-1 leading-none" style={{ fontSize: Math.round(size * 0.42) }}>
+          🎂
+        </span>
+      </span>
+    );
+  }
   return user.avatarUrl ? (
     <img src={user.avatarUrl} alt="" loading="lazy" className={cx('flex-none rounded-full object-cover bg-soft', className)} style={style} />
   ) : (
@@ -565,7 +576,7 @@ export function Podium({ entries, heights = ['124px', '96px', '70px'], height = 
 }
 
 /** Champ fichier caché déclenché par un bouton. */
-export function useFilePicker(accept: string, onPick: (f: File) => void, capture?: 'user' | 'environment') {
+export function useFilePicker(accept: string, onPick: (f: File) => void, capture?: 'user' | 'environment', multiple = false) {
   const ref = useRef<HTMLInputElement | null>(null);
   const input = (
     <input
@@ -573,10 +584,10 @@ export function useFilePicker(accept: string, onPick: (f: File) => void, capture
       type="file"
       accept={accept}
       capture={capture}
+      multiple={multiple}
       className="hidden"
       onChange={(e) => {
-        const f = e.target.files?.[0];
-        if (f) onPick(f);
+        for (const f of Array.from(e.target.files ?? []).slice(0, multiple ? 10 : 1)) onPick(f);
         e.target.value = '';
       }}
     />

@@ -6,6 +6,8 @@ import {
   CaretDown,
   CaretLeft,
   CloudArrowUp,
+  MagnifyingGlass,
+  PushPin,
   CaretRight,
   ChatCircleDots,
   CheckCircle,
@@ -25,6 +27,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { useNavigate, useParams } from 'react-router';
 import { MediaLightbox, MessagePhotoVideo, VoicePlayer } from '../components/ChatMedia';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
+import { RichText } from '../components/RichText';
 import { openReport } from '../components/Report';
 import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, ApiError, errMsg, upload } from '../lib/api';
@@ -38,7 +41,7 @@ import { useLockPageScroll } from '../lib/keyboard';
 import { useGoBack } from '../lib/nav';
 import { discardPending, queueMessage, retryPending, useOutbox } from '../lib/outbox';
 import { presenceLabel, seedPresence, usePresence } from '../lib/presence';
-import { sendTyping, useTyping } from '../lib/socket';
+import { sendTyping, useRecordingVoice, useTyping } from '../lib/socket';
 import { openSheet, toast } from '../lib/store';
 import { useViewport } from '../lib/theme';
 
@@ -69,6 +72,13 @@ export function Messages() {
   const now = useNow(60_000);
   const typing = useTyping();
   const presences = usePresence();
+  const [search, setSearch] = useState('');
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const shown = (data ?? []).filter((c) => {
+    const q = norm(search.trim());
+    if (!q) return true;
+    return norm([conversationName(c, me?.id), ...c.members.map((u) => `${u.displayName} ${u.username}`)].join(' ')).includes(q);
+  });
   useEffect(() => {
     if (data) seedPresence(data.filter((c) => !c.isGroup && c.user).map((c) => [c.user!.id, c.presence]));
   }, [data]);
@@ -77,21 +87,35 @@ export function Messages() {
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
       <PullIndicator pull={pull} refreshing={refreshing} />
-      <button
-        type="button"
-        onClick={() => openSheet('newMessage')}
-        className="tap flex h-[52px] items-center gap-2.5 self-start rounded-[26px] border-0 bg-card px-5 text-[0.9375rem] font-bold text-ink shadow-pill active:scale-[.97]"
-      >
-        <PencilSimple size={20} /> Nouveau message
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => openSheet('newMessage')}
+          className="tap flex h-[52px] flex-none items-center gap-2.5 rounded-[26px] border-0 bg-card px-5 text-[0.9375rem] font-bold text-ink shadow-pill active:scale-[.97]"
+        >
+          <PencilSimple size={20} /> Nouveau
+        </button>
+        {(data?.length ?? 0) > 4 && (
+          <label className="relative flex min-w-0 flex-1 items-center">
+            <MagnifyingGlass size={18} className="pointer-events-none absolute left-4 text-mute" />
+            <input className="field h-[52px] w-full pl-11" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher" aria-label="Rechercher une conversation" />
+          </label>
+        )}
+      </div>
       {data?.length === 0 ? (
         <EmptyCard icon={<ChatCircleDots size={30} weight="fill" />} title="Aucune conversation" text="Écris à un ami, crée un groupe, réponds à une story ou invite quelqu’un dans un salon Make It Friends.">
           <PrimaryBtn onClick={() => openSheet('newMessage')}>Écrire à un ami</PrimaryBtn>
         </EmptyCard>
       ) : (
         <div className="card flex flex-col gap-0.5 p-2">
-          {data?.map((c) => {
+          {shown.length === 0 && <div className="p-4 text-center text-sm text-mute">Aucune conversation pour « {search} ».</div>}
+          {shown.map((c) => {
             const muteActions: MenuAction[] = [
+              {
+                label: c.pinned ? 'Désépingler' : 'Épingler en haut',
+                icon: <PushPin size={18} />,
+                onClick: () => void setPinned(c.id, !c.pinned),
+              },
               {
                 label: c.muted ? 'Réactiver les notifications' : 'Mettre en sourdine',
                 icon: c.muted ? <Bell size={18} /> : <BellSlash size={18} />,
@@ -114,7 +138,11 @@ export function Messages() {
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={cx('block truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>{conversationName(c, me?.id)}</span>
+                  <span className={cx('flex items-center gap-1 truncate text-[0.9375rem]', c.unread ? 'font-extrabold' : 'font-bold')}>
+                    <span className="truncate">{conversationName(c, me?.id)}</span>
+                    {!c.isGroup && c.user?.birthdayToday && <span aria-label="Anniversaire aujourd’hui">🎂</span>}
+                    {c.pinned && <PushPin size={13} weight="fill" className="flex-none text-mute" aria-label="Épinglée" />}
+                  </span>
                   {typing[c.id]?.length ? (
                     <span className="block truncate text-sm font-semibold text-acc">
                       {c.isGroup ? `${c.members.find((u) => u.id === typing[c.id][0])?.displayName.split(' ')[0] ?? 'Quelqu’un'} écrit…` : 'écrit…'}
@@ -137,6 +165,16 @@ export function Messages() {
       )}
     </div>
   );
+}
+
+/** Épingler une conversation en haut de la liste. */
+async function setPinned(id: string, pinned: boolean) {
+  try {
+    await api(`/api/conversations/${id}/pin`, { method: 'PATCH', body: { pinned } });
+    qc.invalidateQueries({ queryKey: ['conversations'] });
+  } catch (e) {
+    toast(errMsg(e), 'error');
+  }
 }
 
 /** Sourdine d'une conversation (liste, fiche du groupe). */
@@ -407,6 +445,14 @@ function TypingDots() {
   );
 }
 
+/** Un à trois émojis, et rien d'autre (affichés en grand). */
+function isEmojiOnly(text: string) {
+  const t = text.trim();
+  if (!t || t.length > 40 || !/^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f\s]+$/u.test(t) || /^[\d#*\s]+$/.test(t)) return false;
+  const count = [...new Intl.Segmenter('fr', { granularity: 'grapheme' }).segment(t.replace(/\s/g, ''))].length;
+  return count >= 1 && count <= 3;
+}
+
 /** Une conversation par instance : passer d'une conversation à l'autre repart d'un état vide. */
 export function Chat() {
   const { id = '' } = useParams();
@@ -437,6 +483,7 @@ function ChatView({ id }: { id: string }) {
     el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 900, iterations: 2 });
   };
   const typingIds = useTyping((s) => s[id]) ?? [];
+  const voiceMap = useRecordingVoice();
   const outbox = useOutbox((s) => s.items);
   const pending = outbox.filter((p) => p.conversationId === id);
   const presences = usePresence();
@@ -607,10 +654,20 @@ function ChatView({ id }: { id: string }) {
   const startVoice = async () => {
     try {
       await recorder.start();
+      sendTyping(id, true, 'voice');
     } catch (e) {
       toast(errMsg(e), 'error');
     }
   };
+  // Pendant l'enregistrement, on rappelle aux autres qu'on enregistre (sinon l'indicateur expire).
+  useEffect(() => {
+    if (!recorder.recording) return;
+    const t = setInterval(() => sendTyping(id, true, 'voice'), 3500);
+    return () => {
+      clearInterval(t);
+      sendTyping(id, false, 'voice');
+    };
+  }, [recorder.recording, id]);
 
   const finishVoice = async (keep: boolean) => {
     const blob = await recorder.stop(keep);
@@ -661,6 +718,7 @@ function ChatView({ id }: { id: string }) {
             ? 'Vu par tout le monde'
             : `Vu par ${seenBy.map((u) => u.displayName.split(' ')[0]).join(', ')}`;
   const typers = typingIds.map((uid) => byId.get(uid)).filter((u): u is UserLite => !!u);
+  const voiceTypers = typers.filter((u) => voiceMap[`${id}:${u.id}`]);
 
   const menuActions = (m: Message): MenuAction[] => {
     const acts: MenuAction[] = [];
@@ -745,6 +803,8 @@ function ChatView({ id }: { id: string }) {
           );
         }
         const prev = msgs[i - 1];
+        // Un à trois émojis seuls : en grand, sans bulle.
+        const bigEmoji = !m.media && !m.meta && isEmojiOnly(m.text);
         const showSender = group && !mine && (!prev || prev.senderId !== m.senderId || prev.meta?.type === 'system');
         const sender = byId.get(m.senderId);
         const story = m.meta?.type === 'story_reply' ? m.meta : null;
@@ -775,8 +835,8 @@ function ChatView({ id }: { id: string }) {
               onReply={() => startReply(m)}
               className={cx(
                 'animate-in rounded-[22px] text-base leading-[1.4] break-words',
-                m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
-                mine ? 'bg-brand text-white' : 'bg-soft text-ink',
+                bigEmoji ? 'px-1 text-[2.6rem] leading-[1.15]' : m.media && m.media.kind !== 'audio' ? 'p-1' : 'px-3.5 py-2.5',
+                bigEmoji ? 'bg-transparent' : mine ? 'bg-brand text-white' : 'bg-soft text-ink',
               )}
               style={{ animationDuration: '.35s' }}
             >
@@ -798,7 +858,11 @@ function ChatView({ id }: { id: string }) {
               )}
               {m.media?.kind === 'audio' && <VoicePlayer media={m.media} mine={mine} />}
               {m.media && m.media.kind !== 'audio' && <MessagePhotoVideo media={m.media} onOpen={() => setViewing(m.media)} />}
-              {m.text && <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>{m.text}</span>}
+              {m.text && (
+                <span className={cx(m.media && m.media.kind !== 'audio' && 'block px-2.5 pt-1.5 pb-1', m.media?.kind === 'audio' && 'mt-1 block')}>
+                  <RichText text={m.text} linkClass={mine ? 'text-white' : undefined} />
+                </span>
+              )}
               {m.meta?.type === 'game_invite' && !mine && (
                 <button
                   type="button"
@@ -867,7 +931,13 @@ function ChatView({ id }: { id: string }) {
           <div className="flex h-10 items-center gap-2 rounded-[22px] bg-soft px-3.5">
             <TypingDots />
             <span className="text-[0.8125rem] font-semibold text-mute">
-              {group ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'écrivent' : 'écrit'}…` : 'écrit…'}
+              {voiceTypers.length === typers.length
+                ? group
+                  ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'enregistrent' : 'enregistre'} un vocal…`
+                  : 'enregistre un vocal…'
+                : group
+                  ? `${typers.map((u) => u.displayName.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'écrivent' : 'écrit'}…`
+                  : 'écrit…'}
             </span>
           </div>
         </div>

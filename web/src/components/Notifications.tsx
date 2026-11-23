@@ -1,4 +1,4 @@
-import type { AppNotification } from '@mandrix/shared';
+import type { AppNotification, Badges } from '@mandrix/shared';
 import {
   At,
   ChartBar,
@@ -15,9 +15,10 @@ import {
   UserPlus,
   UsersThree,
 } from '@phosphor-icons/react';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { friendAction, useNotifications, usePellicule } from '../lib/data';
+import { api } from '../lib/api';
+import { friendAction, qc, useNotifications, usePellicule } from '../lib/data';
 import { countdown, timeAgo } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { cx } from './ui';
@@ -120,6 +121,13 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         ),
         to: `/p/${d.postId}`,
       };
+    case 'birthday':
+      return {
+        icon: <span className="text-[17px] leading-none">🎂</span>,
+        text: <>C’est l’anniversaire de {who} aujourd’hui !</>,
+        to: n.actor ? `/u/${n.actor.username}` : undefined,
+        action: n.actor ? { label: 'Écrire', run: () => nav(`/u/${n.actor!.username}`) } : undefined,
+      };
     case 'alert':
       return {
         icon: <Lightning size={18} weight="fill" className="text-heart" />,
@@ -145,6 +153,24 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
     default:
       return { icon: <Heart size={18} />, text: <>Nouvelle activité</> };
   }
+}
+
+/** « Aujourd'hui », « Cette semaine », « Plus ancien » (heure locale). */
+function periodOf(iso: string, now: number) {
+  const d = new Date(iso);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  if (d >= start) return 'Aujourd’hui';
+  const week = new Date(start);
+  week.setDate(week.getDate() - 6);
+  return d >= week ? 'Cette semaine' : 'Plus ancien';
+}
+
+/** Marque toutes les notifications comme lues (cloche). */
+export async function markAllRead() {
+  await api('/api/notifications/read', { method: 'POST' });
+  qc.setQueryData<AppNotification[]>(['notifications'], (old) => old?.map((n) => ({ ...n, read: true })));
+  qc.setQueryData<Badges>(['badges'], (old) => (old ? { ...old, notifications: 0 } : old));
 }
 
 export function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
@@ -176,9 +202,13 @@ export function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       {isLoading && <div className="p-4 text-center text-sm text-mute">Chargement…</div>}
       {data?.length === 0 && <div className="p-4 text-center text-sm text-mute">Rien de neuf pour l’instant.</div>}
-      {data?.map((n) => {
+      {data?.map((n, idx) => {
         const r = describe(n, go);
+        const group = periodOf(n.createdAt, now);
+        const header = idx === 0 || periodOf(data[idx - 1].createdAt, now) !== group;
         return (
+          <Fragment key={n.id}>
+          {header && <div className="px-2.5 pt-3 pb-1 text-xs font-bold tracking-wide text-mute uppercase">{group}</div>}
           <div
             key={n.id}
             className={cx(rowCls, r.to && 'tap')}
@@ -206,6 +236,7 @@ export function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
               </button>
             )}
           </div>
+          </Fragment>
         );
       })}
     </div>

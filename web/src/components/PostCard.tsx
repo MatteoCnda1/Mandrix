@@ -1,4 +1,4 @@
-import { REACTIONS, type Poll, type Post, type UserLite } from '@mandrix/shared';
+import { REACTIONS, type MediaRef, type Poll, type Post, type UserLite } from '@mandrix/shared';
 import {
   ChatCircle,
   CheckCircle,
@@ -433,6 +433,59 @@ export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 1
   );
 }
 
+/** Carrousel de photos : glisser (défilement natif aimanté), points, double tap = j'aime, tap = plein écran. */
+function Carousel({ post, gallery }: { post: Post; gallery: MediaRef[] }) {
+  const [i, setI] = useState(0);
+  const [open, setOpen] = useState<MediaRef | null>(null);
+  const track = useRef<HTMLDivElement | null>(null);
+  const box = useRef<HTMLDivElement | null>(null);
+  const burst = useHeartBurst();
+  const onTap = useDoubleTap(
+    () => setOpen(gallery[i]),
+    (p) => {
+      if (!post.liked) void toggleLike(post);
+      burst.show(box.current, p);
+    },
+  );
+  const goTo = (k: number) => track.current?.scrollTo({ left: k * track.current.clientWidth, behavior: 'smooth' });
+  return (
+    <div ref={box} className="relative select-none [-webkit-touch-callout:none]">
+      <div
+        ref={track}
+        onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / Math.max(1, e.currentTarget.clientWidth)))}
+        onClick={onTap}
+        role="group"
+        aria-roledescription="carrousel"
+        aria-label={`${gallery.length} photos`}
+        className="no-scrollbar flex cursor-zoom-in snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-3xl"
+        style={{ aspectRatio: ratioOf(gallery[0]) }}
+      >
+        {gallery.map((m, k) => (
+          <div key={m.id} className="ph relative h-full w-full flex-none snap-center snap-always" aria-label={`Photo ${k + 1} sur ${gallery.length}`}>
+            <MediaView media={m} sizes="(max-width: 700px) 100vw, 640px" />
+          </div>
+        ))}
+      </div>
+      {burst.node}
+      <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-xs font-bold text-white tabular-nums">
+        {i + 1}/{gallery.length}
+      </span>
+      <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+        {gallery.map((m, k) => (
+          <button
+            key={m.id}
+            type="button"
+            aria-label={`Aller à la photo ${k + 1}`}
+            onClick={() => goTo(k)}
+            className={cx('h-2 rounded-full border-0 p-0 transition-all', k === i ? 'w-5 bg-white' : 'w-2 bg-white/55')}
+          />
+        ))}
+      </div>
+      {open && <MediaLightbox media={open} gallery={gallery} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
 export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
@@ -477,7 +530,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
 
       {post.kind === 'meme' && <div className="px-2.5 py-1 text-center text-xl leading-tight font-extrabold tracking-[-.02em] text-balance">{post.text}</div>}
 
-      {post.kind === 'photo' && post.media && <TapMedia post={post} ratio={ratioOf(post.media)} />}
+      {post.kind === 'photo' && post.media && (post.gallery ? <Carousel post={post} gallery={post.gallery} /> : <TapMedia post={post} ratio={ratioOf(post.media)} />)}
       {post.kind === 'meme' && post.media && <TapMedia post={post} ratio={ratioOf(post.media, '4 / 3')} />}
       {post.kind === 'video' && post.media && <VideoTeaser post={post} />}
 

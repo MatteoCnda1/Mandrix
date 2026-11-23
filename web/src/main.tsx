@@ -33,6 +33,7 @@ const Reels = lazy(() => import('./screens/Reels').then((m) => ({ default: m.Ree
 const Search = lazy(() => import('./screens/Search').then((m) => ({ default: m.Search })));
 const SettingsPage = lazy(() => import('./screens/Settings').then((m) => ({ default: m.SettingsPage })));
 const ResetPassword = lazy(() => import('./screens/ResetPassword').then((m) => ({ default: m.ResetPassword })));
+const Admin = lazy(() => import('./screens/Admin').then((m) => ({ default: m.Admin })));
 const Unpack = lazy(() => import('./screens/Unpack').then((m) => ({ default: m.Unpack })));
 
 const page = (el: ReactNode) => <Suspense fallback={<ScreenLoader />}>{el}</Suspense>;
@@ -126,6 +127,7 @@ const router = createBrowserRouter([
       { path: 'p/:id', element: page(<PostPage />) },
       { path: 'recherche', element: page(<Search />) },
       { path: 'reglages', element: page(<SettingsPage />) },
+      { path: 'admin', element: page(<Admin />) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

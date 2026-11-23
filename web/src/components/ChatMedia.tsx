@@ -137,11 +137,18 @@ export function MessagePhotoVideo({ media, onOpen }: { media: MediaRef; onOpen: 
 }
 
 /** Affichage plein écran d'une photo ou d'une vidéo de conversation. */
-export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: () => void }) {
+export function MediaLightbox({ media: start, onClose, gallery }: { media: MediaRef; onClose: () => void; gallery?: MediaRef[] }) {
+  const [index, setIndex] = useState(() => Math.max(0, gallery?.findIndex((m) => m.id === start.id) ?? 0));
+  const media = gallery?.[index] ?? start;
+  const go = (d: number) => gallery && setIndex((i) => Math.max(0, Math.min(gallery.length - 1, i + d)));
   const swipe = useSwipeDown(onClose);
   useScrollLock();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowRight') go(1);
+      if (e.key === 'ArrowLeft') go(-1);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -162,7 +169,7 @@ export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: ()
           onClick={(e) => e.stopPropagation()}
         >
           {media.kind === 'image' ? (
-            <ZoomableImage media={media} onDismiss={onClose} />
+            <ZoomableImage key={media.id} media={media} onDismiss={onClose} onSwipeX={gallery ? (dir) => go(-dir) : undefined} />
           ) : (
             <MediaView media={media} fit="contain" controls autoPlay muted={false} loop={false} />
           )}
@@ -176,6 +183,14 @@ export function MediaLightbox({ media, onClose }: { media: MediaRef; onClose: ()
         >
           <X size={20} />
         </button>
+        {gallery && gallery.length > 1 && (
+          <span
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-bold text-white tabular-nums backdrop-blur"
+            style={{ top: 'calc(20px + env(safe-area-inset-top))' }}
+          >
+            {index + 1}/{gallery.length}
+          </span>
+        )}
       </div>
     </Portal>
   );
