@@ -45,7 +45,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
       .where(eq(notifications.userId, me.id))
       .orderBy(desc(notifications.createdAt))
       .limit(60);
-    const actors = await usersByIds(rows.map((r) => r.actorId));
+    const actors = await usersByIds(rows.map((r) => r.actorId), me.id);
     return rows.map((r) => serializeNotification(r, r.actorId ? (actors.get(r.actorId) ?? null) : null));
   });
 

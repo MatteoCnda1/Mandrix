@@ -26,6 +26,8 @@ export interface Me extends UserLite {
   showPresence: boolean;
   /** Anniversaire « MM-JJ ». */
   birthday: string | null;
+  /** Post épinglé en tête de mon profil. */
+  pinnedPostId: ID | null;
 }
 
 /** Présence d'un ami : en ligne, ou dernière activité. */
@@ -53,6 +55,8 @@ export interface UserProfile extends UserLite {
   blockedByMe: boolean;
   /** Anniversaire « MM-JJ » (visible par ses amis). */
   birthday: string | null;
+  /** Post épinglé en tête du profil. */
+  pinnedPostId: ID | null;
 }
 
 export interface UserSearchResult extends UserLite {
@@ -255,6 +259,16 @@ export interface Comment {
   createdAt: string;
   likes: number;
   liked: boolean;
+  /** Réponse à ce commentaire (un seul niveau de réponses). */
+  parentId: ID | null;
+}
+
+/** Posts d'un profil : le post épinglé à part, en tête. */
+export interface ProfilePosts {
+  items: Post[];
+  next: number | null;
+  locked: boolean;
+  pinned: Post | null;
 }
 
 export interface Story {
@@ -342,7 +356,25 @@ export type MessageMeta =
   | { type: 'system' }
   /** Réponse à un message (glisser la bulle) : extrait du message d'origine. */
   | { type: 'reply'; replyTo: ReplyQuote }
+  /** Post partagé : aperçu à jour (null si le post a été supprimé ou masqué). */
+  | { type: 'post_share'; postId: ID; post: SharedPost | null }
   | null;
+
+export interface SharedPost {
+  id: ID;
+  kind: PostKind;
+  author: UserLite;
+  text: string;
+  media: MediaRef | null;
+}
+
+export const SHARED_POST_LABEL = '↗️ Post partagé';
+
+/** Réponse au partage d'un post : conversations servies, et personnes qui ne peuvent pas le voir. */
+export interface ShareResult {
+  sent: ID[];
+  refused: string[];
+}
 
 export interface ReplyQuote {
   id: ID;
@@ -393,6 +425,8 @@ export interface Conversation {
   presence: Presence | null;
   /** Épinglée en haut de la liste. */
   pinned: boolean;
+  /** Photo du groupe. */
+  photo: MediaRef | null;
 }
 
 export interface ConversationDetail {
@@ -407,6 +441,7 @@ export interface ConversationDetail {
   reads: ReadMark[];
   muted: boolean;
   presence: Presence | null;
+  photo: MediaRef | null;
 }
 
 export interface ReadMark {

@@ -21,6 +21,7 @@ import poolRoutes from './routes/pool.js';
 import postRoutes from './routes/posts.js';
 import storyRoutes from './routes/stories.js';
 import userRoutes from './routes/users.js';
+import { securityHeaders } from './lib/security.js';
 
 /** Construit l'application (routes, temps réel) sans démarrer l'écoute ni les tâches planifiées. */
 export async function buildApp(): Promise<FastifyInstance> {
@@ -36,6 +37,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(multipart, { limits: { fileSize: env.maxUploadMb * 1024 * 1024, files: 1 } });
 
   const hasWeb = fs.existsSync(env.webDist);
+  securityHeaders(app, hasWeb ? env.webDist : null);
   // Sert la PWA compilée (et décore reply.sendFile, utilisé aussi pour les médias).
   await app.register(fastifyStatic, {
     root: hasWeb ? env.webDist : mediaDir,

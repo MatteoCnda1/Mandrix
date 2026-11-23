@@ -1,4 +1,4 @@
-import { USERNAME_RE, type FriendsList, type InviteInfo, type UserProfile, type UserSearchResult } from '@mandrix/shared';
+import { USERNAME_RE, type FriendsList, type InviteInfo, type ProfilePosts, type UserProfile, type UserSearchResult } from '@mandrix/shared';
 import { and, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -58,6 +58,19 @@ export default async function userRoutes(app: FastifyInstance) {
     return toMe(u);
   });
 
+  /** Épingler un de ses posts en tête de son profil (null pour désépingler). */
+  app.put('/api/me/pinned-post', async (req) => {
+    const me = requireUser(req);
+    const { postId } = parse(z.object({ postId: z.string().uuid().nullable() }), req.body);
+    if (postId) {
+      const [p] = await db.select({ authorId: schema.posts.authorId, kind: schema.posts.kind }).from(schema.posts).where(eq(schema.posts.id, postId)).limit(1);
+      if (!p || p.authorId !== me.id) return fail(404, 'Post introuvable');
+      if (p.kind === 'meme') fail(400, 'Les mèmes ne s’épinglent pas');
+    }
+    await db.update(users).set({ pinnedPostId: postId }).where(eq(users.id, me.id));
+    return { pinnedPostId: postId };
+  });
+
   app.get('/api/me/invite', async (req): Promise<InviteInfo> => {
     const me = requireUser(req);
     const code = await ensureInviteCode(me.id, me.username);
@@ -112,7 +125,7 @@ export default async function userRoutes(app: FastifyInstance) {
     const friends = await friendIds(u.id);
     const fm = await friendshipMap(me.id, [u.id]);
     return {
-      ...toLite(u),
+      ...toLite(u, u.id === me.id || fm.get(u.id) === 'friends'),
       city: u.city,
       bio: u.bio,
       stats: { posts: stats.posts, friends: friends.length, memesWon: stats.memesWon },
@@ -121,26 +134,30 @@ export default async function userRoutes(app: FastifyInstance) {
       blockedByMe: !!blockRow,
       // Anniversaire visible par soi-même et ses amis seulement.
       birthday: u.id === me.id || fm.get(u.id) === 'friends' ? u.birthday : null,
+      pinnedPostId: u.id === me.id || fm.get(u.id) === 'friends' ? u.pinnedPostId : null,
     };
   });
 
-  app.get('/api/users/:username/posts', async (req) => {
+  app.get('/api/users/:username/posts', async (req): Promise<ProfilePosts> => {
     const me = requireUser(req);
     const { username } = req.params as { username: string };
     const tab = String((req.query as { tab?: string }).tab ?? 'posts');
     const page = Math.max(0, Number((req.query as { page?: string }).page ?? 0) || 0);
-    const [u] = await db.select({ id: users.id }).from(users).where(eq(users.username, username.toLowerCase())).limit(1);
+    const [u] = await db.select({ id: users.id, pinnedPostId: users.pinnedPostId }).from(users).where(eq(users.username, username.toLowerCase())).limit(1);
     if (!u) return fail(404, 'Utilisateur introuvable');
     const kindFilter =
       tab === 'reels' ? sql`p.kind = 'video'` : tab === 'memes' ? sql`p.kind = 'meme'` : sql`p.kind in ('photo','video','poll')`;
     const visible = tab === 'memes' || (await areFriends(me.id, u.id));
-    if (!visible) return { items: [], next: null, locked: true };
+    if (!visible) return { items: [], next: null, locked: true, pinned: null };
+    // Onglet « Posts » : le post épinglé passe en tête, à part.
+    const pinId = tab === 'posts' ? u.pinnedPostId : null;
     const items = await selectPosts(me.id, {
-      where: sql`p.author_id = ${u.id} and ${kindFilter}`,
+      where: sql`p.author_id = ${u.id} and ${kindFilter} ${pinId ? sql`and p.id <> ${pinId}` : sql``}`,
       limit: 30,
       offset: page * 30,
     });
-    return { items, next: items.length === 30 ? page + 1 : null, locked: false };
+    const pinned = pinId && page === 0 ? ((await selectPosts(me.id, { where: sql`p.id = ${pinId} and p.author_id = ${u.id}`, limit: 1 }))[0] ?? null) : null;
+    return { items, next: items.length === 30 ? page + 1 : null, locked: false, pinned };
   });
 
   // ——— Amis ———
@@ -151,7 +168,7 @@ export default async function userRoutes(app: FastifyInstance) {
       .select()
       .from(friendships)
       .where(or(eq(friendships.requesterId, me.id), eq(friendships.addresseeId, me.id)));
-    const map = await usersByIds(rows.flatMap((r) => [r.requesterId, r.addresseeId]));
+    const map = await usersByIds(rows.flatMap((r) => [r.requesterId, r.addresseeId]), me.id);
     const other = (r: (typeof rows)[number]) => map.get(r.requesterId === me.id ? r.addresseeId : r.requesterId)!;
     const byName = (a: { displayName: string }, b: { displayName: string }) => a.displayName.localeCompare(b.displayName, 'fr');
     return {

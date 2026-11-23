@@ -23,7 +23,7 @@ export default async function storyRoutes(app: FastifyInstance) {
       where s.expires_at > now() and m.status <> 'processing' and s.author_id = any(${uuidArray(circle)}) and s.hidden_at is null
       order by s.created_at asc`);
     const list = [...rows];
-    const authors = await usersByIds(list.map((r) => r.authorId));
+    const authors = await usersByIds(list.map((r) => r.authorId), me.id);
     const groups = new Map<string, StoryGroup>();
     for (const r of list) {
       let g = groups.get(r.authorId);

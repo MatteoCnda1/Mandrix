@@ -6,11 +6,32 @@ import { pipeline } from 'node:stream/promises';
 import type { MultipartFile } from '@fastify/multipart';
 import type { MediaRef } from '@mandrix/shared';
 import sharp, { type OutputInfo } from 'sharp';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { fail } from './http.js';
 import { enqueueVideo, transcodeVoice } from './video.js';
+
+/**
+ * Condition SQL « ce média sert encore » (post, carrousel, sondage, story récente, Pellicule, pool, mème,
+ * avatar, photo de groupe, message). Partagée par le ménage nocturne et la suppression d'une pièce jointe.
+ */
+export function mediaReferenced(id: SQL) {
+  return sql`(
+    exists (select 1 from posts p where p.media_id = ${id})
+    or exists (select 1 from post_media pm where pm.media_id = ${id})
+    or exists (select 1 from poll_options o where o.media_id = ${id})
+    or exists (select 1 from stories s where s.media_id = ${id} and s.expires_at > now() - interval '2 days')
+    or exists (select 1 from shots s where s.media_id = ${id})
+    or exists (select 1 from pool_items pi where pi.media_id = ${id})
+    or exists (select 1 from memes mm where mm.media_id = ${id})
+    or exists (select 1 from users u where u.avatar_media_id = ${id})
+    or exists (select 1 from conversations c where c.photo_media_id = ${id})
+    or exists (select 1 from messages msg where msg.meta->'media'->>'id' = (${id})::text)
+    or exists (select 1 from messages msg where msg.media_id = ${id})
+    or exists (select 1 from daily_memes d where d.media_id = ${id})
+  )`;
+}
 
 const VIDEO_MIMES: Record<string, string> = {
   'video/mp4': '.mp4',

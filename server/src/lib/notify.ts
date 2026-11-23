@@ -73,7 +73,7 @@ export async function notify(opts: NotifyOpts) {
         .returning()
     : await db.insert(n).values(values).returning();
 
-  const actor = opts.actorId ? ((await usersByIds([opts.actorId])).get(opts.actorId) ?? null) : null;
+  const actor = opts.actorId ? ((await usersByIds([opts.actorId], opts.userId)).get(opts.actorId) ?? null) : null;
   emitToUser(opts.userId, 'notif:new', serializeNotification(row, actor));
   await emitBadges(opts.userId);
 }

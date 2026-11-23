@@ -9,7 +9,21 @@ type UserRow = Pick<typeof users.$inferSelect, 'id' | 'username' | 'displayName'
 export const parisMonthDay = (d = new Date()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', month: '2-digit', day: '2-digit' }).format(d).replace('/', '-');
 
-export function toLite(u: UserRow): UserLite {
+/** Anniversaire aujourd'hui (à Paris) ; né un 29 février : fêté le 28 les années non bissextiles. */
+export function isBirthdayToday(birthday: string | null | undefined, now = new Date()) {
+  if (!birthday) return false;
+  const today = parisMonthDay(now);
+  if (birthday === today) return true;
+  const year = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric' }).format(now));
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return birthday === '02-29' && today === '02-28' && !leap;
+}
+
+/**
+ * Utilisateur en bref. Le 🎂 du jour n'est montré qu'à ses amis (`withBirthday`) :
+ * l'anniversaire reste privé, comme sur le profil.
+ */
+export function toLite(u: UserRow, withBirthday = false): UserLite {
   return {
     id: u.id,
     username: u.username,
@@ -17,13 +31,13 @@ export function toLite(u: UserRow): UserLite {
     avatarUrl: u.avatarMediaId ? `/media/${u.avatarMediaId}` : null,
     initials: initialsOf(u.displayName),
     tone: toneOf(u.id),
-    ...(u.birthday && u.birthday === parisMonthDay() ? { birthdayToday: true } : {}),
+    ...(withBirthday && isBirthdayToday(u.birthday) ? { birthdayToday: true } : {}),
   };
 }
 
 export function toMe(u: typeof users.$inferSelect): Me {
   return {
-    ...toLite(u),
+    ...toLite(u, true),
     email: u.email,
     city: u.city,
     bio: u.bio,
@@ -32,10 +46,12 @@ export function toMe(u: typeof users.$inferSelect): Me {
     notificationPrefs: u.notificationPrefs ?? {},
     showPresence: u.showPresence,
     birthday: u.birthday,
+    pinnedPostId: u.pinnedPostId,
   };
 }
 
-export async function usersByIds(ids: Iterable<string | null | undefined>): Promise<Map<string, UserLite>> {
+/** Utilisateurs en bref. Avec `viewerId`, le 🎂 du jour apparaît pour le lecteur et ses amis. */
+export async function usersByIds(ids: Iterable<string | null | undefined>, viewerId?: string): Promise<Map<string, UserLite>> {
   const list = [...new Set([...ids].filter((x): x is string => !!x))];
   const map = new Map<string, UserLite>();
   if (list.length === 0) return map;
@@ -43,7 +59,9 @@ export async function usersByIds(ids: Iterable<string | null | undefined>): Prom
     .select({ id: users.id, username: users.username, displayName: users.displayName, avatarMediaId: users.avatarMediaId, birthday: users.birthday })
     .from(users)
     .where(inArray(users.id, list));
-  for (const r of rows) map.set(r.id, toLite(r));
+  const celebrating = viewerId ? rows.filter((r) => isBirthdayToday(r.birthday)) : [];
+  const circle = celebrating.length ? new Set([viewerId!, ...(await friendIds(viewerId!))]) : new Set<string>();
+  for (const r of rows) map.set(r.id, toLite(r, circle.has(r.id)));
   return map;
 }
 
