@@ -4,6 +4,7 @@ import {
   DeviceMobile,
   DownloadSimple,
   EnvelopeSimple,
+  Eye,
   Key,
   MoonStars,
   Prohibit,
@@ -203,6 +204,21 @@ function AmbianceSettings() {
           </button>
         ))}
       </div>
+    </Section>
+  );
+}
+
+function PrivacySettings({ me }: { me: Me }) {
+  const toggle = async (show: boolean) => {
+    try {
+      qc.setQueryData(['me'], await api<Me>('/api/me/presence', { method: 'PATCH', body: { show } }));
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+  return (
+    <Section title="Confidentialité" footer="Si tu masques ta présence, tu ne vois plus non plus celle de tes amis.">
+      <ToggleRow icon={<Eye size={20} />} label="Montrer quand je suis en ligne" sub="« En ligne » ou « Actif il y a … » dans les messages" on={me.showPresence} onChange={toggle} />
     </Section>
   );
 }
@@ -419,6 +435,7 @@ export function SettingsPage() {
     <div data-screen-label="Réglages" className="flex animate-in flex-col gap-5">
       <NotificationSettings me={me} />
       <AmbianceSettings />
+      <PrivacySettings me={me} />
       <AccountSettings me={me} />
     </div>
   );

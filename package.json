@@ -16,7 +16,8 @@
     "db:up": "docker compose -f docker-compose.dev.yml up -d",
     "db:generate": "npm run db:generate -w server",
     "icons": "node web/scripts/gen-icons.mjs",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "lint": "npm run lint -w web"
   },
   "devDependencies": {
     "concurrently": "^9.2.0",

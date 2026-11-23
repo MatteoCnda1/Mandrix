@@ -1,9 +1,9 @@
 import type { PelliculeState } from '@mandrix/shared';
-import { ArrowRight, CameraRotate, CloudArrowUp, Fire, ImageSquare, Lightning, LockSimple, WarningCircle } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, ArrowRight, CameraRotate, CloudArrowUp, Fire, ImageSquare, Lightning, LockSimple, WarningCircle } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { cx, useFilePicker } from '../components/ui';
-import { errMsg } from '../lib/api';
+import { cx, useFilePicker, confirmAction } from '../components/ui';
+import { errMsg, api } from '../lib/api';
 import { qc, usePellicule } from '../lib/data';
 import { enqueueShot, flushQueue, NetworkError, onQueueChange, pendingCount, uploadShot } from '../lib/pelliculeQueue';
 import { countdown } from '../lib/format';
@@ -125,6 +125,18 @@ export function Camera() {
     }
   };
 
+  /** Photo prise par erreur : on la retire tant que c'est possible. */
+  const undoLast = async (shotId: string) => {
+    if (!(await confirmAction({ title: 'Annuler la dernière photo ?', message: 'Elle sera supprimée de ta Pellicule.', confirmLabel: 'Annuler la photo', destructive: true }))) return;
+    try {
+      qc.setQueryData<PelliculeState>(['pellicule'], await api<PelliculeState>(`/api/pellicule/shots/${shotId}`, { method: 'DELETE' }));
+      qc.invalidateQueries({ queryKey: ['unpack'] });
+      toast('Photo annulée');
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
+
   const retryPending = async () => {
     const { sent, last } = await flushQueue();
     if (last) qc.setQueryData(['pellicule'], last);
@@ -174,6 +186,19 @@ export function Camera() {
               </button>
             </div>
           </div>
+        )}
+        {pel?.undo && new Date(pel.undo.until).getTime() > now && (
+          <button
+            type="button"
+            onClick={() => void undoLast(pel.undo!.shotId)}
+            className="tap absolute right-3.5 bottom-3.5 z-10 flex h-10 animate-pop items-center gap-2 rounded-[20px] border-0 bg-black/55 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur"
+          >
+            <ArrowCounterClockwise size={16} weight="bold" />
+            Annuler la dernière photo · {(() => {
+              const left = Math.max(0, Math.floor((new Date(pel.undo.until).getTime() - now) / 1000));
+              return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+            })()}
+          </button>
         )}
         {pel?.moment && momentLeft > 0 ? (
           <div className="absolute top-3.5 left-3.5 flex h-10 animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[0.8125rem] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">

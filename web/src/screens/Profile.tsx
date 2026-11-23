@@ -5,6 +5,8 @@ import {
   Flag,
   GearSix,
   Prohibit,
+  Key,
+  QrCode,
   ChatCircleDots,
   ChartBar,
   Copy,
@@ -24,7 +26,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ReactionPicker } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, PullIndicator, ScreenLoader, Switch, confirmAction, cx } from '../components/ui';
+import { Avatar, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { logout, qc, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
 import { useSwipeX } from '../lib/gestures';
@@ -91,6 +93,7 @@ function Row({ icon, label, onClick, right, danger }: { icon: ReactNode; label: 
 
 function InviteCard() {
   const { data } = useInvite();
+  const [qr, setQr] = useState(false);
   if (!data) return null;
   const copy = () => navigator.clipboard?.writeText(data.code).then(() => toast('Code copié'));
   const share = async () => {
@@ -123,11 +126,35 @@ function InviteCard() {
         <button type="button" aria-label="Copier le code" onClick={copy} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
           <Copy size={18} />
         </button>
+        <button type="button" aria-label="Afficher le QR code" onClick={() => setQr(true)} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
+          <QrCode size={18} />
+        </button>
         <button type="button" aria-label="Partager l’invitation" onClick={share} className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
           <ShareNetwork size={18} /> Inviter
         </button>
       </div>
+      {qr && <QrSheet link={data.link} code={data.code} onClose={() => setQr(false)} />}
     </div>
+  );
+}
+
+/** QR code du lien de parrainage, pour inviter en face à face. */
+function QrSheet({ link, code, onClose }: { link: string; code: string; onClose: () => void }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    // Bibliothèque chargée à la demande (elle n'alourdit pas le reste de l'app).
+    void import('qrcode').then((QR) => QR.toDataURL(link, { width: 560, margin: 1, color: { dark: '#0b0f14', light: '#ffffff' } }).then(setSrc));
+  }, [link]);
+  return (
+    <Sheet title="Inviter avec un QR code" onClose={onClose}>
+      <div className="flex flex-col items-center gap-3 pb-2">
+        <div className="grid aspect-square w-[min(280px,70vw)] place-items-center rounded-[28px] bg-white p-3 shadow-pill">
+          {src ? <img src={src} alt={`QR code du lien d’invitation (code ${code})`} className="h-full w-full" /> : <span className="text-sm text-mute">Préparation…</span>}
+        </div>
+        <div className="font-mono text-lg font-bold tracking-wider">{code}</div>
+        <p className="m-0 text-center text-[0.9375rem] text-mute">Ton ami scanne le code avec l’appareil photo de son téléphone : il arrive sur l’inscription avec ton parrainage.</p>
+      </div>
+    </Sheet>
   );
 }
 
@@ -206,6 +233,15 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
       toast(errMsg(e), 'error');
     }
   };
+  const { data: me } = useMe();
+  const [resetLink, setResetLink] = useState<string | null>(null);
+  const makeResetLink = async () => {
+    try {
+      setResetLink((await api<{ link: string }>(`/api/admin/users/${profile.id}/reset-link`, { method: 'POST' })).link);
+    } catch (e) {
+      toast(errMsg(e), 'error');
+    }
+  };
   const unblock = async () => {
     try {
       await api(`/api/users/${profile.id}/block`, { method: 'DELETE' });
@@ -264,6 +300,22 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             </div>
           )}
         </div>
+        {resetLink && (
+          <Sheet title="Lien de réinitialisation" onClose={() => setResetLink(null)}>
+            <p className="m-0 text-[0.9375rem] text-mute">
+              Envoie ce lien à {profile.displayName.split(' ')[0]} : il permet de choisir un nouveau mot de passe, une seule fois, pendant 1 heure. Toutes ses sessions seront fermées.
+            </p>
+            <div className="rounded-[18px] bg-soft p-3 font-mono text-xs break-all select-all">{resetLink}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <PrimaryBtn tone="soft" onClick={() => void navigator.clipboard?.writeText(resetLink).then(() => toast('Lien copié'))}>
+                Copier
+              </PrimaryBtn>
+              <PrimaryBtn onClick={() => void navigator.share?.({ title: 'Mandrix', text: 'Ton lien pour choisir un nouveau mot de passe Mandrix', url: resetLink }).catch(() => {})}>
+                Partager
+              </PrimaryBtn>
+            </div>
+          </Sheet>
+        )}
         {profile.blockedByMe && (
           <div className="flex items-center gap-3 rounded-[22px] bg-soft p-3.5">
             <Prohibit size={22} className="flex-none text-heart" />
@@ -289,6 +341,9 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
                 danger: true,
                 onClick: () => openReport({ targetType: 'user', targetId: profile.id }),
               },
+              ...(me?.isAdmin
+                ? [{ label: 'Lien de réinitialisation', icon: <Key size={18} />, onClick: () => void makeResetLink() }]
+                : []),
             ]}
           />
         )}
