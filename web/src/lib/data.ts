@@ -11,6 +11,7 @@ import type {
   FriendsList,
   InviteInfo,
   Me,
+  MemberCard,
   Message,
   Page,
   PelliculeState,
@@ -69,6 +70,9 @@ const infinite = <T>(key: unknown[], url: (page: number | string) => string, ini
 /** Fil paginé par curseur (le serveur renvoie le curseur de la page suivante). */
 export const useFeed = () => useInfiniteQuery(infinite<Post>(['feed'], (c) => (c ? `/api/feed?cursor=${c}` : '/api/feed'), ''));
 export const useReels = () => useInfiniteQuery(infinite<Post>(['reels'], (p) => `/api/reels?page=${p}`));
+/** Tous les membres (#93), par pages, avec recherche. */
+export const useDirectory = (q: string, enabled = true) =>
+  useInfiniteQuery({ ...infinite<MemberCard>(['directory', q], (p) => `/api/users/directory?page=${p}${q ? `&q=${encodeURIComponent(q)}` : ''}`), enabled });
 export const useStories = () => useQuery({ queryKey: ['stories'], queryFn: () => api<StoryGroup[]>('/api/stories') });
 export const usePost = (id: string, enabled = true) =>
   useQuery({ queryKey: ['post', id], queryFn: () => api<Post>(`/api/posts/${id}`), enabled: enabled && !!id });
@@ -294,7 +298,7 @@ export async function deletePost(post: Post) {
 export async function friendAction(userId: string, action: 'add' | 'remove') {
   try {
     const res = await api<{ friendship: string }>(`/api/friends/${userId}`, { method: action === 'add' ? 'POST' : 'DELETE' });
-    for (const key of [['friends'], ['profile'], ['user-search'], ['feed'], ['stories'], ['user-posts'], ['notifications']]) {
+    for (const key of [['friends'], ['profile'], ['user-search'], ['directory'], ['feed'], ['stories'], ['user-posts'], ['notifications']]) {
       qc.invalidateQueries({ queryKey: key });
     }
     return res.friendship;

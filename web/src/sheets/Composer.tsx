@@ -177,13 +177,11 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
 
   const labels = opts.map((o) => o.trim()).filter(Boolean);
   const valid =
-    mode === 'story'
-      ? !!file
-      : kind === 0
-        ? photos.length > 0
-        : kind === 1
-          ? !!file
-          : !!q.trim() && (pollKind === 'text' ? labels.length >= 2 : pollKind === 'image' ? imgOpts.every(Boolean) : true);
+    kind === 0
+      ? photos.length > 0
+      : kind === 1
+        ? !!file
+        : !!q.trim() && (pollKind === 'text' ? labels.length >= 2 : pollKind === 'image' ? imgOpts.every(Boolean) : true);
 
   const busy = progress !== null;
 
@@ -194,12 +192,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
     if (!valid || busy) return;
     setProgress(0);
     try {
-      if (mode === 'story') {
-        const m = await uploadOne(file!);
-        await api('/api/stories', { body: { mediaId: m.id } });
-        qc.invalidateQueries({ queryKey: ['stories'] });
-        toast('Story publiée');
-      } else if (kind === 0) {
+      if (kind === 0) {
         // Carrousel : envoi des photos une à une, la progression couvre l'ensemble.
         const ids: string[] = [];
         for (const [i, f] of photos.entries()) ids.push((await uploadOne(f, i / photos.length, 1 / photos.length)).id);
@@ -245,166 +238,159 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
 
   return (
     <Sheet
-      title={mode === 'story' ? 'Nouvelle story' : 'Nouveau post'}
+      title="Nouveau post"
       onClose={close}
       locked={busy}
       onLockedClose={() => toast('Envoi en cours, encore quelques secondes…')}
     >
-      {mode === 'story' ? (
-        <>
-          <DropZone file={file} accept="image/*,video/*" label="Touche pour ajouter une photo ou une vidéo" onPick={pick} onClear={() => setFile(null)} aspect="4 / 5" />
-          <p className="m-0 px-1 text-[0.8125rem] text-mute">Visible par tes amis pendant 24 heures.</p>
-        </>
-      ) : (
-        <>
-          <Seg
-            value={kind}
-            onChange={(k) => {
-              setKind(k);
-              setFile(null);
-            }}
-            options={[
-              { value: 0 as const, label: 'Photo' },
-              { value: 1 as const, label: 'Vidéo' },
-              { value: 2 as const, label: 'Sondage' },
-            ]}
-          />
-          {kind < 2 ? (
-            <>
-              {kind === 0 ? (
-                <PhotoPicker
-                  photos={photos}
-                  onAdd={(f) => {
-                    if (f.size > maxMb * 1024 * 1024) return toast(`Photo trop volumineuse (max ${maxMb} Mo)`, 'error');
-                    setPhotos((p) => (p.length < 10 ? [...p, f] : p));
-                  }}
-                  onRemove={(i) => setPhotos((p) => p.filter((_, j) => j !== i))}
-                />
-              ) : (
-                <DropZone
-                  key={kind}
-                  file={file}
-                  accept="video/mp4,video/webm,video/quicktime"
-                  label="Touche pour ajouter une vidéo"
-                  onPick={pick}
-                  onClear={() => setFile(null)}
-                />
-              )}
-              <input
-                ref={textRef}
-                className="field"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={140}
-                placeholder="Ajoute une légende, @mentionne un ami, #hashtag…"
+      <>
+        <Seg
+          value={kind}
+          onChange={(k) => {
+            setKind(k);
+            setFile(null);
+          }}
+          options={[
+            { value: 0 as const, label: 'Photo' },
+            { value: 1 as const, label: 'Vidéo' },
+            { value: 2 as const, label: 'Sondage' },
+          ]}
+        />
+        {kind < 2 ? (
+          <>
+            {kind === 0 ? (
+              <PhotoPicker
+                photos={photos}
+                onAdd={(f) => {
+                  if (f.size > maxMb * 1024 * 1024) return toast(`Photo trop volumineuse (max ${maxMb} Mo)`, 'error');
+                  setPhotos((p) => (p.length < 10 ? [...p, f] : p));
+                }}
+                onRemove={(i) => setPhotos((p) => p.filter((_, j) => j !== i))}
               />
-              <MentionSuggestions value={text} onChange={setText} inputRef={textRef} className="-mt-1" />
-              <button
-                type="button"
-                onClick={() => setPool(!pool)}
-                className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
-              >
-                <Sticker size={22} />
-                <span className="flex-1">Envoyer aussi dans le pool Make It Friends</span>
-                <Switch on={pool} />
-              </button>
-            </>
-          ) : (
-            <>
-              <Seg
-                size="sm"
-                value={pollKind}
-                onChange={setPollKind}
-                options={[
-                  { value: 'text' as const, label: 'Choix' },
-                  { value: 'image' as const, label: 'Photos' },
-                  { value: 'slider' as const, label: 'Curseur' },
-                ]}
+            ) : (
+              <DropZone
+                key={kind}
+                file={file}
+                accept="video/mp4,video/webm,video/quicktime"
+                label="Touche pour ajouter une vidéo"
+                onPick={pick}
+                onClear={() => setFile(null)}
               />
-              <input ref={qRef} className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" />
-              <MentionSuggestions value={q} onChange={setQ} inputRef={qRef} className="-mt-1" />
-              {pollKind === 'text' && (
-                <>
-                  {opts.map((o, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input
-                        className="field min-w-0 flex-1"
-                        value={o}
-                        maxLength={30}
-                        placeholder={`Option ${i + 1}${i > 1 ? ' (facultatif)' : ''}`}
-                        onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
-                      />
-                      {i > 1 && (
-                        <button
-                          type="button"
-                          aria-label={`Retirer l’option ${i + 1}`}
-                          onClick={() => setOpts(opts.filter((_, j) => j !== i))}
-                          className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-soft text-mute"
-                        >
-                          <X size={18} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {opts.length < POLL_MAX_OPTIONS && (
-                    <button
-                      type="button"
-                      onClick={() => setOpts([...opts, ''])}
-                      className="tap flex h-12 items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-line bg-transparent text-sm font-bold text-mute"
-                    >
-                      <Plus size={18} weight="bold" /> Ajouter une option
-                    </button>
-                  )}
-                </>
-              )}
-              {pollKind === 'image' && (
-                <div className="grid grid-cols-2 gap-2">
-                  {[0, 1].map((i) => (
-                    <div key={i} className="flex flex-col gap-2">
-                      <DropZone
-                        file={imgOpts[i]}
-                        accept="image/*"
-                        label="Photo"
-                        aspect="1"
-                        onPick={(f) => setImgOpts(imgOpts.map((x, j) => (j === i ? f : x)))}
-                      />
-                      <input
-                        className="field"
-                        value={opts[i]}
-                        maxLength={30}
-                        placeholder={`Option ${i + 1}`}
-                        onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-              {pollKind === 'slider' && (
-                <div className="flex items-center gap-3 rounded-[24px] bg-soft px-4 py-3 text-sm text-mute">
-                  <span className="text-2xl">😴</span>
-                  <span className="flex-1">Tes amis répondent en faisant glisser un curseur, et découvrent la moyenne.</span>
-                  <span className="text-2xl">🔥</span>
-                </div>
-              )}
-              <div className="flex flex-col gap-1.5">
-                <span className="px-1 text-[0.8125rem] font-semibold text-mute">Durée du sondage</span>
-                <Seg size="sm" value={duration ?? 0} onChange={(v) => setDuration(v || null)} options={POLL_DURATIONS.map((d) => ({ value: d.hours ?? 0, label: d.label }))} />
+            )}
+            <input
+              ref={textRef}
+              className="field"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={140}
+              placeholder="Ajoute une légende, @mentionne un ami, #hashtag…"
+            />
+            <MentionSuggestions value={text} onChange={setText} inputRef={textRef} className="-mt-1" />
+            <button
+              type="button"
+              onClick={() => setPool(!pool)}
+              className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
+            >
+              <Sticker size={22} />
+              <span className="flex-1">Envoyer aussi dans le pool Make It Friends</span>
+              <Switch on={pool} />
+            </button>
+          </>
+        ) : (
+          <>
+            <Seg
+              size="sm"
+              value={pollKind}
+              onChange={setPollKind}
+              options={[
+                { value: 'text' as const, label: 'Choix' },
+                { value: 'image' as const, label: 'Photos' },
+                { value: 'slider' as const, label: 'Curseur' },
+              ]}
+            />
+            <input ref={qRef} className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" />
+            <MentionSuggestions value={q} onChange={setQ} inputRef={qRef} className="-mt-1" />
+            {pollKind === 'text' && (
+              <>
+                {opts.map((o, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      className="field min-w-0 flex-1"
+                      value={o}
+                      maxLength={30}
+                      placeholder={`Option ${i + 1}${i > 1 ? ' (facultatif)' : ''}`}
+                      onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
+                    />
+                    {i > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`Retirer l’option ${i + 1}`}
+                        onClick={() => setOpts(opts.filter((_, j) => j !== i))}
+                        className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-soft text-mute"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {opts.length < POLL_MAX_OPTIONS && (
+                  <button
+                    type="button"
+                    onClick={() => setOpts([...opts, ''])}
+                    className="tap flex h-12 items-center justify-center gap-2 rounded-[24px] border-2 border-dashed border-line bg-transparent text-sm font-bold text-mute"
+                  >
+                    <Plus size={18} weight="bold" /> Ajouter une option
+                  </button>
+                )}
+              </>
+            )}
+            {pollKind === 'image' && (
+              <div className="grid grid-cols-2 gap-2">
+                {[0, 1].map((i) => (
+                  <div key={i} className="flex flex-col gap-2">
+                    <DropZone
+                      file={imgOpts[i]}
+                      accept="image/*"
+                      label="Photo"
+                      aspect="1"
+                      onPick={(f) => setImgOpts(imgOpts.map((x, j) => (j === i ? f : x)))}
+                    />
+                    <input
+                      className="field"
+                      value={opts[i]}
+                      maxLength={30}
+                      placeholder={`Option ${i + 1}`}
+                      onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
+                    />
+                  </div>
+                ))}
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isPublic}
-                onClick={() => setIsPublic(!isPublic)}
-                className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
-              >
-                <Eye size={22} />
-                <span className="flex-1">Montrer qui a voté quoi</span>
-                <Switch on={isPublic} />
-              </button>
-            </>
-          )}
-        </>
-      )}
+            )}
+            {pollKind === 'slider' && (
+              <div className="flex items-center gap-3 rounded-[24px] bg-soft px-4 py-3 text-sm text-mute">
+                <span className="text-2xl">😴</span>
+                <span className="flex-1">Tes amis répondent en faisant glisser un curseur, et découvrent la moyenne.</span>
+                <span className="text-2xl">🔥</span>
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <span className="px-1 text-[0.8125rem] font-semibold text-mute">Durée du sondage</span>
+              <Seg size="sm" value={duration ?? 0} onChange={(v) => setDuration(v || null)} options={POLL_DURATIONS.map((d) => ({ value: d.hours ?? 0, label: d.label }))} />
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isPublic}
+              onClick={() => setIsPublic(!isPublic)}
+              className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
+            >
+              <Eye size={22} />
+              <span className="flex-1">Montrer qui a voté quoi</span>
+              <Switch on={isPublic} />
+            </button>
+          </>
+        )}
+      </>
       <button
         type="button"
         onClick={publish}

@@ -1,4 +1,5 @@
-import { USERNAME_RE, type FriendsList, type InviteInfo, type ProfilePosts, type UserProfile, type UserSearchResult } from '@mandrix/shared';
+import { USERNAME_RE, type FriendsList, type Friendship, type MemberCard, type Page, type ProfilePosts, type UserProfile, type UserSearchResult } from '@mandrix/shared';
+import type { InviteInfo } from '@mandrix/shared';
 import { and, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -12,10 +13,13 @@ import { saveUpload } from '../lib/media.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { notBlocked, selectPosts } from '../lib/posts.js';
 import { streakFor } from '../lib/streak.js';
-import { areFriends, friendIds, friendshipMap, toLite, toMe, usersByIds } from '../lib/users.js';
+import { areFriends, friendIds, friendshipMap, toLite, toMe, usersByIds, uuidArray } from '../lib/users.js';
+import { foldSql, likePattern } from '../lib/text.js';
 import { perMinute } from '../lib/limits.js';
 
 const { users, friendships } = schema;
+/** Membres par page dans « Tous les membres ». */
+const DIRECTORY_PAGE = 24;
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1, 'Ton nom ne peut pas être vide').max(40).optional(),
@@ -104,6 +108,87 @@ export default async function userRoutes(app: FastifyInstance) {
       .limit(20);
     const fm = await friendshipMap(me.id, rows.map((r) => r.id));
     return rows.map((r) => ({ ...toLite(r), friendship: fm.get(r.id) ?? 'none' }));
+  });
+
+  /**
+   * Tous les membres (#93) : demandes reçues d'abord, puis ceux qui ne sont pas encore amis
+   * (par amis en commun), puis demandes envoyées et amis. Comptes bloqués et suspendus exclus.
+   */
+  app.get('/api/users/directory', async (req): Promise<Page<MemberCard>> => {
+    const me = requireUser(req);
+    const query = req.query as { q?: string; page?: string };
+    const page = Math.max(0, Math.min(200, Number(query.page ?? 0) || 0));
+    const q = String(query.q ?? '').trim().slice(0, 60);
+    const search = q
+      ? sql`and (${foldSql(sql`u.display_name`)} like ${likePattern(q)} or u.username like ${likePattern(q)})`
+      : sql``;
+    const rows = await db.execute<{
+      id: string;
+      username: string;
+      displayName: string;
+      avatarMediaId: string | null;
+      birthday: string | null;
+      city: string | null;
+      bio: string | null;
+      friendship: Friendship;
+      mutual: number;
+      posts: number;
+      friends: number;
+    }>(sql`
+      with rel as (
+        select case when requester_id = ${me.id} then addressee_id else requester_id end as id,
+          case when status = 'accepted' then 'friends' when requester_id = ${me.id} then 'pending_out' else 'pending_in' end as f
+        from friendships where requester_id = ${me.id} or addressee_id = ${me.id}
+      ),
+      mine as (select id from rel where f = 'friends')
+      select u.id, u.username, u.display_name as "displayName", u.avatar_media_id as "avatarMediaId", u.birthday, u.city, u.bio,
+        coalesce(rel.f, 'none') as friendship,
+        (select count(*)::int from friendships f2
+          where f2.status = 'accepted' and (f2.requester_id = u.id or f2.addressee_id = u.id)
+            and (case when f2.requester_id = u.id then f2.addressee_id else f2.requester_id end) in (select id from mine)) as mutual,
+        (select count(*)::int from posts p where p.author_id = u.id and p.hidden_at is null and p.kind <> 'meme') as posts,
+        (select count(*)::int from friendships f3 where f3.status = 'accepted' and (f3.requester_id = u.id or f3.addressee_id = u.id)) as friends
+      from users u left join rel on rel.id = u.id
+      where u.id <> ${me.id} and u.suspended_at is null and ${notBlocked(me.id, sql`u.id`)} ${search}
+      order by case coalesce(rel.f, 'none') when 'pending_in' then 0 when 'none' then 1 when 'pending_out' then 2 else 3 end,
+        mutual desc, u.created_at desc, u.id
+      limit ${DIRECTORY_PAGE + 1} offset ${page * DIRECTORY_PAGE}`);
+    const list = [...rows];
+    const more = list.length > DIRECTORY_PAGE;
+    const shown = list.slice(0, DIRECTORY_PAGE);
+    // Amis en commun : quelques visages par carte.
+    const mine = new Set(await friendIds(me.id));
+    const ids = shown.map((r) => r.id);
+    const links = ids.length
+      ? [
+          ...(await db.execute<{ a: string; b: string }>(sql`
+            select requester_id as a, addressee_id as b from friendships
+            where status = 'accepted' and (requester_id = any(${uuidArray(ids)}) or addressee_id = any(${uuidArray(ids)}))`)),
+        ]
+      : [];
+    const common = new Map<string, string[]>();
+    for (const { a, b } of links) {
+      for (const [who, other] of [
+        [a, b],
+        [b, a],
+      ]) {
+        if (ids.includes(who) && mine.has(other)) common.set(who, [...(common.get(who) ?? []), other]);
+      }
+    }
+    const faces = await usersByIds([...common.values()].flatMap((l) => l.slice(0, 3)), me.id);
+    return {
+      items: shown.map((r) => ({
+        ...toLite(r, r.friendship === 'friends'),
+        city: r.city,
+        bio: r.bio,
+        friendship: r.friendship,
+        mutual: r.mutual,
+        mutualPreview: (common.get(r.id) ?? []).slice(0, 3).map((id) => faces.get(id)!).filter(Boolean),
+        posts: r.posts,
+        friends: r.friends,
+      })),
+      next: more ? page + 1 : null,
+    };
   });
 
   app.get('/api/users/:username', async (req): Promise<UserProfile> => {

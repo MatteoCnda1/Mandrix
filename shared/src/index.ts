@@ -63,6 +63,18 @@ export interface UserSearchResult extends UserLite {
   friendship: Friendship;
 }
 
+/** Carte d'un membre dans « Tous les membres » (#93). */
+export interface MemberCard extends UserLite {
+  city: string | null;
+  bio: string | null;
+  friendship: Friendship;
+  /** Amis en commun : nombre et quelques visages. */
+  mutual: number;
+  mutualPreview: UserLite[];
+  posts: number;
+  friends: number;
+}
+
 export interface FriendsList {
   friends: UserLite[];
   incoming: UserLite[];

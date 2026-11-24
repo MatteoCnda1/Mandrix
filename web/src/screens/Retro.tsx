@@ -128,7 +128,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
           {s(m.count, 'mème', 'mèmes')} · {s(m.wins, 'victoire', 'victoires')}
         </Line>
         {m.best && (
-          <div className="mx-auto mt-2 flex w-[min(72vw,320px)] animate-in flex-col overflow-hidden rounded-[24px] bg-white text-ink shadow-hero" style={{ animationDelay: '.4s', animationFillMode: 'both' }}>
+          <div className="mx-auto mt-2 flex w-[min(72vw,320px)] animate-in flex-col overflow-hidden rounded-[24px] bg-white text-black shadow-hero" style={{ animationDelay: '.4s', animationFillMode: 'both' }}>
             <div className="px-3 py-2.5 text-center text-lg leading-tight font-extrabold">{m.best.caption}</div>
             <div className="ph aspect-[4/3]">
               <MediaView media={m.best.media} sizes="320px" />
@@ -276,7 +276,7 @@ export function Retro() {
             <CaretLeft size={20} weight="bold" />
           </button>
           {i === last && slides.length > 1 ? (
-            <button type="button" onClick={() => setI(0)} className="tap flex h-11 items-center gap-2 rounded-full border-0 bg-white px-5 text-sm font-extrabold text-ink">
+            <button type="button" onClick={() => setI(0)} className="tap flex h-11 items-center gap-2 rounded-full border-0 bg-white px-5 text-sm font-extrabold text-black">
               <ArrowCounterClockwise size={18} weight="bold" /> Revoir
             </button>
           ) : (
