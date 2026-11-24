@@ -484,6 +484,17 @@ export function ratioOf(m: MediaRef | null, fallback = '4 / 5') {
   return String(r);
 }
 
+/** Hauteur maximale d'une photo ou vidéo dans le fil : jamais plus haute qu'une bonne part de l'écran. */
+export const POST_MEDIA_MAX_H = 'min(64svh, 560px)';
+
+/**
+ * Cadre d'une photo ou vidéo de post : format 1,91:1 à 4:5, et hauteur plafonnée (le centre est gardé,
+ * l'image entière reste visible en plein écran).
+ */
+export function mediaFrame(m: MediaRef | null, fallback = '4 / 5'): CSSProperties {
+  return { aspectRatio: ratioOf(m, fallback), maxHeight: POST_MEDIA_MAX_H };
+}
+
 export function ScreenLoader() {
   const block = 'skel';
   return (
