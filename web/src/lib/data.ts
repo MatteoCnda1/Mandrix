@@ -30,7 +30,7 @@ import type {
 } from '@mandrix/shared';
 import { QueryClient, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { api, ApiError, errMsg } from './api';
-import { closeSheet, toast } from './store';
+import { closeSheet, toast, type PoolTarget } from './store';
 import { useOutbox } from './outbox';
 
 export const qc = new QueryClient({
@@ -249,11 +249,19 @@ export async function votePoll(post: Post, body: { optionId?: string; value?: nu
   }
 }
 
-export async function sendToPool(target: { postId?: string; shotId?: string }, scope: PoolScope) {
+/** Met à jour l'état « dans le pool » d'une story dans le cache (la visionneuse le lit en direct). */
+function patchStory(storyId: string, pool: PoolScope | null) {
+  qc.setQueryData<StoryGroup[]>(['stories'], (groups) =>
+    groups?.map((g) => ({ ...g, stories: g.stories.map((s) => (s.id === storyId ? { ...s, pool } : s)) })),
+  );
+}
+
+export async function sendToPool(target: PoolTarget, scope: PoolScope) {
   try {
     const res = await api<{ pool: PoolScope | null }>('/api/pool', { body: { ...target, scope } });
     if (target.postId) patchPost(target.postId, (p) => ({ ...p, pool: res.pool }));
     if (target.shotId) patchShot(target.shotId, (s) => ({ ...s, pool: res.pool }));
+    if (target.storyId) patchStory(target.storyId, res.pool);
     qc.invalidateQueries({ queryKey: ['pool-stats'] });
     toast(res.pool ? (scope === 'public' ? 'Envoyé dans le pool public' : 'Envoyé dans le pool de tes amis') : 'Contenu en attente de vérification');
     return true;
@@ -263,11 +271,12 @@ export async function sendToPool(target: { postId?: string; shotId?: string }, s
   }
 }
 
-export async function removeFromPool(target: { postId?: string; shotId?: string }) {
+export async function removeFromPool(target: PoolTarget) {
   try {
     await api('/api/pool/remove', { body: target });
     if (target.postId) patchPost(target.postId, (p) => ({ ...p, pool: null }));
     if (target.shotId) patchShot(target.shotId, (s) => ({ ...s, pool: null }));
+    if (target.storyId) patchStory(target.storyId, null);
     qc.invalidateQueries({ queryKey: ['pool-stats'] });
     toast('Retiré du pool');
   } catch (e) {

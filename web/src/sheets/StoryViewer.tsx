@@ -1,14 +1,14 @@
 import type { StoryView } from '@mandrix/shared';
-import { Eye, PaperPlaneRight, Trash, X } from '@phosphor-icons/react';
+import { CheckCircle, Eye, PaperPlaneRight, Sticker, Trash, X } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, MediaView, Sheet, confirmAction } from '../components/ui';
 import { api, errMsg } from '../lib/api';
-import { qc, useMe, useStories } from '../lib/data';
+import { qc, removeFromPool, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
 import { useMediaGestures } from '../lib/gestures';
 import { useScrollLock } from '../lib/scrollLock';
-import { toast, useUI } from '../lib/store';
+import { openPool, toast, useUI } from '../lib/store';
 
 const IMAGE_MS = 4500;
 const QUICK = ['😂', '😍', '😮', '🔥', '👏'];
@@ -39,6 +39,11 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const group = groups?.[pos.group];
   const story = group?.stories[pos.index];
   const mine = !!me && group?.user.id === me.id;
+  // Feuille « Envoyer dans le pool » ouverte : la story attend.
+  const poolOpen = useUI((s) => !!s.poolFor);
+  const halted = paused || poolOpen;
+  // État « dans le pool » lu en direct (la liste affichée est figée à l'ouverture).
+  const pool = live?.flatMap((g) => g.stories).find((s) => s.id === story?.id)?.pool ?? story?.pool ?? null;
 
   const next = () => {
     if (!groups || !group) return close();
@@ -73,7 +78,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   // Avance automatique pour les photos : le temps écoulé est cumulé image par image,
   // donc un passage manuel ou une pause ne décale jamais la story suivante.
   useEffect(() => {
-    if (!story || story.media.kind === 'video' || paused) return;
+    if (!story || story.media.kind === 'video' || halted) return;
     let last = performance.now();
     const t = setInterval(() => {
       const now = performance.now();
@@ -87,7 +92,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
       } else setProgress(p);
     }, 40);
     return () => clearInterval(t);
-  }, [story?.id, paused]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [story?.id, halted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gestes : tap gauche/droite, maintenir pour mettre en pause, glisser vers le bas pour fermer,
   // glisser à gauche/droite pour changer d'ami.
@@ -101,14 +106,14 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (paused) v.pause();
+    if (halted) v.pause();
     else
       v.play().catch(() => {
         // iOS refuse parfois le son sans geste : on relance sans le son plutôt que de rester bloqué.
         v.muted = true;
         v.play().catch(() => {});
       });
-  }, [paused, story?.id]);
+  }, [halted, story?.id]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -208,12 +213,21 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
           <Avatar user={group.user} size={40} />
           <span className="text-[0.9375rem] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>
           <span className="text-[0.8125rem] text-fog">{timeAgo(story.createdAt)}</span>
+          <button
+            type="button"
+            aria-label={pool ? 'Retirer la story du pool' : 'Envoyer la story dans le pool'}
+            aria-pressed={!!pool}
+            onClick={() => (pool ? void removeFromPool({ storyId: story.id }) : openPool({ storyId: story.id }))}
+            className={`tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 text-white ${pool ? 'bg-brand' : 'bg-white/15'}`}
+          >
+            {pool ? <CheckCircle size={20} weight="fill" /> : <Sticker size={20} />}
+          </button>
           {mine && (
-            <button type="button" aria-label="Supprimer la story" onClick={remove} className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
+            <button type="button" aria-label="Supprimer la story" onClick={remove} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
               <Trash size={20} />
             </button>
           )}
-          <button type="button" aria-label="Fermer" onClick={close} className={`tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white ${mine ? '' : 'ml-auto'}`}>
+          <button type="button" aria-label="Fermer" onClick={close} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
             <X size={20} />
           </button>
         </div>

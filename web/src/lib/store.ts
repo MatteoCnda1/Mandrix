@@ -1,6 +1,9 @@
 import type { PoolScope, Post } from '@mandrix/shared';
 import { create } from 'zustand';
 
+/** Contenu à envoyer dans le pool : un post, une photo du déballage ou une story. */
+export type PoolTarget = { postId?: string; shotId?: string; storyId?: string };
+
 export type SheetName = 'friends' | 'editProfile' | 'invite' | 'newMessage' | 'install';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -11,7 +14,7 @@ interface BeforeInstallPromptEvent extends Event {
 interface UIState {
   composer: null | { mode: 'post' | 'story'; kind?: 0 | 1 | 2; pool?: boolean };
   commentsFor: string | null;
-  poolFor: null | { postId?: string; shotId?: string };
+  poolFor: null | PoolTarget;
   /** Post à envoyer en message (#73). */
   shareFor: Post | null;
   story: null | { group: number; index: number };
@@ -56,5 +59,5 @@ export const openSheet = (sheet: SheetName) => useUI.setState({ sheet, ...(sheet
 export const openInvite = (game: 'mif' | 'whois') => useUI.setState({ sheet: 'invite', inviteGame: game });
 export const closeSheet = () => useUI.setState({ sheet: null });
 export const openShare = (post: Post) => useUI.setState({ shareFor: post });
-export const openPool = (target: { postId?: string; shotId?: string }) => useUI.setState({ poolFor: target });
+export const openPool = (target: PoolTarget) => useUI.setState({ poolFor: target });
 export type { PoolScope };

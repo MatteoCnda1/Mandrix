@@ -3,14 +3,14 @@ import { GlobeHemisphereWest, ShieldCheck, UsersThree } from '@phosphor-icons/re
 import { useState } from 'react';
 import { PrimaryBtn, Sheet } from '../components/ui';
 import { sendToPool } from '../lib/data';
-import { useUI } from '../lib/store';
+import { useUI, type PoolTarget } from '../lib/store';
 
 const OPTS: { value: PoolScope; icon: typeof GlobeHemisphereWest; label: string; sub: string }[] = [
   { value: 'public', icon: GlobeHemisphereWest, label: 'Pool public', sub: 'Tous les joueurs de Mandrix peuvent tomber dessus.' },
   { value: 'friends', icon: UsersThree, label: 'Amis seulement', sub: 'Uniquement dans les salons de tes amis.' },
 ];
 
-export function PoolSheet({ target }: { target: { postId?: string; shotId?: string } }) {
+export function PoolSheet({ target }: { target: PoolTarget }) {
   const [scope, setScope] = useState<PoolScope>('public');
   const [busy, setBusy] = useState(false);
   const close = () => useUI.setState({ poolFor: null });

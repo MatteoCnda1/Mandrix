@@ -110,3 +110,35 @@ describe('import d’images dans le pool', () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 });
+
+describe('stories dans le pool', () => {
+  const jpg = async (background: string) => ({ name: 'story.jpg', type: 'image/jpeg', data: await sharp({ create: { width: 540, height: 960, channels: 3, background } }).jpeg().toBuffer() });
+  const poolCount = async () => (await call<{ publicCount: number }>(me, 'GET', '/api/pool/stats')).body.publicCount;
+
+  it('une story (la sienne ou celle d’un ami) peut rejoindre le pool, pas celle d’un inconnu', async () => {
+    const m = (await upload<MediaRef>(amie, '/api/media', await jpg('#aa44ff'))).body;
+    const story = (await call<{ id: string }>(amie, 'POST', '/api/stories', { mediaId: m.id })).body;
+    const before = await poolCount();
+    // Pas amie avec l'autrice : introuvable.
+    expect((await call(inconnue, 'POST', '/api/pool', { storyId: story.id, scope: 'public' })).status).toBe(404);
+    expect((await call(me, 'POST', '/api/pool', { storyId: story.id, scope: 'public' })).body).toEqual({ pool: 'public' });
+    expect(await poolCount()).toBe(before + 1);
+    const groups = (await call<{ user: { id: string }; stories: { id: string; pool: string | null }[] }[]>(me, 'GET', '/api/stories')).body;
+    expect(groups.find((g) => g.user.id === amie.id)?.stories.find((s) => s.id === story.id)?.pool).toBe('public');
+    const notifs = (await call<{ type: string; data: { storyId?: string } }[]>(amie, 'GET', '/api/notifications')).body;
+    expect(notifs.some((n) => n.type === 'pool_added' && n.data.storyId === story.id)).toBe(true);
+    // Retirer : celle qui l'a ajoutée (ou l'autrice).
+    expect((await call(me, 'POST', '/api/pool/remove', { storyId: story.id })).body).toEqual({ pool: null });
+    expect(await poolCount()).toBe(before);
+    // Story expirée : on ne peut plus l'ajouter.
+    await db.execute(sql`update stories set expires_at = now() - interval '1 minute' where id = ${story.id}`);
+    expect((await call(amie, 'POST', '/api/pool', { storyId: story.id, scope: 'public' })).status).toBe(404);
+  });
+
+  it('un post qu’on ne peut pas voir ne rejoint pas le pool', async () => {
+    const m = (await upload<MediaRef>(amieDAmie, '/api/media', await jpg('#44aa88'))).body;
+    const post = (await call<Post>(amieDAmie, 'POST', '/api/posts', { kind: 'photo', mediaId: m.id })).body;
+    expect((await call(me, 'POST', '/api/pool', { postId: post.id, scope: 'public' })).status).toBe(404);
+    expect((await call(amie, 'POST', '/api/pool', { postId: post.id, scope: 'friends' })).body).toEqual({ pool: 'friends' });
+  });
+});

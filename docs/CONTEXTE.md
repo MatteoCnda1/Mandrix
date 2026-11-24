@@ -73,7 +73,9 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - **Post épinglé** en tête du profil (#81, `users.pinned_post_id`, menu ··· d'un de ses posts).
 - Fil paginé par **curseur** (`?cursor=`, date de tri + id). Légende **modifiable** (« modifié »). Stories : **« N vues »** et liste des amis qui ont vu.
 - **Recherche** `/recherche` (#13) : légendes, options de sondage et mèmes du cercle, `#hashtag` exact, personnes ; « Tu les connais peut-être ? » (amis d'amis par amis en commun).
-- Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses.
+- Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses. **Pool** : bouton dans la visionneuse
+  (ses stories et celles de ses amis, tant qu'elles sont en ligne) ; la story attend pendant le choix ; le média reste
+  dans le pool après l'expiration de la story.
 - **Créer une story** (#92, `web/src/sheets/StoryCreator.tsx`) : plein écran sur l'appareil photo (`web/src/lib/camera.ts`, partagé avec
   la Pellicule), galerie en secours ; recadrage 9:16 (glisser, pincer, molette, « Remplir » / « Ajuster » avec fond flouté), aperçu
   exact puis publication d'une image rendue en 1080 × 1920 (`web/src/lib/storyImage.ts`). Vidéos : aperçu puis envoi tel quel.
