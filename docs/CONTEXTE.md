@@ -217,12 +217,24 @@ git archive --format=tar main | gzip | ssh pve 'cat > /tmp/mandrix-src.tgz \
   && pct push 107 /tmp/mandrix-src.tgz /tmp/mandrix-src.tgz \
   && pct exec 107 -- tar -xzf /tmp/mandrix-src.tgz -C /opt/mandrix \
   && rm -f /tmp/mandrix-src.tgz \
-  && pct exec 107 -- sh -c "cd /opt/mandrix && docker compose up -d --build"'
+  && pct exec 107 -- sh -c "cd /opt/mandrix && docker compose up -d --build app \
+       && docker builder prune -f && docker image prune -f" \
+  && pct fstrim 107 && lvs pve/data'
 ```
 
-Puis vérifier : `/api/config` répond, les fichiers servis correspondent au build (comparaison md5), le NAS est joignable.
+**Toujours nettoyer après la construction** : le cache de construction Docker grossit à chaque déploiement (4,3 Go le
+24 novembre 2026) et remplit le pool LVM « thin » `pve/data` qui porte les disques de **toutes** les VM et conteneurs.
+`pct fstrim 107` rend au pool la place libérée. Viser un `Data%` de `pve/data` bien sous 85 %.
 
-**Supervision** (#18) : watchdog NAS/disque/site sur le Proxmox, restauration test hebdomadaire des sauvegardes,
+Puis vérifier : `/api/config` répond, le nouveau code est servi (chercher un texte récent dans `assets/index-*.js` :
+le nom du fichier change à chaque compilation, `__BUILD_ID__`), le NAS est joignable.
+
+**Incident du 24 novembre 2026** : pool `pve/data` plein à 100 % pendant un `docker compose build` → écritures refusées
+sur tous les disques, LXC 107 en `emergency_ro` (PostgreSQL ne pouvait plus écrire), erreurs sur 102 et 104. Réparé par
+`lvextend -L +12G pve/data` (66,2 Go ; il reste ~2,75 Go libres dans le groupe `pve`), `pct stop 107 && pct fsck 107 --force 1
+&& pct start 107`, nettoyage Docker et `pct fstrim 107`. Le pool est surréservé (96 Go de disques déclarés pour 66 Go réels).
+
+**Supervision** (#18) : watchdog NAS/disque/pool LVM/site sur le Proxmox, restauration test hebdomadaire des sauvegardes,
 déploiement automatique facultatif (clé de déploiement GitHub), alertes en push chez les admins. Voir [SUPERVISION.md](SUPERVISION.md).
 
 ## 6. Qualité et flux de travail

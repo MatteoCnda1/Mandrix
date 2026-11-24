@@ -20,5 +20,7 @@ git -C "$SRC" archive --format=tar "$new" | tar -x -C "$DEST"
 cd "$DEST"
 docker compose --profile tunnel up -d --build
 echo "$new" > "$DEST/.deployed"
-# Ménage des anciennes images.
+# Ménage : anciennes images et cache de construction, qui remplissait le pool LVM partagé par toutes les VM
+# (incident du 24/11/2026). Penser à `pct fstrim 107` côté Proxmox pour rendre la place au pool.
 docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -f >/dev/null 2>&1 || true
