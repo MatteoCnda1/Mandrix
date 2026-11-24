@@ -93,7 +93,8 @@ export async function makeVariants(rel: string, width: number | null): Promise<n
   for (const w of VARIANT_WIDTHS) {
     if (w >= width * 0.9) break;
     try {
-      await sharp(path.join(mediaDir, rel)).resize({ width: w }).webp({ quality: 76 }).toFile(path.join(mediaDir, variantPath(rel, w)));
+      // `animated` : les miniatures d'un GIF restent animées (sans effet sur une photo).
+      await sharp(path.join(mediaDir, rel), { animated: true }).resize({ width: w }).webp({ quality: 76 }).toFile(path.join(mediaDir, variantPath(rel, w)));
       made.push(w);
     } catch {
       break;
@@ -125,6 +126,50 @@ interface SaveOpts {
   accept?: 'image' | 'video' | 'audio' | 'any';
   sealedUntil?: Date | null;
   maxSide?: number;
+  /** Image fixe (photo de profil, de groupe) : un GIF animé n'en garde que la première image. */
+  still?: boolean;
+}
+
+/** Enregistre une image (envoi, import) : WebP, orientation appliquée, métadonnées retirées, miniatures. */
+export async function saveImageBuffer(buf: Buffer, ownerId: string, opts: Pick<SaveOpts, 'sealedUntil' | 'maxSide' | 'still'> = {}) {
+  const id = randomUUID();
+  const now = new Date();
+  const rel = path.join(String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
+  await fs.mkdir(path.join(mediaDir, rel), { recursive: true });
+  let out: { data: Buffer; info: OutputInfo };
+  try {
+    const side = opts.maxSide ?? 2048;
+    // rotate() applique l'orientation EXIF ; la sortie WebP ne conserve aucune métadonnée (GPS…).
+    // GIF (ou WebP) animé : toutes les images sont gardées, la sortie est un WebP animé.
+    out = await sharp(buf, { failOn: 'none', animated: !opts.still })
+      .rotate()
+      .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer({ resolveWithObject: true });
+  } catch {
+    return fail(415, 'Image illisible');
+  }
+  const relPath = path.join(rel, `${id}.webp`);
+  await fs.writeFile(path.join(mediaDir, relPath), out.data);
+  // Les photos scellées de la Pellicule n'ont pas besoin de miniatures avant le déballage : faites quand même, c'est rapide.
+  const variants = await makeVariants(relPath, out.info.width);
+  const [row] = await db
+    .insert(schema.media)
+    .values({
+      id,
+      ownerId,
+      kind: 'image',
+      mime: 'image/webp',
+      path: relPath,
+      width: out.info.width,
+      // Image animée : `height` couvre toutes les images empilées, `pageHeight` en est une.
+      height: out.info.pageHeight ?? out.info.height,
+      size: out.info.size,
+      sealedUntil: opts.sealedUntil ?? null,
+      variants,
+    })
+    .returning();
+  return row;
 }
 
 export async function saveUpload(file: MultipartFile, ownerId: string, opts: SaveOpts = {}) {
@@ -149,41 +194,7 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
   const rel = path.join(String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
   await fs.mkdir(path.join(mediaDir, rel), { recursive: true });
 
-  if (isImage) {
-    const buf = await file.toBuffer();
-    let out: { data: Buffer; info: OutputInfo };
-    try {
-      const side = opts.maxSide ?? 2048;
-      // rotate() applique l'orientation EXIF ; la sortie WebP ne conserve aucune métadonnée (GPS…).
-      out = await sharp(buf, { failOn: 'none' })
-        .rotate()
-        .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 82 })
-        .toBuffer({ resolveWithObject: true });
-    } catch {
-      return fail(415, 'Image illisible');
-    }
-    const relPath = path.join(rel, `${id}.webp`);
-    await fs.writeFile(path.join(mediaDir, relPath), out.data);
-    // Les photos scellées de la Pellicule n'ont pas besoin de miniatures avant le déballage : faites quand même, c'est rapide.
-    const variants = await makeVariants(relPath, out.info.width);
-    const [row] = await db
-      .insert(schema.media)
-      .values({
-        id,
-        ownerId,
-        kind: 'image',
-        mime: 'image/webp',
-        path: relPath,
-        width: out.info.width,
-        height: out.info.height,
-        size: out.info.size,
-        sealedUntil: opts.sealedUntil ?? null,
-        variants,
-      })
-      .returning();
-    return row;
-  }
+  if (isImage) return saveImageBuffer(await file.toBuffer(), ownerId, opts);
 
   if (isAudio) {
     const sourceRel = path.join(rel, `${id}.src${AUDIO_MIMES[mime]}`);

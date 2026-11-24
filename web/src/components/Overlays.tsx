@@ -11,6 +11,7 @@ const InviteSheet = lazy(() => import('../sheets/Invite').then((m) => ({ default
 const NewMessageSheet = lazy(() => import('../sheets/NewMessage').then((m) => ({ default: m.NewMessageSheet })));
 const PoolSheet = lazy(() => import('../sheets/Pool').then((m) => ({ default: m.PoolSheet })));
 const ShareSheet = lazy(() => import('../sheets/Share').then((m) => ({ default: m.ShareSheet })));
+const StoryCreator = lazy(() => import('../sheets/StoryCreator').then((m) => ({ default: m.StoryCreator })));
 const StoryViewer = lazy(() => import('../sheets/StoryViewer').then((m) => ({ default: m.StoryViewer })));
 
 export function Overlays() {
@@ -22,7 +23,8 @@ export function Overlays() {
   const sheet = useUI((s) => s.sheet);
   return (
     <Suspense fallback={null}>
-      {composer && <Composer key={composer.mode} mode={composer.mode} initialKind={composer.kind} initialPool={composer.pool} />}
+      {composer?.mode === 'story' && <StoryCreator />}
+      {composer?.mode === 'post' && <Composer key={composer.mode} mode={composer.mode} initialKind={composer.kind} initialPool={composer.pool} />}
       {commentsFor && <CommentsSheet postId={commentsFor} />}
       {poolFor && <PoolSheet target={poolFor} />}
       {shareFor && <ShareSheet post={shareFor} />}

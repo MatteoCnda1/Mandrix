@@ -28,7 +28,7 @@ import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
 import { MentionSuggestions, RichText } from './RichText';
 import { openPool, openShare, toast, useUI } from '../lib/store';
-import { Avatar, confirmAction, cx, fmtDuration, MediaView, PrimaryBtn, ratioOf, Sheet, VideoProcessing } from './ui';
+import { Avatar, confirmAction, cx, fmtDuration, mediaFrame, MediaView, POST_MEDIA_MAX_H, PrimaryBtn, ratioOf, Sheet, VideoProcessing } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -282,7 +282,7 @@ function VideoTeaser({ post }: { post: Post }) {
   const [dur, setDur] = useState<string | null>(fmtDuration(media.duration));
   if (media.processing) {
     return (
-      <div className="overflow-hidden rounded-3xl" style={{ aspectRatio: ratioOf(media, '4 / 5') }}>
+      <div className="w-full overflow-hidden rounded-3xl" style={mediaFrame(media, '4 / 5')}>
         <VideoProcessing />
       </div>
     );
@@ -293,7 +293,7 @@ function VideoTeaser({ post }: { post: Post }) {
       onClick={() => nav(`/reels?v=${post.id}`)}
       aria-label="Lire la vidéo"
       className="tap phdark relative grid w-full place-items-center overflow-hidden rounded-3xl border-0 p-0"
-      style={{ aspectRatio: ratioOf(post.media, '4 / 5') }}
+      style={mediaFrame(post.media, '4 / 5')}
     >
       {media.poster ? (
         <img src={media.poster} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
@@ -439,8 +439,8 @@ export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 1
         aria-label="Ouvrir en grand (toucher deux fois pour aimer)"
         onClick={onTap}
         onKeyDown={(e) => e.key === 'Enter' && setOpen(true)}
-        className={cx('ph relative cursor-zoom-in overflow-hidden rounded-3xl select-none [-webkit-touch-callout:none]', className)}
-        style={{ aspectRatio: ratio }}
+        className={cx('ph relative w-full cursor-zoom-in overflow-hidden rounded-3xl select-none [-webkit-touch-callout:none]', className)}
+        style={{ aspectRatio: ratio, maxHeight: POST_MEDIA_MAX_H }}
       >
         <MediaView media={post.media} sizes={sizes} autoPlay={post.media.kind === 'video'} />
         {burst.node}
@@ -474,8 +474,8 @@ function Carousel({ post, gallery }: { post: Post; gallery: MediaRef[] }) {
         role="group"
         aria-roledescription="carrousel"
         aria-label={`${gallery.length} photos`}
-        className="no-scrollbar flex cursor-zoom-in snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-3xl"
-        style={{ aspectRatio: ratioOf(gallery[0]) }}
+        className="no-scrollbar flex w-full cursor-zoom-in snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-3xl"
+        style={mediaFrame(gallery[0])}
       >
         {gallery.map((m, k) => (
           <div key={m.id} className="ph relative h-full w-full flex-none snap-center snap-always" aria-label={`Photo ${k + 1} sur ${gallery.length}`}>

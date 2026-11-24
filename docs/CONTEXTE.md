@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 23 novembre 2026 (lot 7, issues #88 à #90).
+> Dernière mise à jour : 24 novembre 2026 (lot 8, issues #92 et #93).
 
 ## 1. L'idée
 
@@ -74,6 +74,9 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - Fil paginé par **curseur** (`?cursor=`, date de tri + id). Légende **modifiable** (« modifié »). Stories : **« N vues »** et liste des amis qui ont vu.
 - **Recherche** `/recherche` (#13) : légendes, options de sondage et mèmes du cercle, `#hashtag` exact, personnes ; « Tu les connais peut-être ? » (amis d'amis par amis en commun).
 - Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses.
+- **Créer une story** (#92, `web/src/sheets/StoryCreator.tsx`) : plein écran sur l'appareil photo (`web/src/lib/camera.ts`, partagé avec
+  la Pellicule), galerie en secours ; recadrage 9:16 (glisser, pincer, molette, « Remplir » / « Ajuster » avec fond flouté), aperçu
+  exact puis publication d'une image rendue en 1080 × 1920 (`web/src/lib/storyImage.ts`). Vidéos : aperçu puis envoi tel quel.
 - Répondre à une story envoie un message privé qui **affiche la photo de la story** des deux côtés (instantané dans `messages.meta`).
 - Tirer pour rafraîchir.
 
@@ -99,7 +102,9 @@ La file reprend au démarrage (`resumeVideoQueue`).
 
 ### Make It Friends
 Jeu temps réel 2 à 8 joueurs : une image tirée du pool, chacun écrit une légende, tout le monde vote.
-Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images partagé (signalements, modération admin),
+Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images partagé (signalements, modération admin ; import d'un dossier
+d'images : `npm run cli -w server -- import-pool <dossier> <pseudo> [public|friends]`, en production
+`docker compose exec app node server/dist/cli.js import-pool …`, relançable sans doublon grâce à `.mandrix-import.json`),
 podium avec départage par auteur en cas d'égalité. Correctif : la création de salon diffuse maintenant l'état (#20).
 
 **Mème du jour** (#9, onglet du jeu `/jeu?onglet=jour`) : une image du pool public tirée à 8 h (heure de Paris), une légende
@@ -152,6 +157,11 @@ puis podium des mèmes les plus aimés.
 ### Profil et compte
 Statistiques, série, amis, code de parrainage (`InviteCard`), mode sombre, installation guidée, modération (admin).
 
+**Tous les membres** (#93, onglet de la feuille Amis, `GET /api/users/directory?q=&page=`) : cartes façon Instagram (photo, nom,
+ville, bio, amis en commun, posts et amis, bouton Ajouter). Demandes reçues d'abord, puis non-amis par amis en commun, puis demandes
+envoyées et amis ; bloqués et suspendus exclus ; recherche sans accents (`server/src/lib/text.ts`, partagé avec la recherche dans
+une conversation).
+
 **Réglages** `/reglages` :
 - notifications par catégorie, en push et dans la cloche, et **heures calmes** (#12) ; appliquées côté serveur (`notify`, `sendPush(…, kind)`) ;
 - **ambiance** de fond (#14) : Aurore, Ciel vivant, Doodles & grain, Heure réelle (doré le dimanche 19 h–21 h), mémorisée par appareil, figée par « Réduire les animations » ;
@@ -167,6 +177,9 @@ Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli
 - Zoom au pincement et au double tap désactivés (Safari ignore `user-scalable=no` : les évènements de geste sont annulés).
 - Écrans et feuilles chargés à la demande (`React.lazy`) : JS initial ≈ 186 Ko compressés (#15).
 - Photos : variantes WebP 360/720/1280 générées à l'envoi (rattrapage au démarrage), servies en `?w=` via `srcset` (#15).
+- **GIF animés** : convertis en WebP animé (`sharp(…, { animated: true })`), miniatures comprises ; photos de profil et de groupe
+  restent fixes (`saveUpload(…, { still: true })`). Côté téléphone, une image animée n'est ni réduite ni recadrée (`isAnimated`).
+  Les GIF postés avant ce correctif ont été enregistrés figés (première image seulement) : il faut les reposter.
 - Accessibilité (#16) : tailles de texte en `rem`, texte secondaire et liens ≥ 4,5:1, focus gardé dans les feuilles.
 - Mise à jour sur demande : bannière « Mettre à jour » (`registerType: 'prompt'`, message `SKIP_WAITING`).
 - **Photos réduites avant l'envoi** (#78, `web/src/lib/image.ts`) : 2048 px max, JPEG 0,85 (PNG gardé en PNG), EXIF retiré, dans `upload()`.

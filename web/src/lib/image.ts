@@ -8,8 +8,26 @@ const SMALL = 700 * 1024;
  * la transparence). Orientation EXIF appliquée, métadonnées (dont la position GPS) retirées.
  * En cas d'échec (format non décodable…), le fichier d'origine part sans changement.
  */
+/**
+ * Image animée (GIF, WebP animé, PNG animé) : on ne la touche pas, un canvas n'en garderait qu'une image.
+ * Lit seulement l'en-tête du fichier.
+ */
+export async function isAnimated(file: Blob): Promise<boolean> {
+  if (file.type === 'image/gif') return true;
+  if (file.type !== 'image/webp' && file.type !== 'image/png' && file.type !== 'image/apng') return false;
+  try {
+    const head = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+    const text = String.fromCharCode(...head);
+    // WebP : bloc VP8X avec le drapeau d'animation, ou bloc ANIM ; PNG animé : bloc acTL avant les données.
+    if (file.type === 'image/webp') return (text.slice(12, 16) === 'VP8X' && (head[20] & 0x02) !== 0) || text.includes('ANIM');
+    return text.includes('acTL');
+  } catch {
+    return false;
+  }
+}
+
 export async function shrinkImage(file: Blob, maxSide = UPLOAD_MAX_SIDE, quality = 0.85): Promise<Blob> {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.size < SMALL || typeof createImageBitmap !== 'function') return file;
+  if (!file.type.startsWith('image/') || file.size < SMALL || typeof createImageBitmap !== 'function' || (await isAnimated(file))) return file;
   let bmp: ImageBitmap | null = null;
   try {
     bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });

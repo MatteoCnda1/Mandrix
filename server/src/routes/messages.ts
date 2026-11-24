@@ -21,6 +21,7 @@ import { requireUser, type AuthUser } from '../lib/auth.js';
 import { fail, isUuid, parse, uuidParam } from '../lib/http.js';
 import { deleteMediaFile, mediaReferenced, mediaRef, saveUpload, variantPath } from '../lib/media.js';
 import { canSeePost } from '../lib/posts.js';
+import { fold, foldSql, likePattern } from '../lib/text.js';
 import { emitBadges, notify } from '../lib/notify.js';
 import { sendPush } from '../lib/push.js';
 import { isBlockedBetween } from '../lib/blocks.js';
@@ -291,10 +292,7 @@ async function groupPhotos(ids: (string | null)[]) {
   return map;
 }
 
-/** Recherche sans accents ni casse (« cafe » trouve « Café »). */
-const FOLD_FROM = 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ';
-const FOLD_TO = 'aaaaaaceeeeiiiinooooouuuuyy';
-const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
 
 /** Vérifie que tous les utilisateurs sont amis avec `me`. */
 async function onlyFriends(meId: string, ids: string[]) {
@@ -428,7 +426,7 @@ export default async function messageRoutes(app: FastifyInstance) {
     if (!conv.isGroup) fail(400, 'Seuls les groupes ont une photo');
     const file = await req.file();
     if (!file) return fail(400, 'Aucune image reçue');
-    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512 });
+    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512, still: true });
     const [updated] = await db.update(conversations).set({ photoMediaId: m.id }).where(eq(conversations.id, conv.id)).returning();
     if (conv.photoMediaId) await dropAttachment(conv.photoMediaId);
     await postMessage(updated, me, `${me.displayName} a changé la photo du groupe`, { type: 'system' });
@@ -451,7 +449,7 @@ export default async function messageRoutes(app: FastifyInstance) {
     const c = await ownConversation(uuidParam(req.params), me.id);
     const q = fold(String((req.query as { q?: string }).q ?? '').trim()).slice(0, 100);
     if (q.length < 2) return [];
-    const like = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    const like = likePattern(q);
     const rows = await db
       .select()
       .from(messages)
@@ -460,7 +458,7 @@ export default async function messageRoutes(app: FastifyInstance) {
           eq(messages.conversationId, c.id),
           sql`${messages.deletedAt} is null`,
           sql`coalesce(${messages.meta}->>'type', '') <> 'system'`,
-          sql`translate(lower(${messages.text}), ${FOLD_FROM}, ${FOLD_TO}) like ${like}`,
+          sql`${foldSql(sql`${messages.text}`)} like ${like}`,
         ),
       )
       .orderBy(desc(messages.createdAt), desc(messages.id))
