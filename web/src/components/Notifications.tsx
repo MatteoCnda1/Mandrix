@@ -70,7 +70,11 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
         action: { label: 'Voir', run: () => nav('/deballage') },
       };
     case 'pool_added':
-      return { icon: <Sticker size={18} weight="fill" />, text: <>{who} a envoyé ta photo dans le pool</>, to: d.postId ? `/p/${d.postId}` : '/deballage' };
+      return {
+        icon: <Sticker size={18} weight="fill" />,
+        text: <>{who} a envoyé ta {d.storyId ? 'story' : 'photo'} dans le pool</>,
+        to: d.postId ? `/p/${d.postId}` : d.shotId ? '/deballage' : '/jeu',
+      };
     case 'pool_drawn':
       return { icon: <Sticker size={18} weight="fill" />, text: <>Ta {d.kind === 'video' ? 'vidéo' : 'photo'} a été tirée {String(d.count)} fois dans le pool</>, to: '/jeu' };
     case 'streak':

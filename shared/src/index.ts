@@ -290,6 +290,8 @@ export interface Story {
   seen: boolean;
   /** Mes stories : nombre de vues (null pour celles des autres). */
   views: number | null;
+  /** Dans le pool de Make It Friends (public ou amis), sinon null. */
+  pool: PoolScope | null;
 }
 
 export interface StoryView {

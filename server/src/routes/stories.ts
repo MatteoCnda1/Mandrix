@@ -15,10 +15,11 @@ export default async function storyRoutes(app: FastifyInstance) {
   app.get('/api/stories', async (req): Promise<StoryGroup[]> => {
     const me = requireUser(req);
     const circle = [me.id, ...(await friendIds(me.id))];
-    const rows = await db.execute<{ id: string; authorId: string; createdAt: Date; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; mediaVariants: number[] | null; seen: boolean; views: number | null }>(sql`
+    const rows = await db.execute<{ id: string; authorId: string; createdAt: Date; mediaId: string; kind: string; width: number | null; height: number | null; mediaDuration: number | null; mediaPoster: boolean; mediaVariants: number[] | null; seen: boolean; views: number | null; pool: 'public' | 'friends' | null }>(sql`
       select s.id, s.author_id as "authorId", s.created_at as "createdAt", m.id as "mediaId", m.kind, m.width, m.height, ${sql.raw(MEDIA_SQL_COLUMNS)},
         exists(select 1 from story_views v where v.story_id = s.id and v.viewer_id = ${me.id}) as seen,
-        case when s.author_id = ${me.id} then (select count(*)::int from story_views v where v.story_id = s.id and v.viewer_id <> ${me.id}) end as views
+        case when s.author_id = ${me.id} then (select count(*)::int from story_views v where v.story_id = s.id and v.viewer_id <> ${me.id}) end as views,
+        (select pi.scope from pool_items pi where pi.media_id = s.media_id and pi.status = 'active') as pool
       from stories s join media m on m.id = s.media_id
       where s.expires_at > now() and m.status <> 'processing' and s.author_id = any(${uuidArray(circle)}) and s.hidden_at is null
       order by s.created_at asc`);
@@ -38,6 +39,7 @@ export default async function storyRoutes(app: FastifyInstance) {
         createdAt: new Date(r.createdAt).toISOString(),
         seen,
         views: r.views,
+        pool: r.pool,
       });
       if (!seen) g.allSeen = false;
     }

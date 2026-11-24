@@ -7,9 +7,11 @@ import { requireUser } from '../lib/auth.js';
 import { fail, parse, uuidParam } from '../lib/http.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
-import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
+import { areFriends, friendIds, usersByIds, uuidArray } from '../lib/users.js';
+import { isBlockedBetween } from '../lib/blocks.js';
+import { canSeePost } from '../lib/posts.js';
 
-const { poolItems, poolReports, posts, shots } = schema;
+const { poolItems, poolReports, posts, shots, stories } = schema;
 
 export async function upsertPoolItem(v: { mediaId: string; ownerId: string; addedById: string; scope: 'public' | 'friends' }) {
   await db
@@ -22,8 +24,13 @@ export async function upsertPoolItem(v: { mediaId: string; ownerId: string; adde
     });
 }
 
-async function resolveTarget(body: { postId?: string; shotId?: string }) {
+/**
+ * Média visé (post, photo du déballage ou story) et son propriétaire.
+ * `viewerId` : pour ajouter au pool, il faut pouvoir voir le contenu (pour le retirer, non).
+ */
+async function resolveTarget(body: { postId?: string; shotId?: string; storyId?: string }, viewerId?: string) {
   if (body.postId) {
+    if (viewerId && !(await canSeePost(viewerId, body.postId))) return fail(404, 'Post introuvable');
     const [p] = await db.select().from(posts).where(eq(posts.id, body.postId)).limit(1);
     if (!p || !p.mediaId) return fail(404, 'Ce post ne contient pas de média');
     if (p.kind === 'meme') return fail(400, 'Ce mème vient déjà du pool');
@@ -34,6 +41,19 @@ async function resolveTarget(body: { postId?: string; shotId?: string }) {
     if (!s) return fail(404, 'Photo introuvable');
     if (s.revealAt > new Date()) return fail(403, 'Cette photo est encore scellée');
     return { mediaId: s.mediaId, ownerId: s.userId };
+  }
+  if (body.storyId) {
+    const [s] = await db.select().from(stories).where(eq(stories.id, body.storyId)).limit(1);
+    if (!s) return fail(404, 'Story introuvable');
+    // Ajout : une story encore en ligne, de soi ou d'un ami, ni masquée ni d'un compte bloqué.
+    if (viewerId) {
+      const visible =
+        s.expiresAt > new Date() &&
+        !s.hiddenAt &&
+        (s.authorId === viewerId || ((await areFriends(viewerId, s.authorId)) && !(await isBlockedBetween(viewerId, s.authorId))));
+      if (!visible) return fail(404, 'Story introuvable');
+    }
+    return { mediaId: s.mediaId, ownerId: s.authorId };
   }
   return fail(400, 'Contenu manquant');
 }
@@ -85,7 +105,7 @@ export async function reportPoolItem(itemId: string, reporterId: string) {
   await db.update(poolItems).set({ status: 'reported' }).where(and(eq(poolItems.id, itemId), eq(poolItems.status, 'active')));
 }
 
-const targetSchema = z.object({ postId: z.string().uuid().optional(), shotId: z.string().uuid().optional() });
+const targetSchema = z.object({ postId: z.string().uuid().optional(), shotId: z.string().uuid().optional(), storyId: z.string().uuid().optional() });
 
 export default async function poolRoutes(app: FastifyInstance) {
   app.get('/api/pool/stats', async (req): Promise<PoolStats> => {
@@ -100,14 +120,14 @@ export default async function poolRoutes(app: FastifyInstance) {
   app.post('/api/pool', async (req) => {
     const me = requireUser(req);
     const body = parse(targetSchema.extend({ scope: z.enum(['public', 'friends']) }), req.body);
-    const t = await resolveTarget(body);
+    const t = await resolveTarget(body, me.id);
     await upsertPoolItem({ mediaId: t.mediaId, ownerId: t.ownerId, addedById: me.id, scope: body.scope });
     if (t.ownerId !== me.id) {
       await notify({
         userId: t.ownerId,
         type: 'pool_added',
         actorId: me.id,
-        data: { postId: body.postId ?? null, shotId: body.shotId ?? null },
+        data: { postId: body.postId ?? null, shotId: body.shotId ?? null, storyId: body.storyId ?? null },
         dedupeKey: `pool_added:${t.mediaId}`,
       });
     }
