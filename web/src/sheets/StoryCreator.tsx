@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Avatar, Portal, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { useCamera } from '../lib/camera';
+import { isAnimated } from '../lib/image';
 import { qc, useConfig, useMe } from '../lib/data';
 import { useObjectUrl } from '../lib/hooks';
 import { useScrollLock } from '../lib/scrollLock';
@@ -11,7 +12,8 @@ import { toast, useUI } from '../lib/store';
 
 // Nouvelle story (#92) : appareil photo en plein écran, recadrage dans le format 9:16, aperçu, publication.
 
-type Picked = { blob: Blob; kind: 'image' | 'video' };
+/** « animated » : GIF ou image animée, envoyée telle quelle (le recadrage par canvas la figerait). */
+type Picked = { blob: Blob; kind: 'image' | 'video' | 'animated' };
 const close = () => useUI.setState({ composer: null });
 const RESET: StoryView = { zoom: 1, x: 0, y: 0 };
 
@@ -55,9 +57,9 @@ function CameraStep({ onPicked }: { onPicked: (p: Picked) => void }) {
   const cam = useCamera(facing);
   const { data: config } = useConfig();
   const maxMb = config?.maxUploadMb ?? 100;
-  const accept = (f: File) => {
+  const accept = async (f: File) => {
     if (f.size > maxMb * 1024 * 1024) return toast(`Fichier trop volumineux (max ${maxMb} Mo)`, 'error');
-    onPicked({ blob: f, kind: f.type.startsWith('video/') ? 'video' : 'image' });
+    onPicked({ blob: f, kind: f.type.startsWith('video/') ? 'video' : (await isAnimated(f)) ? 'animated' : 'image' });
   };
   const gallery = useFilePicker('image/*,video/mp4,video/webm,video/quicktime', accept);
   // Caméra refusée ou absente : l'appareil photo du téléphone, par le sélecteur de fichiers.
@@ -321,8 +323,8 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
   );
 }
 
-/** Vidéo : aperçu dans le cadre de la story, puis publication (conversion côté serveur). */
-function VideoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
+/** Vidéo ou GIF : aperçu dans le cadre de la story, puis publication telle quelle (conversion côté serveur). */
+function MediaStep({ blob, animated, onBack }: { blob: Blob; animated: boolean; onBack: () => void }) {
   const url = useObjectUrl(blob);
   const { ref, frame } = useFrame();
   const [muted, setMuted] = useState(true);
@@ -331,7 +333,7 @@ function VideoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
     if (progress !== null) return;
     setProgress(0);
     try {
-      await publishStory(blob, blob instanceof File ? blob.name : 'story.mp4', setProgress);
+      await publishStory(blob, blob instanceof File ? blob.name : animated ? 'story.gif' : 'story.mp4', setProgress);
     } catch (e) {
       toast(errMsg(e), 'error');
       setProgress(null);
@@ -351,15 +353,21 @@ function VideoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
       <div ref={ref} className="grid min-h-0 flex-1 place-items-center px-3 py-3">
         {frame && url && (
           <div className="relative overflow-hidden rounded-[28px] bg-[#0b0f14]" style={{ width: frame.w, height: frame.h }}>
-            <video src={url} autoPlay loop playsInline muted={muted} className="absolute inset-0 h-full w-full object-contain" />
+            {animated ? (
+              <img src={url} alt="Aperçu de ta story animée" className="absolute inset-0 h-full w-full object-contain" />
+            ) : (
+              <video src={url} autoPlay loop playsInline muted={muted} className="absolute inset-0 h-full w-full object-contain" />
+            )}
             {progress !== null && <UploadOverlay progress={progress} />}
           </div>
         )}
       </div>
       <div className="flex flex-none items-center justify-center gap-2.5 px-4 pt-1" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
-        <RoundBtn label={muted ? 'Activer le son' : 'Couper le son'} onClick={() => setMuted(!muted)}>
-          {muted ? <SpeakerSlash size={20} /> : <SpeakerHigh size={20} />}
-        </RoundBtn>
+        {!animated && (
+          <RoundBtn label={muted ? 'Activer le son' : 'Couper le son'} onClick={() => setMuted(!muted)}>
+            {muted ? <SpeakerSlash size={20} /> : <SpeakerHigh size={20} />}
+          </RoundBtn>
+        )}
         <button type="button" onClick={publish} disabled={progress !== null} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white px-5 text-sm font-extrabold text-black disabled:opacity-50">
           <PaperPlaneTilt size={18} weight="fill" /> Publier
         </button>
@@ -413,7 +421,7 @@ export function StoryCreator() {
           </>
         )}
         {picked?.kind === 'image' && <PhotoStep blob={picked.blob} onBack={() => setPicked(null)} />}
-        {picked?.kind === 'video' && <VideoStep blob={picked.blob} onBack={() => setPicked(null)} />}
+        {(picked?.kind === 'video' || picked?.kind === 'animated') && <MediaStep blob={picked.blob} animated={picked.kind === 'animated'} onBack={() => setPicked(null)} />}
       </div>
     </Portal>
   );

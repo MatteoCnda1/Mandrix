@@ -426,7 +426,7 @@ export default async function messageRoutes(app: FastifyInstance) {
     if (!conv.isGroup) fail(400, 'Seuls les groupes ont une photo');
     const file = await req.file();
     if (!file) return fail(400, 'Aucune image reçue');
-    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512 });
+    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512, still: true });
     const [updated] = await db.update(conversations).set({ photoMediaId: m.id }).where(eq(conversations.id, conv.id)).returning();
     if (conv.photoMediaId) await dropAttachment(conv.photoMediaId);
     await postMessage(updated, me, `${me.displayName} a changé la photo du groupe`, { type: 'system' });

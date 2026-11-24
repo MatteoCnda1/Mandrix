@@ -86,7 +86,7 @@ export default async function userRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const file = await req.file();
     if (!file) return fail(400, 'Aucune image reçue');
-    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512 });
+    const m = await saveUpload(file, me.id, { accept: 'image', maxSide: 512, still: true });
     const [u] = await db.update(users).set({ avatarMediaId: m.id }).where(eq(users.id, me.id)).returning();
     return toMe(u);
   });

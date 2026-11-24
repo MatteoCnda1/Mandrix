@@ -175,6 +175,9 @@ Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli
 - Zoom au pincement et au double tap désactivés (Safari ignore `user-scalable=no` : les évènements de geste sont annulés).
 - Écrans et feuilles chargés à la demande (`React.lazy`) : JS initial ≈ 186 Ko compressés (#15).
 - Photos : variantes WebP 360/720/1280 générées à l'envoi (rattrapage au démarrage), servies en `?w=` via `srcset` (#15).
+- **GIF animés** : convertis en WebP animé (`sharp(…, { animated: true })`), miniatures comprises ; photos de profil et de groupe
+  restent fixes (`saveUpload(…, { still: true })`). Côté téléphone, une image animée n'est ni réduite ni recadrée (`isAnimated`).
+  Les GIF postés avant ce correctif ont été enregistrés figés (première image seulement) : il faut les reposter.
 - Accessibilité (#16) : tailles de texte en `rem`, texte secondaire et liens ≥ 4,5:1, focus gardé dans les feuilles.
 - Mise à jour sur demande : bannière « Mettre à jour » (`registerType: 'prompt'`, message `SKIP_WAITING`).
 - **Photos réduites avant l'envoi** (#78, `web/src/lib/image.ts`) : 2048 px max, JPEG 0,85 (PNG gardé en PNG), EXIF retiré, dans `upload()`.

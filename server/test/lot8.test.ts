@@ -1,8 +1,9 @@
-import type { MemberCard, Page } from '@mandrix/shared';
+import type { MediaRef, MemberCard, Page, Post } from '@mandrix/shared';
+import sharp from 'sharp';
 import { sql } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
-import { befriend, call, makeUser, useApp, type TestUser } from './helpers.js';
+import { app, befriend, call, makeUser, upload, useApp, type TestUser } from './helpers.js';
 
 useApp();
 
@@ -52,5 +53,32 @@ describe('tous les membres (#93)', () => {
     expect(second.next).toBeNull();
     const all = [...first.items, ...second.items].map((m) => m.id);
     expect(new Set(all).size).toBe(27);
+  });
+});
+
+describe('GIF animés', () => {
+  const animatedGif = async (width = 800, height = 500) => {
+    const frames = await Promise.all(['#ff0000', '#00ff00', '#0000ff'].map((background) => sharp({ create: { width, height, channels: 3, background } }).png().toBuffer()));
+    return { name: 'anim.gif', type: 'image/gif', data: await sharp(frames, { join: { animated: true } }).gif({ delay: 150, loop: 0 }).toBuffer() };
+  };
+  const pagesOf = async (url: string) => {
+    const res = await app.inject({ method: 'GET', url, headers: { cookie: me.cookie } });
+    expect(res.statusCode).toBe(200);
+    return (await sharp(res.rawPayload).metadata()).pages ?? 1;
+  };
+
+  it('restent animés une fois postés, miniatures comprises', async () => {
+    const m = (await upload<MediaRef>(me, '/api/media', await animatedGif())).body;
+    expect(m).toMatchObject({ kind: 'image', width: 800, height: 500 });
+    expect(await pagesOf(m.url)).toBe(3);
+    expect(await pagesOf(`${m.url}?w=360`)).toBe(3);
+    const post = (await call<Post>(me, 'POST', '/api/posts', { kind: 'photo', mediaId: m.id, text: 'Ça bouge' })).body;
+    expect(await pagesOf(post.media!.url)).toBe(3);
+  });
+
+  it('une photo de profil reste fixe', async () => {
+    const res = await upload<{ avatarUrl: string }>(me, '/api/me/avatar', await animatedGif(300, 300));
+    expect(res.status).toBe(200);
+    expect(await pagesOf(res.body.avatarUrl)).toBe(1);
   });
 });
