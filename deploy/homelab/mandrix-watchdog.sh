@@ -1,7 +1,9 @@
 #!/bin/sh
 # Supervision Mandrix, lancée toutes les 5 minutes sur le Proxmox (mandrix-watchdog.timer).
 # - NAS injoignable deux fois de suite : Wake-on-LAN (wake-nas) et alerte ;
-# - partage NFS figé ou disque presque plein : alerte ;
+# - partage NFS figé ou disque presque plein (Proxmox, NAS, LXC) : alerte ;
+# - pool LVM « thin » des VM et conteneurs presque plein : alerte (plein, toutes les écritures échouent) ;
+# - disque du LXC passé en lecture seule (erreur d'écriture) : alerte ;
 # - site public injoignable : redémarre le tunnel (ou l'app) dans le LXC et alerte.
 # Les alertes arrivent en notification push chez les admins (POST /api/internal/alert).
 set -u
@@ -14,6 +16,9 @@ CT=${CT:-107}
 APP_LAN=${APP_LAN:-http://192.168.1.116:3000}
 PUBLIC_URL=${PUBLIC_URL:-https://mandrix.rudylink.eu}
 DISK_LIMIT=${DISK_LIMIT:-90}
+# Pool LVM « thin » qui porte les disques des VM et conteneurs (vide pour ne pas le surveiller).
+THIN_POOL=${THIN_POOL:-pve/data}
+THIN_LIMIT=${THIN_LIMIT:-85}
 STATE=/var/lib/mandrix-watchdog
 mkdir -p "$STATE"
 
@@ -63,6 +68,52 @@ for target in / "$NAS_MOUNT"; do
     fi
   fi
 done
+
+# ——— Disque du LXC Mandrix (base PostgreSQL, images Docker) ———
+ct_used=$(timeout 20 pct exec "$CT" -- df -P / 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')
+if [ -n "$ct_used" ] && [ "$ct_used" -ge "$DISK_LIMIT" ]; then
+  today=$(date +%F)
+  if [ "$(cat "$STATE/disk_ct" 2>/dev/null)" != "$today" ]; then
+    echo "$today" > "$STATE/disk_ct"
+    alert disk_ct "Disque de Mandrix presque plein" "Le disque du LXC $CT est rempli à $ct_used %. Nettoyer : docker builder prune -f && docker image prune -f, puis pct fstrim $CT."
+  fi
+fi
+
+# ——— Disque du LXC en lecture seule (erreur d'écriture, pool plein…) ———
+if timeout 20 pct exec "$CT" -- grep ' / ' /proc/mounts 2>/dev/null | awk '{print $4}' | grep -Eq '(^|,)(ro|emergency_ro)(,|$)'; then
+  n=$(fail ro)
+  if [ "$n" -eq 1 ] || [ $(( n % 12 )) -eq 0 ]; then
+    log "disque du LXC $CT en lecture seule"
+    # L'alerte peut échouer si la base ne peut plus écrire : elle reste dans le journal.
+    alert ro "Mandrix en lecture seule ⚠️" "Le disque du LXC $CT est passé en lecture seule : plus rien n'est enregistré. Vérifier lvs $THIN_POOL, puis pct stop $CT && pct fsck $CT --force 1 && pct start $CT."
+  fi
+else
+  ok ro >/dev/null
+fi
+
+# ——— Pool LVM thin (disques des VM et conteneurs) ———
+# Plein, toute écriture échoue sur toutes les VM : c'est ce qui a figé Mandrix le 24 novembre 2026.
+if [ -n "$THIN_POOL" ] && command -v lvs >/dev/null; then
+  read -r data meta <<EOF2
+$(timeout 20 lvs --noheadings -o data_percent,metadata_percent "$THIN_POOL" 2>/dev/null | tr ',' '.')
+EOF2
+  for pair in "data:${data:-}" "meta:${meta:-}"; do
+    kind=${pair%%:*}
+    pct_used=${pair#*:}
+    [ -n "$pct_used" ] || continue
+    whole=${pct_used%%.*}
+    if [ "$whole" -ge "$THIN_LIMIT" ]; then
+      level=$([ "$whole" -ge 95 ] && echo critique || echo alerte)
+      key="thin_${kind}_$level"
+      today=$(date +%F)
+      if [ "$(cat "$STATE/$key" 2>/dev/null)" != "$today" ]; then
+        echo "$today" > "$STATE/$key"
+        what=$([ "$kind" = data ] && echo "données" || echo "métadonnées")
+        alert "$key" "Pool LVM presque plein ($level)" "$THIN_POOL ($what) est rempli à $pct_used %. Plein, toutes les VM et conteneurs ne pourront plus écrire. Libérer de la place (pct fstrim, docker builder prune) ou agrandir le pool (lvextend)."
+      fi
+    fi
+  done
+fi
 
 # ——— Site public ———
 if curl -fsS -m 15 -o /dev/null "$PUBLIC_URL/api/config"; then

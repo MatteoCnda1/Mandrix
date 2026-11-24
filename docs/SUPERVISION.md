@@ -19,7 +19,11 @@ Le même jeton doit figurer dans `/etc/mandrix-watchdog.env` sur le Proxmox (ét
 
 - NAS injoignable deux fois de suite : `wake-nas` (Wake-on-LAN) et alerte, puis rappel toutes les heures ; alerte au retour ;
 - montage NFS figé (`stat` qui ne répond pas) : alerte ;
-- disque du Proxmox ou du NAS rempli au-delà de 90 % : une alerte par jour ;
+- disque du Proxmox, du NAS ou du LXC Mandrix rempli au-delà de 90 % : une alerte par jour ;
+- pool LVM « thin » `pve/data` (disques de toutes les VM et conteneurs) rempli au-delà de 85 % (données ou métadonnées) :
+  une alerte par jour, et une alerte « critique » à 95 %. Plein, plus aucune VM ne peut écrire ;
+- disque du LXC passé en lecture seule (`ro` / `emergency_ro`, après une erreur d'écriture) : alerte, puis toutes les heures
+  (si la base ne peut plus écrire, l'alerte peut échouer : elle reste dans le journal) ;
 - site public injoignable 10 minutes : si l'app répond en local, le tunnel Cloudflare est redémarré ; sinon toute la pile est relancée.
 
 ```bash
@@ -29,7 +33,12 @@ printf 'ALERT_TOKEN=%s\n' "<jeton de l'étape 1>" > /etc/mandrix-watchdog.env &&
 systemctl daemon-reload && systemctl enable --now mandrix-watchdog.timer
 ```
 
-Réglages facultatifs dans `/etc/mandrix-watchdog.env` : `NAS_IP`, `NAS_MOUNT`, `CT`, `APP_LAN`, `PUBLIC_URL`, `DISK_LIMIT`.
+Réglages facultatifs dans `/etc/mandrix-watchdog.env` : `NAS_IP`, `NAS_MOUNT`, `CT`, `APP_LAN`, `PUBLIC_URL`, `DISK_LIMIT`,
+`THIN_POOL` (défaut `pve/data`, vide pour ne pas le surveiller), `THIN_LIMIT` (défaut 85).
+
+**Pool LVM presque plein** : `pct exec 107 -- sh -c 'docker builder prune -f && docker image prune -f'`, `pct fstrim <id>`
+pour chaque conteneur (rend la place libérée au pool), puis si besoin `lvextend -L +<n>G pve/data` (place libre : `vgs pve`).
+**Disque en lecture seule** : libérer ou agrandir le pool d'abord, puis `pct stop 107 && pct fsck 107 --force 1 && pct start 107`.
 Journal : `journalctl -t mandrix-watchdog`.
 
 ## 3. Restauration test des sauvegardes (chaque lundi à 5 h)
