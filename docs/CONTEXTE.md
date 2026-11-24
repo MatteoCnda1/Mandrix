@@ -102,7 +102,9 @@ La file reprend au démarrage (`resumeVideoQueue`).
 
 ### Make It Friends
 Jeu temps réel 2 à 8 joueurs : une image tirée du pool, chacun écrit une légende, tout le monde vote.
-Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images partagé (signalements, modération admin),
+Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images partagé (signalements, modération admin ; import d'un dossier
+d'images : `npm run cli -w server -- import-pool <dossier> <pseudo> [public|friends]`, en production
+`docker compose exec app node server/dist/cli.js import-pool …`, relançable sans doublon grâce à `.mandrix-import.json`),
 podium avec départage par auteur en cas d'égalité. Correctif : la création de salon diffuse maintenant l'état (#20).
 
 **Mème du jour** (#9, onglet du jeu `/jeu?onglet=jour`) : une image du pool public tirée à 8 h (heure de Paris), une légende

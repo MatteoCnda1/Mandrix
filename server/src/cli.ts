@@ -2,8 +2,9 @@
 import { eq, or } from 'drizzle-orm';
 import { db, schema, sql } from './db/index.js';
 import { hashPassword, randomToken } from './lib/auth.js';
+import { importPool } from './lib/poolImport.js';
 
-const [cmd, arg, arg2] = process.argv.slice(2);
+const [cmd, arg, arg2, arg3] = process.argv.slice(2);
 
 async function findUser(login: string) {
   const [u] = await db
@@ -33,13 +34,23 @@ async function main() {
       console.log(`@${u.username} est maintenant administrateur.`);
       break;
     }
+    case 'import-pool': {
+      // Toutes les images d'un dossier rejoignent le pool du jeu (public par défaut), au nom d'un membre.
+      if (!arg || !arg2) throw new Error('Usage : import-pool <dossier> <email|pseudo> [public|friends]');
+      const u = await findUser(arg2);
+      const scope = arg3 === 'friends' ? 'friends' : 'public';
+      const r = await importPool(arg, u.id, scope, (line) => console.log(line));
+      console.log(`Pool ${scope === 'public' ? 'public' : 'amis'} : ${r.imported} image(s) ajoutée(s) au nom de @${u.username}, ${r.skipped} déjà importée(s), ${r.failed.length} échec(s).`);
+      if (r.failed.length) process.exitCode = 1;
+      break;
+    }
     case 'users': {
       const rows = await db.select({ username: schema.users.username, email: schema.users.email, admin: schema.users.isAdmin }).from(schema.users);
       console.table(rows);
       break;
     }
     default:
-      console.log('Commandes : reset-password <email|pseudo> [mdp] · make-admin <email|pseudo> · users');
+      console.log('Commandes : reset-password <email|pseudo> [mdp] · make-admin <email|pseudo> · users · import-pool <dossier> <email|pseudo> [public|friends]');
   }
 }
 

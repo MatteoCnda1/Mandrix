@@ -1,8 +1,12 @@
 import type { MediaRef, MemberCard, Page, Post } from '@mandrix/shared';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import sharp from 'sharp';
 import { sql } from 'drizzle-orm';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { db } from '../src/db/index.js';
+import { IMPORT_MANIFEST, importPool } from '../src/lib/poolImport.js';
 import { app, befriend, call, makeUser, upload, useApp, type TestUser } from './helpers.js';
 
 useApp();
@@ -80,5 +84,29 @@ describe('GIF animés', () => {
     const res = await upload<{ avatarUrl: string }>(me, '/api/me/avatar', await animatedGif(300, 300));
     expect(res.status).toBe(200);
     expect(await pagesOf(res.body.avatarUrl)).toBe(1);
+  });
+});
+
+describe('import d’images dans le pool', () => {
+  it('ajoute les images d’un dossier au pool public, sans doublon à la relance', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mandrix-pool-'));
+    for (const [name, background] of [
+      ['a.jpg', '#ff8800'],
+      ['b.jpeg', '#0088ff'],
+    ] as const) {
+      await fs.writeFile(path.join(dir, name), await sharp({ create: { width: 640, height: 480, channels: 3, background } }).jpeg().toBuffer());
+    }
+    await fs.writeFile(path.join(dir, 'notes.txt'), 'pas une image');
+    await fs.writeFile(path.join(dir, 'casse.jpg'), 'pas vraiment un jpeg');
+    const before = (await call<{ publicCount: number }>(me, 'GET', '/api/pool/stats')).body.publicCount;
+    const first = await importPool(dir, me.id, 'public');
+    expect(first.imported).toBe(2);
+    expect(first.failed.map((f) => f.file)).toEqual(['casse.jpg']);
+    expect((await call<{ publicCount: number }>(me, 'GET', '/api/pool/stats')).body.publicCount).toBe(before + 2);
+    const again = await importPool(dir, me.id, 'public');
+    expect(again).toMatchObject({ imported: 0, skipped: 2 });
+    const manifest = JSON.parse(await fs.readFile(path.join(dir, IMPORT_MANIFEST), 'utf8'));
+    expect(Object.keys(manifest).sort()).toEqual(['a.jpg', 'b.jpeg']);
+    await fs.rm(dir, { recursive: true, force: true });
   });
 });
