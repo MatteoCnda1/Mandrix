@@ -76,6 +76,12 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - Stories 24 h avec **aperçu de la story** dans la tuile du fil, vues, réponses. **Pool** : bouton dans la visionneuse
   (ses stories et celles de ses amis, tant qu'elles sont en ligne) ; la story attend pendant le choix ; le média reste
   dans le pool après l'expiration de la story.
+- **Musique sur les stories photo** (#104, `server/src/lib/plex.ts`, `web/src/components/MusicPicker.tsx`) : recherche dans la
+  bibliothèque Musique de Plex (LXC 101, section détectée ou `PLEX_MUSIC_SECTION`), choix du passage (15 ou 30 s) avec écoute
+  (`/api/music/tracks/:id/preview`, AAC découpé par ffmpeg). À la publication, le passage est découpé en AAC et rangé dans Mandrix
+  avec la pochette (`stories.music_media_id`, `stories.music`) : la story se lit même Plex éteint ; la photo reste affichée le temps
+  de l'extrait. Réglages `PLEX_URL` et `PLEX_TOKEN` dans le `.env` du serveur (jamais envoyés aux téléphones ; le jeton passe en
+  en-tête à ffmpeg). Sans eux, le bouton n'apparaît pas (`AppConfig.music`).
 - **Créer une story** (#92, `web/src/sheets/StoryCreator.tsx`) : plein écran sur l'appareil photo (`web/src/lib/camera.ts`, partagé avec
   la Pellicule), galerie en secours ; recadrage 9:16 (glisser, pincer, molette, « Remplir » / « Ajuster » avec fond flouté), aperçu
   exact puis publication d'une image rendue en 1080 × 1920 (`web/src/lib/storyImage.ts`). Vidéos : aperçu puis envoi tel quel.
@@ -300,6 +306,7 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 | `0008_pin_birthday_gallery` | épinglage, anniversaire, carrousel |
 | `0009_message_client_id` | identifiant d'envoi des messages (anti-doublon) |
 | `0010_share_replies_group_photo` | réponses aux commentaires (`parent_id`), photo de groupe, post épinglé du profil |
+| `0012_story_music` | musique des stories (`music_media_id`, `music`) |
 | `0011_guess_whois` | « Qui a pris ça ? » (`shot_guesses`, `guess_rounds`), questions de « Qui de nous… ? » (`whois_questions`) |
 
 ## 9. Pistes ouvertes

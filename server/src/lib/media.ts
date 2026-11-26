@@ -27,6 +27,7 @@ export function mediaReferenced(id: SQL) {
     or exists (select 1 from memes mm where mm.media_id = ${id})
     or exists (select 1 from users u where u.avatar_media_id = ${id})
     or exists (select 1 from conversations c where c.photo_media_id = ${id})
+    or exists (select 1 from stories s where (s.music_media_id = ${id} or s.music->>'coverMediaId' = (${id})::text) and s.expires_at > now() - interval '2 days')
     or exists (select 1 from messages msg where msg.meta->'media'->>'id' = (${id})::text)
     or exists (select 1 from messages msg where msg.media_id = ${id})
     or exists (select 1 from daily_memes d where d.media_id = ${id})

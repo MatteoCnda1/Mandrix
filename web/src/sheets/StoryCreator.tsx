@@ -1,5 +1,6 @@
-import { ArrowCounterClockwise, ArrowLeft, CameraRotate, CornersIn, CornersOut, Eye, ImageSquare, PaperPlaneTilt, PencilSimple, SpeakerHigh, SpeakerSlash, WarningCircle, X } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, ArrowLeft, CameraRotate, CornersIn, CornersOut, Eye, ImageSquare, MusicNotes, PaperPlaneTilt, PencilSimple, SpeakerHigh, SpeakerSlash, WarningCircle, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { MusicPicker, previewUrl as musicPreviewUrl, type PickedMusic } from '../components/MusicPicker';
 import { Avatar, Portal, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { useCamera } from '../lib/camera';
@@ -140,8 +141,31 @@ const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 const mid = (a: Pt, b: Pt) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
 /** Photo : recadrage (glisser, pincer, molette), Remplir / Ajuster, aperçu puis publication. */
+/** Musique choisie, en surimpression du cadre : pochette, titre, artiste ; toucher pour modifier, ✕ pour retirer. */
+function MusicChip({ music, onEdit, onRemove }: { music: PickedMusic; onEdit?: () => void; onRemove?: () => void }) {
+  return (
+    <div className="absolute top-14 left-1/2 z-10 flex max-w-[85%] -translate-x-1/2 items-center gap-2 rounded-full bg-black/55 py-1 pr-1 pl-1 text-white backdrop-blur">
+      <button type="button" onClick={onEdit} disabled={!onEdit} className="tap flex min-w-0 items-center gap-2 border-0 bg-transparent p-0 text-left text-white" aria-label={`Musique : ${music.track.title}, ${music.track.artist}. Modifier`}>
+        {music.track.cover ? <img src={music.track.cover} alt="" className="h-8 w-8 flex-none rounded-full object-cover" /> : <MusicNotes size={18} className="ml-1.5 flex-none" />}
+        <span className="min-w-0 truncate text-[0.8125rem] font-bold">
+          {music.track.title} <span className="font-semibold text-white/70">· {music.track.artist}</span>
+        </span>
+      </button>
+      {onRemove && (
+        <button type="button" aria-label="Retirer la musique" onClick={onRemove} className="tap grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
+          <X size={14} weight="bold" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
   const { data: me } = useMe();
+  const { data: config } = useConfig();
+  // Musique (#104) : titre et passage choisis dans la bibliothèque Plex.
+  const [music, setMusic] = useState<PickedMusic | null>(null);
+  const [picking, setPicking] = useState(false);
   const url = useObjectUrl(blob);
   const { ref, frame } = useFrame();
   const [img, setImg] = useState<ImageBitmap | HTMLImageElement | null>(null);
@@ -232,7 +256,7 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
     setProgress(0);
     try {
       const out = preview ?? (await render());
-      await publishStory(out, 'story.jpg', setProgress);
+      await publishStory(out, 'story.jpg', setProgress, music);
     } catch (e) {
       toast(errMsg(e), 'error');
       setProgress(null);
@@ -260,6 +284,12 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
             {preview && previewUrl ? (
               <>
                 <img src={previewUrl} alt="Aperçu de ta story" className="absolute inset-0 h-full w-full object-cover" />
+                {music && (
+                  <>
+                    <audio src={musicPreviewUrl(music)} autoPlay loop />
+                    <MusicChip music={music} />
+                  </>
+                )}
                 {/* Comme dans la visionneuse : barre de progression et auteur. */}
                 <div className="absolute top-3.5 right-[18px] left-[18px] h-[3px] rounded-full bg-white/40">
                   <div className="h-full w-1/3 rounded-full bg-white" />
@@ -295,10 +325,21 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
                 )}
               </div>
             )}
+            {!preview && music && <MusicChip music={music} onEdit={() => setPicking(true)} onRemove={() => setMusic(null)} />}
             {progress !== null && <UploadOverlay progress={progress} />}
           </div>
         )}
       </div>
+      {picking && (
+        <MusicPicker
+          initial={music}
+          onClose={() => setPicking(false)}
+          onPick={(m) => {
+            setMusic(m);
+            setPicking(false);
+          }}
+        />
+      )}
       <div className="flex flex-none items-center justify-center gap-2.5 px-4 pt-1" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
         {preview ? (
           <button type="button" onClick={() => setPreview(null)} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white/15 px-4 text-sm font-bold text-white">
@@ -312,6 +353,11 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
             <RoundBtn label="Recadrer à nouveau" onClick={() => setView(RESET)} disabled={view.zoom === 1 && view.x === 0 && view.y === 0}>
               <ArrowCounterClockwise size={20} weight="bold" />
             </RoundBtn>
+            {config?.music && (
+              <RoundBtn label={music ? 'Changer la musique' : 'Ajouter une musique'} onClick={() => setPicking(true)} className={music ? 'bg-white text-black' : undefined}>
+                <MusicNotes size={20} weight={music ? 'fill' : 'regular'} />
+              </RoundBtn>
+            )}
             <button type="button" onClick={showPreview} disabled={!img} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white/15 px-4 text-sm font-bold text-white disabled:opacity-40">
               <Eye size={18} /> Aperçu
             </button>
@@ -391,10 +437,11 @@ function UploadOverlay({ progress }: { progress: number }) {
   );
 }
 
-async function publishStory(blob: Blob, name: string, onProgress: (p: number) => void) {
+async function publishStory(blob: Blob, name: string, onProgress: (p: number) => void, music?: PickedMusic | null) {
   const m = await upload<{ id: string }>('/api/media', blob, name, onProgress);
   onProgress(1);
-  await api('/api/stories', { body: { mediaId: m.id } });
+  // Avec une musique, le serveur découpe aussi le passage (quelques secondes).
+  await api('/api/stories', { body: { mediaId: m.id, music: music ? { trackId: music.trackId, start: music.start, duration: music.duration } : undefined } });
   qc.invalidateQueries({ queryKey: ['stories'] });
   toast('Story publiée, visible 24 heures');
   close();

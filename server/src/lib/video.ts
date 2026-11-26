@@ -12,7 +12,7 @@ import { emitToUser } from '../realtime/io.js';
 
 const abs = (rel: string) => path.join(mediaDir, rel);
 
-function run(cmd: string, args: string[], timeoutMs = 30 * 60_000): Promise<{ code: number; stdout: string; stderr: string }> {
+export function run(cmd: string, args: string[], timeoutMs = 30 * 60_000): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -37,7 +37,7 @@ function run(cmd: string, args: string[], timeoutMs = 30 * 60_000): Promise<{ co
 }
 
 let ffmpegOk: boolean | null = null;
-async function hasFfmpeg() {
+export async function hasFfmpeg() {
   if (ffmpegOk === null) ffmpegOk = (await run('ffmpeg', ['-version'], 10_000)).code === 0;
   return ffmpegOk;
 }
