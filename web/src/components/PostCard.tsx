@@ -28,7 +28,7 @@ import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
 import { MentionSuggestions, RichText } from './RichText';
 import { openPool, openShare, toast, useUI } from '../lib/store';
-import { Avatar, confirmAction, cx, fmtDuration, mediaFrame, MediaView, POST_MEDIA_MAX_H, PrimaryBtn, ratioOf, Sheet, VideoProcessing } from './ui';
+import { Avatar, confirmAction, cx, fmtDuration, mediaFrame, MediaView, POST_MEDIA_MAX_H, PrimaryBtn, ratioOf, Sheet, VideoProcessing, wholeRatio } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -418,7 +418,22 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
 }
 
 /** Photo (ou mème) du fil : tap = plein écran zoomable, double tap = j'aime avec un grand cœur. */
-export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 100vw, 640px' }: { post: Post; ratio: string; className?: string; sizes?: string }) {
+/**
+ * `whole` : média montré en entier (mèmes) — format du média, fond flouté dans les bandes, rien n'est rogné.
+ */
+export function TapMedia({
+  post,
+  ratio,
+  className,
+  sizes = '(max-width: 700px) 100vw, 640px',
+  whole = false,
+}: {
+  post: Post;
+  ratio: string;
+  className?: string;
+  sizes?: string;
+  whole?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
   const burst = useHeartBurst();
@@ -439,10 +454,13 @@ export function TapMedia({ post, ratio, className, sizes = '(max-width: 700px) 1
         aria-label="Ouvrir en grand (toucher deux fois pour aimer)"
         onClick={onTap}
         onKeyDown={(e) => e.key === 'Enter' && setOpen(true)}
-        className={cx('ph relative w-full cursor-zoom-in overflow-hidden rounded-3xl select-none [-webkit-touch-callout:none]', className)}
-        style={{ aspectRatio: ratio, maxHeight: POST_MEDIA_MAX_H }}
+        className={cx('ph relative w-full cursor-zoom-in overflow-hidden rounded-3xl select-none [-webkit-touch-callout:none]', whole && 'bg-[#0b0f14]', className)}
+        style={{ aspectRatio: whole ? wholeRatio(post.media) : ratio, maxHeight: POST_MEDIA_MAX_H }}
       >
-        <MediaView media={post.media} sizes={sizes} autoPlay={post.media.kind === 'video'} />
+        {whole && (post.media.kind === 'video' ? post.media.poster : post.media.url) && (
+          <img src={(post.media.kind === 'video' ? post.media.poster : post.media.url)!} alt="" aria-hidden loading="lazy" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl" />
+        )}
+        <MediaView media={post.media} sizes={sizes} autoPlay={post.media.kind === 'video'} fit={whole ? 'contain' : 'cover'} className={whole ? 'relative' : undefined} />
         {burst.node}
       </div>
       {open && <MediaLightbox media={post.media} onClose={() => setOpen(false)} />}
@@ -548,7 +566,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
       {post.kind === 'meme' && <div className="px-2.5 py-1 text-center text-xl leading-tight font-extrabold tracking-[-.02em] text-balance">{post.text}</div>}
 
       {post.kind === 'photo' && post.media && (post.gallery ? <Carousel post={post} gallery={post.gallery} /> : <TapMedia post={post} ratio={ratioOf(post.media)} />)}
-      {post.kind === 'meme' && post.media && <TapMedia post={post} ratio={ratioOf(post.media, '4 / 3')} />}
+      {post.kind === 'meme' && post.media && <TapMedia post={post} ratio={ratioOf(post.media, '4 / 3')} whole />}
       {post.kind === 'video' && post.media && <VideoTeaser post={post} />}
 
       {isPoll && post.poll && (

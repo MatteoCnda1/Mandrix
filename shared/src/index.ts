@@ -444,6 +444,27 @@ export interface Message {
   createdAt: string;
 }
 
+/** Durée maximale des vidéos (secondes) : posts et messages, stories. */
+export const VIDEO_LIMITS = { post: 180, story: 60 } as const;
+
+/** « 45 s », « 3 min », « 1 min 05 s ». */
+export function fmtSeconds(total: number): string {
+  const s = Math.round(total);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m} min ${String(r).padStart(2, '0')} s` : `${m} min`;
+}
+
+/** Raison du refus d'une vidéo trop longue (null si elle passe). */
+export function videoTooLong(duration: number | null | undefined, where: keyof typeof VIDEO_LIMITS): string | null {
+  const max = VIDEO_LIMITS[where];
+  if (!duration || duration <= max + 0.5) return null;
+  return where === 'story'
+    ? `Vidéo trop longue pour une story (${fmtSeconds(duration)}) : ${fmtSeconds(max)} maximum. Publie-la plutôt en post.`
+    : `Vidéo trop longue (${fmtSeconds(duration)}) : ${fmtSeconds(max)} maximum.`;
+}
+
 /** Libellé court d'une pièce jointe (aperçu de conversation, notification). */
 export function attachmentLabel(kind: MediaRef['kind'] | null | undefined, duration?: number | null): string {
   if (kind === 'audio') {

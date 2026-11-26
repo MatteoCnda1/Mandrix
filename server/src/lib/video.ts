@@ -42,7 +42,7 @@ async function hasFfmpeg() {
   return ffmpegOk;
 }
 
-async function probe(file: string) {
+export async function probe(file: string) {
   const r = await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', file], 60_000);
   try {
     const j = JSON.parse(r.stdout) as { streams?: { width?: number; height?: number }[]; format?: { duration?: string } };

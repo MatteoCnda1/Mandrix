@@ -7,6 +7,7 @@ import { api, errMsg, upload } from '../lib/api';
 import { qc, useConfig } from '../lib/data';
 import { useObjectUrl } from '../lib/hooks';
 import { toast, useUI } from '../lib/store';
+import { checkVideoLength } from '../lib/videoCheck';
 
 const close = () => useUI.setState({ composer: null });
 
@@ -170,8 +171,10 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const [progress, setProgress] = useState<number | null>(null);
 
   const maxMb = config?.maxUploadMb ?? 100;
-  const pick = (f: File) => {
+  const pick = async (f: File) => {
     if (f.size > maxMb * 1024 * 1024) return toast(`Fichier trop volumineux (max ${maxMb} Mo)`, 'error');
+    // Vidéo trop longue : refusée avec la raison, avant tout envoi.
+    if (!(await checkVideoLength(f, 'post'))) return;
     setFile(f);
   };
 

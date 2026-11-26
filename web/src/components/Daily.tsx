@@ -8,7 +8,7 @@ import { qc } from '../lib/data';
 import { countdown, fmtCount } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { toast } from '../lib/store';
-import { Avatar, cx, mediaFrame, MediaView, Podium, PrimaryBtn } from './ui';
+import { Avatar, cx, MediaView, Podium, PrimaryBtn, WholeMedia } from './ui';
 
 export const useDaily = () => useQuery({ queryKey: ['daily'], queryFn: () => api<DailyState>('/api/daily'), refetchInterval: 60_000 });
 export const useSeason = () => useQuery({ queryKey: ['season'], queryFn: () => api<SeasonState>('/api/season') });
@@ -168,9 +168,7 @@ export function DailyMemeView({ emptyPool }: { emptyPool?: React.ReactNode }) {
               <PhaseChip meme={today} />
             </span>
           </div>
-          <div className="ph w-full overflow-hidden rounded-[24px]" style={mediaFrame(today.media, '4 / 3')}>
-            <MediaView media={today.media} />
-          </div>
+          <WholeMedia media={today.media} className="rounded-[24px]" />
           <div className="text-[0.8125rem] font-semibold text-mute">{today.participants ? `${fmtCount(today.participants)} légende${today.participants > 1 ? 's' : ''} proposée${today.participants > 1 ? 's' : ''}` : 'Sois le premier à proposer une légende'}</div>
           {today.phase === 'caption' ? <CaptionPhase meme={today} /> : <VotePhase meme={today} />}
         </section>

@@ -42,6 +42,7 @@ import { qc, useConversation, useConversations, useFriends, useMe, useMessages }
 import { shortTime } from '../lib/format';
 import { useNow, usePullToRefresh } from '../lib/hooks';
 import { useLockPageScroll } from '../lib/keyboard';
+import { checkVideoLength } from '../lib/videoCheck';
 import { useGoBack } from '../lib/nav';
 import { discardPending, newClientId, queueMessage, retryPending, useOutbox } from '../lib/outbox';
 import { presenceLabel, seedPresence, usePresence } from '../lib/presence';
@@ -692,8 +693,9 @@ function ChatView({ id }: { id: string }) {
   const [viewing, setViewing] = useState<MediaRef | null>(null);
   const preview = useObjectUrl(file);
   const recorder = useVoiceRecorder(() => void finishVoice(true));
-  const picker = useFilePicker('image/*,video/mp4,video/webm,video/quicktime', (f) => {
+  const picker = useFilePicker('image/*,video/mp4,video/webm,video/quicktime', async (f) => {
     if (f.size > 100 * 1024 * 1024) return toast('Fichier trop volumineux (100 Mo max)', 'error');
+    if (!(await checkVideoLength(f, 'post'))) return;
     setFile(f);
   });
 

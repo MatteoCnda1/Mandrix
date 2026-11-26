@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle, CircleNotch, Copy, Crown, Flag, HourglassMediu
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { DailyMemeView } from '../components/Daily';
-import { Avatar, MediaView, Podium, PrimaryBtn, Seg, confirmAction, cx } from '../components/ui';
+import { Avatar, Podium, PrimaryBtn, Seg, WholeMedia, confirmAction, cx } from '../components/ui';
 import { qc, useMe, usePoolStats } from '../lib/data';
 import { useNow } from '../lib/hooks';
 import { gameEmit, useGame, useWhois } from '../lib/socket';
@@ -283,42 +283,45 @@ function Caption({ room }: { room: GameRoom }) {
         <div className={cx('grid min-h-[66px] place-items-center px-2.5 py-1.5 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance', shown ? 'text-ink' : 'text-mute')}>
           {shown || 'Ta légende apparaît ici'}
         </div>
-        <div className="ph relative grid aspect-[4/3] place-items-center overflow-hidden rounded-3xl">
-          {room.me.image ? <MediaView media={room.me.image.media} autoPlay /> : <span className="font-mono text-xs text-phink">aucune image</span>}
-          {room.me.image && (
-            <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[0.8125rem] font-bold text-ink">du pool · {room.me.image.by}</span>
-          )}
-          {!submitted && (
-            <>
-              <button
-                type="button"
-                aria-label="Signaler cette image"
-                onClick={async () => {
-                  if (await confirmAction({ title: 'Signaler cette image ?', message: 'Elle sera retirée du pool en attendant vérification.', confirmLabel: 'Signaler', destructive: true })) {
-                    await gameEmit('game:report');
-                    toast('Signalement envoyé, image retirée');
-                  }
-                }}
-                className="tap absolute right-[62px] bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-card text-ink active:scale-90"
-              >
-                <Flag size={20} />
-              </button>
-              <button
-                type="button"
-                aria-label={`Changer d’image (${room.me.shufflesLeft} restants)`}
-                disabled={room.me.shufflesLeft <= 0}
-                onClick={() => gameEmit('game:shuffle')}
-                className={cx(
-                  'tap absolute right-2.5 bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-ink text-inv transition-transform duration-[400ms] ease-spring active:rotate-180',
-                  room.me.shufflesLeft <= 0 && 'opacity-40',
-                )}
-              >
-                <Shuffle size={20} />
-                <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[0.6875rem] font-extrabold text-white">{room.me.shufflesLeft}</span>
-              </button>
-            </>
-          )}
-        </div>
+        {room.me.image ? (
+          <WholeMedia media={room.me.image.media} autoPlay>
+            {room.me.image && (
+              <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[0.8125rem] font-bold text-ink">du pool · {room.me.image.by}</span>
+            )}
+            {!submitted && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Signaler cette image"
+                  onClick={async () => {
+                    if (await confirmAction({ title: 'Signaler cette image ?', message: 'Elle sera retirée du pool en attendant vérification.', confirmLabel: 'Signaler', destructive: true })) {
+                      await gameEmit('game:report');
+                      toast('Signalement envoyé, image retirée');
+                    }
+                  }}
+                  className="tap absolute right-[62px] bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-card text-ink active:scale-90"
+                >
+                  <Flag size={20} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Changer d’image (${room.me.shufflesLeft} restants)`}
+                  disabled={room.me.shufflesLeft <= 0}
+                  onClick={() => gameEmit('game:shuffle')}
+                  className={cx(
+                    'tap absolute right-2.5 bottom-2.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-ink text-inv transition-transform duration-[400ms] ease-spring active:rotate-180',
+                    room.me.shufflesLeft <= 0 && 'opacity-40',
+                  )}
+                >
+                  <Shuffle size={20} />
+                  <span className="absolute -top-1.5 -right-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-brand px-1 text-[0.6875rem] font-extrabold text-white">{room.me.shufflesLeft}</span>
+                </button>
+              </>
+            )}
+          </WholeMedia>
+        ) : (
+          <div className="ph grid aspect-[4/3] place-items-center rounded-3xl font-mono text-xs text-phink">aucune image</div>
+        )}
       </div>
       {submitted ? (
         <div className="flex h-16 items-center justify-center gap-2 rounded-[32px] bg-card text-[0.9375rem] font-bold text-mute shadow-card">
@@ -374,9 +377,7 @@ function Vote({ room }: { room: GameRoom }) {
       </div>
       <div key={current.id} className="card flex animate-in flex-col gap-2.5 p-3.5">
         <div className="px-2.5 py-2 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{current.caption}</div>
-        <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
-          <MediaView media={current.image.media} autoPlay />
-        </div>
+        <WholeMedia media={current.image.media} autoPlay />
         <div className="px-1 text-[0.8125rem] text-mute">Légende de {current.author.displayName}</div>
       </div>
       <div className="grid grid-cols-3 gap-2">
@@ -448,9 +449,7 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
         <div className="card flex flex-col gap-2.5 p-3.5">
           <div className="px-1 text-[0.8125rem] font-bold text-acc">Mème gagnant · {room.winner.author.id === meId ? 'toi' : room.winner.author.displayName}</div>
           <div className="px-2.5 py-1 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{room.winner.caption}</div>
-          <div className="ph aspect-[4/3] overflow-hidden rounded-3xl">
-            <MediaView media={room.winner.image.media} autoPlay />
-          </div>
+          <WholeMedia media={room.winner.image.media} autoPlay />
         </div>
       )}
       {!room.winner && <div className="card p-5 text-center text-[0.9375rem] text-mute">Personne n’a écrit de légende cette manche.</div>}
