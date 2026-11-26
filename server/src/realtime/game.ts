@@ -40,6 +40,10 @@ interface Room {
   shuffles: Map<string, number>;
   captions: Map<string, string>;
   memes: Meme[];
+  /** Mème en cours de vote (index dans `memes`, mélangés). */
+  voteIndex: number;
+  /** Tout le monde a voté : passage au mème suivant déjà programmé. */
+  advancing: boolean;
   winner: Meme | null;
   used: Set<string>;
   published: Set<string>;
@@ -47,6 +51,8 @@ interface Room {
 }
 
 const rooms = new Map<string, Room>();
+/** Durées du vote (modifiables en test) : temps par mème, pause quand tout le monde a voté. */
+export const voteTiming = { memeMs: GAME.voteSecondsPerMeme * 1000, pauseMs: 1200 };
 const userRoom = new Map<string, string>();
 const userSockets = new Map<string, Set<string>>();
 
@@ -64,9 +70,16 @@ function memeView(room: Room, m: Meme, viewer: string): GameMeme {
   };
 }
 
-function hasVotedAll(room: Room, userId: string) {
-  return room.memes.every((m) => m.authorId === userId || m.ratings.has(userId));
+const currentMeme = (room: Room) => (room.stage === 'vote' ? (room.memes[room.voteIndex] ?? null) : null);
+
+/** A noté le mème en cours (l'auteur n'a pas à le faire). */
+function votedCurrent(room: Room, userId: string) {
+  const m = currentMeme(room);
+  return !!m && (m.authorId === userId || m.ratings.has(userId));
 }
+
+/** Joueurs qui doivent noter le mème en cours : tous sauf son auteur. */
+const votersFor = (room: Room, m: Meme) => [...room.players.values()].filter((p) => p.user.id !== m.authorId);
 
 function myMeme(room: Room, userId: string) {
   return room.memes.find((m) => m.authorId === userId) ?? null;
@@ -84,7 +97,7 @@ function viewFor(room: Room, userId: string): GameRoom {
       roundScore: p.roundScore,
       connected: p.connected,
       submitted: room.captions.has(p.user.id),
-      voted: room.stage === 'vote' && hasVotedAll(room, p.user.id),
+      voted: room.stage === 'vote' && votedCurrent(room, p.user.id),
     })),
     rounds: room.rounds,
     source: room.source,
@@ -99,12 +112,13 @@ function viewFor(room: Room, userId: string): GameRoom {
       memeId: mine?.id ?? null,
       published: !!mine && room.published.has(mine.id),
     },
-    memes:
-      room.stage === 'vote'
-        ? room.memes.filter((m) => m.authorId !== userId).map((m) => memeView(room, m, userId))
-        : showResults
-          ? [...room.memes].sort((a, b) => b.score - a.score).map((m) => memeView(room, m, userId))
-          : [],
+    memes: showResults ? [...room.memes].sort((a, b) => b.score - a.score).map((m) => memeView(room, m, userId)) : [],
+    vote: (() => {
+      const m = currentMeme(room);
+      if (!m) return null;
+      const voters = votersFor(room, m);
+      return { index: room.voteIndex + 1, total: room.memes.length, meme: memeView(room, m, userId), voted: voters.filter((p) => m.ratings.has(p.user.id)).length, voters: voters.length };
+    })(),
     winner: showResults && room.winner ? memeView(room, room.winner, userId) : null,
     error: room.error,
   };
@@ -172,6 +186,8 @@ export async function createRoom(userId: string) {
     shuffles: new Map(),
     captions: new Map(),
     memes: [],
+    voteIndex: 0,
+    advancing: false,
     winner: null,
     used: new Set(),
     published: new Set(),
@@ -222,9 +238,9 @@ export function leaveRoom(userId: string) {
     clearTimer(room);
     room.stage = 'final';
   } else if (room.stage === 'caption') {
-    maybeEndCaption(room);
+    if (maybeEndCaption(room)) return;
   } else if (room.stage === 'vote') {
-    maybeEndVote(room);
+    if (maybeAdvance(room)) return;
   }
   broadcast(room);
 }
@@ -328,9 +344,13 @@ export function submitCaption(userId: string, raw: string) {
   if (!maybeEndCaption(room)) broadcast(room);
 }
 
+/**
+ * Fin anticipée seulement quand **tous** les joueurs du salon ont écrit : un téléphone verrouillé (socket coupé)
+ * ne doit pas faire perdre sa légende à son joueur. Sinon, on attend la fin du temps.
+ */
 function maybeEndCaption(room: Room) {
-  const active = [...room.players.values()].filter((p) => p.connected);
-  if (active.length > 0 && active.every((p) => room.captions.has(p.user.id))) {
+  const players = [...room.players.values()];
+  if (players.length > 0 && players.every((p) => room.captions.has(p.user.id))) {
     endCaption(room);
     return true;
   }
@@ -339,45 +359,73 @@ function maybeEndCaption(room: Room) {
 
 function endCaption(room: Room) {
   if (room.stage !== 'caption') return;
-  room.memes = [...room.captions.entries()].map(([authorId, caption]) => ({
-    id: randomUUID(),
-    authorId,
-    image: room.images.get(authorId)!,
-    caption,
-    ratings: new Map(),
-    score: 0,
-  }));
+  // Ordre mélangé : ni l'ordre d'arrivée ni celui des joueurs ne trahit l'auteur.
+  room.memes = mixed(
+    [...room.captions.entries()].map(([authorId, caption]) => ({
+      id: randomUUID(),
+      authorId,
+      image: room.images.get(authorId)!,
+      caption,
+      ratings: new Map(),
+      score: 0,
+    })),
+  );
   if (room.memes.length === 0) {
     clearTimer(room);
     room.stage = 'results';
     broadcast(room);
     return;
   }
+  room.voteIndex = 0;
+  startMemeVote(room);
+}
+
+function mixed<T>(list: T[]) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+/** Vote du mème en cours, pour tout le monde en même temps. */
+function startMemeVote(room: Room) {
   room.stage = 'vote';
-  const perVoter = Math.max(1, room.memes.length - 1);
-  setTimer(room, perVoter * GAME.voteSecondsPerMeme * 1000 + 3000, () => endVote(room));
-  if (!maybeEndVote(room)) broadcast(room);
+  room.advancing = false;
+  setTimer(room, voteTiming.memeMs, () => nextMeme(room));
+  if (!maybeAdvance(room)) broadcast(room);
+}
+
+/** Tous les joueurs connectés (sauf l'auteur) ont noté : court instant, puis mème suivant. */
+function maybeAdvance(room: Room) {
+  const m = currentMeme(room);
+  if (!m || room.advancing) return false;
+  const waiting = votersFor(room, m).filter((p) => p.connected && !m.ratings.has(p.user.id));
+  if (waiting.length > 0) return false;
+  room.advancing = true;
+  setTimer(room, voteTiming.pauseMs, () => nextMeme(room));
+  broadcast(room);
+  return true;
+}
+
+function nextMeme(room: Room) {
+  if (room.stage !== 'vote') return;
+  room.voteIndex++;
+  if (room.voteIndex >= room.memes.length) void endVote(room);
+  else startMemeVote(room);
 }
 
 export function rate(userId: string, memeId: string, rating: number) {
   const room = requireRoom(userId);
   if (room.stage !== 'vote') fail(409, 'Le vote est terminé');
-  const meme = room.memes.find((m) => m.id === memeId);
-  if (!meme) fail(404, 'Mème introuvable');
+  const meme = currentMeme(room);
+  // Tout le monde vote le même mème : celui d'avant est clos, celui d'après pas encore ouvert.
+  if (!meme || meme.id !== memeId) fail(409, 'Ce mème n’est plus au vote');
   if (meme!.authorId === userId) fail(400, 'Tu ne peux pas noter ton propre mème');
   const r = Math.trunc(Number(rating));
   if (!GAME.ratings.some((x) => x.value === r)) fail(400, 'Note invalide');
   meme!.ratings.set(userId, r);
-  if (!maybeEndVote(room)) broadcast(room);
-}
-
-function maybeEndVote(room: Room) {
-  const voters = [...room.players.values()].filter((p) => p.connected).map((p) => p.user.id);
-  if (voters.every((id) => hasVotedAll(room, id))) {
-    void endVote(room);
-    return true;
-  }
-  return false;
+  if (!maybeAdvance(room)) broadcast(room);
 }
 
 async function endVote(room: Room) {
@@ -481,9 +529,9 @@ export function onDisconnect(userId: string, socketId: string) {
   const p = room?.players.get(userId);
   if (!room || !p) return;
   p.connected = false;
-  if (room.stage === 'caption') maybeEndCaption(room);
-  else if (room.stage === 'vote') maybeEndVote(room);
-  broadcast(room);
+  // Un joueur parti un instant ne bloque pas le vote en cours (on n'attend que les connectés),
+  // mais l'écriture des légendes l'attend jusqu'à la fin du temps.
+  if (room.stage !== 'vote' || !maybeAdvance(room)) broadcast(room);
   // Laisse une minute pour revenir (changement d'appli, réseau mobile…).
   p.leaveTimer = setTimeout(() => {
     if (!p.connected) leaveRoom(userId);

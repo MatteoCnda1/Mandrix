@@ -345,32 +345,28 @@ function Caption({ room }: { room: GameRoom }) {
   );
 }
 
+/**
+ * Vote : tout le monde note le même mème en même temps. Après son vote, on attend les autres ;
+ * le mème suivant arrive pour tout le monde quand chacun a voté (ou à la fin du temps).
+ */
 function Vote({ room }: { room: GameRoom }) {
   const left = useLeft(room.deadline);
-  const pending = room.memes.filter((m) => m.myRating === null);
-  const current = pending[0];
-  const idx = room.memes.length - pending.length + 1;
+  const vote = room.vote;
   const tones = ['bg-card text-ink shadow-pill', 'bg-brand text-white shadow-[0_6px_18px_rgba(14,118,198,.25)]', 'bg-ink text-inv shadow-[0_6px_18px_rgba(11,15,20,.2)]'];
-
-  if (!current) {
-    const voted = room.players.filter((p) => p.voted).length;
-    return (
-      <div className="card flex animate-in flex-col items-center gap-3 px-6 py-10 text-center">
-        <HourglassMedium size={34} className="text-acc" />
-        <div className="text-xl font-extrabold">Votes envoyés</div>
-        <div className="text-[0.9375rem] text-mute">
-          En attente des autres joueurs · {voted}/{room.players.length} · {left} s
-        </div>
-      </div>
-    );
-  }
+  if (!vote) return null;
+  const current = vote.meme;
+  const done = current.mine || current.myRating !== null;
+  const everyone = vote.voted >= vote.voters;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
         <div className="text-[1.0625rem] font-extrabold">
-          Mème {idx}/{room.memes.length} · note la légende
+          Mème {vote.index}/{vote.total}
         </div>
+        <span className="rounded-[14px] bg-soft px-2.5 py-1 text-xs font-bold text-mute" aria-live="polite">
+          {vote.voted}/{vote.voters} ont voté
+        </span>
         <span className="ml-auto flex h-9 items-center gap-1.5 rounded-[18px] bg-card px-3 text-sm font-extrabold tabular-nums">
           <Timer size={16} /> {left} s
         </span>
@@ -378,20 +374,41 @@ function Vote({ room }: { room: GameRoom }) {
       <div key={current.id} className="card flex animate-in flex-col gap-2.5 p-3.5">
         <div className="px-2.5 py-2 text-center text-[clamp(20px,4.6vw,26px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{current.caption}</div>
         <WholeMedia media={current.image.media} autoPlay />
-        <div className="px-1 text-[0.8125rem] text-mute">Légende de {current.author.displayName}</div>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        {GAME.ratings.map((r) => (
-          <button
-            key={r.value}
-            type="button"
-            onClick={() => gameEmit('game:rate', current.id, r.value)}
-            className={cx('tap h-14 rounded-[28px] border-0 text-[0.9375rem] font-bold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[.94]', tones[r.value])}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
+      {current.mine ? (
+        <div className="flex h-14 items-center justify-center gap-2 rounded-[28px] bg-glass text-[0.9375rem] font-bold text-mute">
+          <Crown size={18} weight="fill" className="text-acc" /> C’est ton mème : les autres votent…
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2" role="group" aria-label="Noter ce mème">
+          {GAME.ratings.map((r) => {
+            const picked = current.myRating === r.value;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                disabled={done && !picked}
+                aria-pressed={picked}
+                onClick={() => !done && gameEmit('game:rate', current.id, r.value)}
+                className={cx(
+                  'tap h-14 rounded-[28px] border-0 text-[0.9375rem] font-bold transition-[transform,opacity] duration-200 active:scale-[.94]',
+                  tones[r.value],
+                  done && !picked && 'opacity-35',
+                  picked && 'ring-4 ring-acc/40',
+                )}
+              >
+                {r.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {done && (
+        <div className="flex items-center justify-center gap-2 text-sm font-semibold text-mute" aria-live="polite">
+          <HourglassMedium size={16} />
+          {everyone ? 'Tout le monde a voté, mème suivant…' : `Vote enregistré · en attente des autres (${vote.voted}/${vote.voters})`}
+        </div>
+      )}
     </div>
   );
 }

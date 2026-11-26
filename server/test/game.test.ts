@@ -72,13 +72,15 @@ describe('Make It Friends', () => {
     await emit(b, 'game:caption', 'Moi le lundi matin');
     await wait(200);
     expect(state[mathis.username]?.stage).toBe('vote');
-    const toRate = state[mathis.username]!.memes;
-    expect(toRate).toHaveLength(1);
-    expect(toRate[0].author.id).toBe(lea.id);
-
-    await emit(a, 'game:rate', toRate[0].id, 2);
-    await emit(b, 'game:rate', state[lea.username]!.memes[0].id, 1);
-    await wait(300);
+    // Vote commun : un mème à la fois, le même pour les deux ; chacun note celui de l'autre.
+    for (let round = 0; round < 2; round++) {
+      const v = state[mathis.username]!.vote!;
+      expect(state[lea.username]!.vote!.meme.id).toBe(v.meme.id);
+      expect(v.total).toBe(2);
+      if (v.meme.author.id === lea.id) await emit(a, 'game:rate', v.meme.id, 2);
+      else await emit(b, 'game:rate', v.meme.id, 1);
+      await wait(1500);
+    }
     const results = state[mathis.username]!;
     expect(results.stage).toBe('results');
     expect(results.winner?.caption).toBe('Moi le lundi matin');
@@ -87,5 +89,64 @@ describe('Make It Friends', () => {
     expect((await emit(b, 'game:publish')).ok).toBe(true);
     const memes = await call(lea, 'GET', '/api/memes');
     expect(memes.body.items[0].text).toBe('Moi le lundi matin');
+  });
+});
+
+describe('vote commun et légendes attendues', () => {
+  it('attend un joueur déconnecté pour les légendes, puis fait voter tout le monde sur le même mème', async () => {
+    const { voteTiming } = await import('../src/realtime/game.js');
+    voteTiming.pauseMs = 50;
+    const maya = await makeUser('maya');
+    const noe = await makeUser('noe');
+    const zoe = await makeUser('zoe');
+    const a = await connect(maya);
+    const b = await connect(noe);
+    let c = await connect(zoe);
+    const code = (await emit<GameRoom>(a, 'game:create')).data!.code;
+    await emit(b, 'game:join', code);
+    await emit(c, 'game:join', code);
+    await emit(a, 'game:start');
+    await wait(200);
+    // Zoé verrouille son téléphone : son socket tombe, elle reste dans le salon.
+    c.disconnect();
+    await wait(100);
+    await emit(a, 'game:caption', 'Légende A');
+    await emit(b, 'game:caption', 'Légende B');
+    await wait(200);
+    expect(state[maya.username]?.stage).toBe('caption');
+    // Elle revient et écrit la sienne : les trois légendes partent au vote.
+    c = await connect(zoe);
+    await wait(150);
+    await emit(c, 'game:caption', 'Légende Z');
+    await wait(200);
+    const v1 = state[maya.username]!.vote!;
+    expect(state[maya.username]!.stage).toBe('vote');
+    expect(v1).toMatchObject({ index: 1, total: 3, voters: 2, voted: 0 });
+    expect(state[noe.username]!.vote!.meme.id).toBe(v1.meme.id);
+    expect(state[zoe.username]!.vote!.meme.id).toBe(v1.meme.id);
+    const sockets = { [maya.id]: a, [noe.id]: b, [zoe.id]: c };
+    const voters = [maya, noe, zoe].filter((u) => u.id !== v1.meme.author.id);
+    // Un seul a voté : on reste sur le même mème.
+    expect((await emit(sockets[voters[0].id], 'game:rate', v1.meme.id, 1)).ok).toBe(true);
+    await wait(150);
+    expect(state[maya.username]!.vote).toMatchObject({ index: 1, voted: 1, voters: 2 });
+    // Voter pour un autre mème que celui affiché : refusé.
+    expect((await emit(sockets[voters[1].id], 'game:rate', 'pas-ce-meme', 1)).error).toMatch(/plus au vote/);
+    await emit(sockets[voters[1].id], 'game:rate', v1.meme.id, 2);
+    await wait(250);
+    expect(state[noe.username]!.vote).toMatchObject({ index: 2, voted: 0 });
+    // Personne ne vote : à la fin du temps, mème suivant puis résultats.
+    voteTiming.memeMs = 200;
+    const v2 = state[maya.username]!.vote!;
+    const voter = [maya, noe, zoe].find((u) => u.id !== v2.meme.author.id)!;
+    await emit(sockets[voter.id], 'game:rate', v2.meme.id, 0);
+    await wait(150);
+    const other = [maya, noe, zoe].find((u) => u.id !== v2.meme.author.id && u.id !== voter.id)!;
+    await emit(sockets[other.id], 'game:rate', v2.meme.id, 0);
+    await wait(800);
+    expect(state[maya.username]!.stage).toBe('results');
+    expect(state[maya.username]!.memes).toHaveLength(3);
+    voteTiming.memeMs = 15_000;
+    voteTiming.pauseMs = 1200;
   });
 });

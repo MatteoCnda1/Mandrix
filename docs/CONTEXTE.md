@@ -118,6 +118,10 @@ Salons en mémoire, codes `MDRX-###`, invitations par message, pool d'images par
 d'images : `npm run cli -w server -- import-pool <dossier> <pseudo> [public|friends]`, en production
 `docker compose exec app node server/dist/cli.js import-pool …`, relançable sans doublon grâce à `.mandrix-import.json`),
 podium avec départage par auteur en cas d'égalité. Correctif : la création de salon diffuse maintenant l'état (#20).
+**Vote commun** (#108) : les mèmes de la manche (mélangés) passent un par un, le même pour tout le monde ; chacun note,
+l'auteur attend (« C'est ton mème »), et on passe au suivant quand tous les joueurs connectés ont voté (petite pause) ou au
+bout de 15 s. L'écriture des légendes attend **tous** les joueurs du salon (un téléphone verrouillé coupe le socket mais ne
+fait plus perdre sa légende) ; sinon, fin du temps. Durées réglables en test (`voteTiming`).
 
 **Mème du jour** (#9, onglet du jeu `/jeu?onglet=jour`) : une image du pool public tirée à 8 h (heure de Paris), une légende
 par personne modifiable jusqu'à 18 h, votes anonymes de 18 h à minuit, résultats le lendemain. Chaque vote vaut 50 points,
