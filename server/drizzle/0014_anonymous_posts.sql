@@ -1,0 +1,1 @@
+ALTER TABLE "posts" ADD COLUMN "anonymous" boolean DEFAULT false NOT NULL;

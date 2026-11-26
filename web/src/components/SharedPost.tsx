@@ -18,11 +18,11 @@ export function SharedPostCard({ post, mine }: { post: SharedPost | null; mine: 
     <button
       type="button"
       onClick={() => nav(`/p/${post.id}`)}
-      aria-label={`Voir le post de ${post.author.displayName}`}
+      aria-label={post.anonymous ? 'Voir le post anonyme' : `Voir le post de ${post.author.displayName}`}
       className={cx('tap block w-[min(240px,62vw)] overflow-hidden rounded-[18px] border-0 p-0 text-left', mine ? 'bg-white/15 text-white' : 'bg-card text-ink')}
     >
       <span className="flex items-center gap-2 px-2.5 py-2">
-        <Avatar user={post.author} size={24} />
+        <Avatar user={post.author} size={24} anonymous={post.anonymous} />
         <span className="min-w-0 truncate text-[0.8125rem] font-bold">{post.author.displayName}</span>
       </span>
       {media ? (

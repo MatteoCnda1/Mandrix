@@ -77,6 +77,7 @@ function ReportQueue() {
         <article key={`${c.targetType}:${c.targetId}`} className="card flex flex-col gap-3 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-soft px-2.5 py-1 text-xs font-bold">{TYPE_LABEL[c.targetType]}</span>
+            {c.anonymous && <span className="rounded-full bg-ink px-2.5 py-1 text-xs font-bold text-inv">Publié en anonyme</span>}
             {c.hidden && <span className="rounded-full bg-heart/15 px-2.5 py-1 text-xs font-bold text-heart">Masqué</span>}
             {c.authorSuspended && <span className="rounded-full bg-heart px-2.5 py-1 text-xs font-bold text-white">Compte suspendu</span>}
             <span className="ml-auto text-xs text-mute">

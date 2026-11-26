@@ -75,7 +75,8 @@ function Reactions({ post, className }: { post: Post; className?: string }) {
 
 export function ActionBar({ post }: { post: Post }) {
   const { data: me } = useMe();
-  const canPool = !!post.media && post.kind !== 'meme' && post.kind !== 'poll';
+  // Le pool montre à qui est l'image : pas de post anonyme dedans.
+  const canPool = !!post.media && post.kind !== 'meme' && post.kind !== 'poll' && !post.anonymous;
   const pill = 'tap flex h-11 items-center gap-1.5 rounded-[22px] border-0 bg-soft px-3.5 text-sm font-semibold text-ink transition-transform duration-200 active:scale-[.92]';
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -355,16 +356,21 @@ function EditCaption({ post, onClose }: { post: Post; onClose: () => void }) {
 function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; onEdit: () => void }) {
   const nav = useNavigate();
   const { data: me } = useMe();
-  const mine = me && (post.author.id === me.id || me.isAdmin);
+  // `mine` : seul moyen de reconnaître son post anonyme (l'auteur affiché est factice).
+  const own = !!me && (post.mine || post.author.id === me.id);
+  const mine = me && (own || me.isAdmin);
+  const profile = post.anonymous ? post.realAuthor : post.author;
   const item = 'tap flex h-12 w-full items-center gap-2.5 rounded-[20px] border-0 bg-transparent px-3 text-left text-[0.9375rem] font-semibold text-ink hover:bg-soft';
   return (
     <>
       <div className="fixed inset-0 z-20" onClick={onClose} />
       <div className="absolute top-12 right-0 z-30 flex w-56 origin-top-right animate-drop flex-col gap-0.5 rounded-[24px] bg-card p-1.5 shadow-menu">
-        <button type="button" className={item} onClick={() => nav(`/u/${post.author.username}`)}>
-          <User size={20} /> Voir le profil
-        </button>
-        {me && post.author.id === me.id && (post.kind === 'photo' || post.kind === 'video') && (
+        {profile && (
+          <button type="button" className={item} onClick={() => nav(`/u/${profile.username}`)}>
+            <User size={20} /> {post.anonymous ? 'Profil de l’auteur (admin)' : 'Voir le profil'}
+          </button>
+        )}
+        {own && (post.kind === 'photo' || post.kind === 'video') && (
           <button
             type="button"
             className={item}
@@ -376,7 +382,7 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
             <PencilSimple size={20} /> Modifier la légende
           </button>
         )}
-        {me && post.author.id === me.id && post.kind !== 'meme' && (
+        {me && own && post.kind !== 'meme' && !post.anonymous && (
           <button
             type="button"
             className={item}
@@ -388,13 +394,14 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
             <PushPin size={20} weight={me.pinnedPostId === post.id ? 'fill' : 'regular'} /> {me.pinnedPostId === post.id ? 'Désépingler du profil' : 'Épingler sur mon profil'}
           </button>
         )}
-        {me && post.author.id !== me.id && (
+        {me && !own && (
           <button
             type="button"
             className={item}
             onClick={() => {
               onClose();
-              openReport({ targetType: 'post', targetId: post.id, authorName: post.author.displayName.split(' ')[0] });
+              // Post anonyme : pas de « Bloquer … » (on ne sait pas qui c'est).
+              openReport({ targetType: 'post', targetId: post.id, authorName: post.anonymous ? undefined : post.author.displayName.split(' ')[0] });
             }}
           >
             <Flag size={20} /> Signaler
@@ -406,7 +413,8 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
             className={cx(item, 'text-heart')}
             onClick={async () => {
               onClose();
-              if (await confirmAction({ title: 'Supprimer ce post ?', message: 'Il disparaîtra du fil de tes amis.', confirmLabel: 'Supprimer le post', destructive: true })) deletePost(post);
+              const message = post.anonymous ? 'Il disparaîtra du fil de tout le monde.' : 'Il disparaîtra du fil de tes amis.';
+              if (await confirmAction({ title: 'Supprimer ce post ?', message, confirmLabel: 'Supprimer le post', destructive: true })) deletePost(post);
             }}
           >
             <Trash size={20} /> Supprimer
@@ -521,6 +529,13 @@ function Carousel({ post, gallery }: { post: Post; gallery: MediaRef[] }) {
   );
 }
 
+/** À côté de « Anonyme » : « toi » pour l'auteur, le vrai nom pour les admins (modération). */
+function AnonymousTag({ post }: { post: Post }) {
+  const label = post.mine ? 'toi' : post.realAuthor ? `admin : ${post.realAuthor.displayName}` : null;
+  if (!label) return null;
+  return <span className="ml-1.5 rounded-full bg-soft px-2 py-0.5 align-[1px] text-[0.75rem] font-semibold text-mute">{label}</span>;
+}
+
 export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
@@ -535,10 +550,18 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
         </div>
       )}
       <div className="relative flex items-center gap-2.5">
-        <button type="button" className="tap flex min-w-0 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink" onClick={() => nav(`/u/${post.author.username}`)}>
-          <Avatar user={post.author} size={small ? 36 : 44} />
+        <button
+          type="button"
+          className="tap flex min-w-0 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink disabled:cursor-default"
+          disabled={post.anonymous}
+          onClick={() => !post.anonymous && nav(`/u/${post.author.username}`)}
+        >
+          <Avatar user={post.author} size={small ? 36 : 44} anonymous={post.anonymous} />
           <div className="min-w-0">
-            <div className={cx('truncate font-bold', small ? 'text-sm' : 'text-[0.9375rem]')}>{post.author.displayName}</div>
+            <div className={cx('truncate font-bold', small ? 'text-sm' : 'text-[0.9375rem]')}>
+              {post.author.displayName}
+              {post.anonymous && <AnonymousTag post={post} />}
+            </div>
             {!small && (
               <div className="truncate text-[0.8125rem] text-mute">
                 {timeAgo(post.createdAt)}

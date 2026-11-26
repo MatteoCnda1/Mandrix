@@ -1,4 +1,4 @@
-import type { MediaRef, Poll, PollKind, PoolScope, Post, PostKind, ReactionCount, UserLite } from '@mandrix/shared';
+import { ANONYMOUS_AUTHOR, type MediaRef, type Poll, type PollKind, type PoolScope, type Post, type PostKind, type ReactionCount, type UserLite } from '@mandrix/shared';
 import { sql, type SQL } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { MEDIA_SQL_COLUMNS, mediaRef } from './media.js';
@@ -33,6 +33,7 @@ interface PostRow extends Record<string, unknown> {
   pollEndsAt: Date | null;
   pollPublic: boolean;
   edited: boolean;
+  anonymous: boolean;
   sortAt: Date;
   sortKey: string;
 }
@@ -55,19 +56,26 @@ interface SelectOpts {
 
 /**
  * Condition SQL « le lecteur peut voir le post p » : son auteur, ses amis, les amis de quelqu'un
- * qui l'a republié, et tout le monde pour les mèmes (galerie publique).
+ * qui l'a republié, et tout le monde pour les mèmes (galerie publique) et les posts anonymes
+ * (un cercle de lecteurs restreint trahirait l'auteur).
  */
 export function visibleTo(viewerId: string, circle: string[]) {
   const c = uuidArray(circle);
-  return sql`(p.kind = 'meme' or p.author_id = ${viewerId} or p.author_id = any(${c})
+  return sql`(p.kind = 'meme' or p.anonymous or p.author_id = ${viewerId} or p.author_id = any(${c})
     or exists(select 1 from reposts r where r.post_id = p.id and r.user_id = any(${c})))`;
+}
+
+/** Le lecteur est-il admin ? (seuls les admins voient l'auteur réel d'un contenu anonyme). */
+export async function isAdminId(userId: string) {
+  const [u] = await db.execute<{ isAdmin: boolean }>(sql`select is_admin as "isAdmin" from users where id = ${userId}`);
+  return !!u?.isAdmin;
 }
 
 /** Auteur et type d'un post que le lecteur peut voir ; 404 sinon (sans révéler qu'il existe). */
 export async function visiblePost(viewerId: string, postId: string) {
   const circle = [viewerId, ...(await friendIds(viewerId))];
-  const [p] = await db.execute<{ authorId: string; kind: PostKind; text: string; pollKind: PollKind | null; pollEndsAt: Date | null; pollPublic: boolean }>(sql`
-    select p.author_id as "authorId", p.kind, p.text, p.poll_kind as "pollKind", p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic"
+  const [p] = await db.execute<{ authorId: string; kind: PostKind; text: string; pollKind: PollKind | null; pollEndsAt: Date | null; pollPublic: boolean; anonymous: boolean }>(sql`
+    select p.author_id as "authorId", p.kind, p.text, p.poll_kind as "pollKind", p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic", p.anonymous
     from posts p
     where p.id = ${postId} and ${visibleTo(viewerId, circle)}
       and (p.hidden_at is null or p.author_id = ${viewerId}) and ${notBlocked(viewerId, sql`p.author_id`)}
@@ -88,12 +96,14 @@ export async function canSeePost(viewerId: string, postId: string) {
 
 export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<Post[]> {
   const circle = opts.circle ? uuidArray(opts.circle) : null;
+  // Post anonyme : même rang et même « republié par » que l'auteur soit du cercle ou non,
+  // sinon l'écart trahirait qu'il en fait partie.
   const repostedBy = circle
-    ? sql`case when p.author_id = any(${circle}) then null else
+    ? sql`case when p.author_id = any(${circle}) and not p.anonymous then null else
         (select r.user_id from reposts r where r.post_id = p.id and r.user_id = any(${circle}) order by r.created_at desc limit 1) end`
     : sql`null::uuid`;
   const sortAt = circle
-    ? sql`case when p.author_id = any(${circle}) then p.created_at else
+    ? sql`case when p.anonymous or p.author_id = any(${circle}) then p.created_at else
         (select max(r.created_at) from reposts r where r.post_id = p.id and r.user_id = any(${circle})) end`
     : sql`p.created_at`;
 
@@ -111,7 +121,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
       (select coalesce(json_agg(json_build_object('emoji', x.emoji, 'count', x.n) order by x.n desc, x.first), '[]'::json)
         from (select pr.emoji, count(*)::int as n, min(pr.created_at) as first from post_reactions pr where pr.post_id = p.id group by pr.emoji) x) as reactions,
       (select pr.emoji from post_reactions pr where pr.post_id = p.id and pr.user_id = ${viewerId}) as "myReaction",
-      p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic", (p.edited_at is not null) as edited,
+      p.poll_ends_at as "pollEndsAt", p.poll_public as "pollPublic", (p.edited_at is not null) as edited, p.anonymous,
       ${sortAt} as "sortAt", (${sortAt})::text as "sortKey"
     from posts p
     left join media m on m.id = p.media_id
@@ -125,6 +135,7 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
 
   const list = [...rows];
   const usersMap = await usersByIds(list.flatMap((r) => [r.authorId, r.repostedById]), viewerId);
+  const admin = list.some((r) => r.anonymous) && (await isAdminId(viewerId));
   const galleries = await loadGalleries(list.filter((r) => r.kind === 'photo').map((r) => r.id));
   const polls = await loadPolls(
     viewerId,
@@ -134,7 +145,10 @@ export async function selectPosts(viewerId: string, opts: SelectOpts): Promise<P
   return list.map((r) => ({
     id: r.id,
     kind: r.kind,
-    author: usersMap.get(r.authorId)!,
+    author: r.anonymous ? ANONYMOUS_AUTHOR : usersMap.get(r.authorId)!,
+    anonymous: r.anonymous,
+    mine: r.authorId === viewerId,
+    ...(r.anonymous && admin && usersMap.has(r.authorId) ? { realAuthor: usersMap.get(r.authorId)! } : {}),
     text: r.text,
     media: r.mediaId
       ? mediaRef({ id: r.mediaId, kind: r.mediaKind ?? 'image', width: r.mediaW, height: r.mediaH, status: r.mediaStatus, duration: r.mediaDuration, hasPoster: r.mediaPoster, variants: r.mediaVariants })

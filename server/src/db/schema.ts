@@ -134,6 +134,11 @@ export const posts = pgTable(
     hiddenAt: ts('hidden_at'),
     /** Légende modifiée par l'auteur. */
     editedAt: ts('edited_at'),
+    /**
+     * Publié en anonyme : visible de tous les membres, signé « Anonyme ». L'auteur réel n'est
+     * renvoyé qu'à lui-même (`mine`) et aux admins (`realAuthor`), jamais dans le temps réel ni les push.
+     */
+    anonymous: boolean('anonymous').notNull().default(false),
     createdAt: created(),
   },
   (t) => [index('posts_author_idx').on(t.authorId, t.createdAt), index('posts_kind_idx').on(t.kind, t.createdAt)],

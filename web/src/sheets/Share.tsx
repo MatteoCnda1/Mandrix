@@ -84,7 +84,7 @@ export function ShareSheet({ post }: { post: Post }) {
   return (
     <Sheet title="Envoyer à…" onClose={close}>
       <div className="flex justify-center [&>button]:shadow-pill">
-        <SharedPostCard post={{ id: post.id, kind: post.kind, author: post.author, text: post.text, media: post.media }} mine={false} />
+        <SharedPostCard post={{ id: post.id, kind: post.kind, author: post.author, text: post.text, media: post.media, anonymous: post.anonymous }} mine={false} />
       </div>
       {targets.length === 0 ? (
         <p className="m-0 px-1 text-sm text-mute">Ajoute des amis pour leur envoyer des posts.</p>

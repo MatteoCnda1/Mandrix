@@ -196,7 +196,7 @@ export function toggleLike(post: Post) {
 }
 
 export function toggleRepost(post: Post, myId: string) {
-  if (post.author.id === myId) {
+  if (post.mine || post.author.id === myId) {
     toast('Tu ne peux pas republier ton propre post', 'error');
     return;
   }

@@ -1,8 +1,8 @@
-import { POLL_DURATIONS, POLL_MAX_OPTIONS, type MediaRef, type PollKind, type Post } from '@mandrix/shared';
-import { Eye, Image as ImageIcon, Plus, Sticker, X } from '@phosphor-icons/react';
+import { borderlineHits, POLL_DURATIONS, POLL_MAX_OPTIONS, type MediaRef, type PollKind, type Post } from '@mandrix/shared';
+import { Detective, Eye, Image as ImageIcon, Plus, Sticker, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { MentionSuggestions } from '../components/RichText';
-import { Seg, Sheet, Switch, cx, useFilePicker } from '../components/ui';
+import { Seg, Sheet, Switch, chooseAction, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { qc, useConfig } from '../lib/data';
 import { useObjectUrl } from '../lib/hooks';
@@ -156,6 +156,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const [opts, setOpts] = useState(poll?.opts ?? ['', '', '']);
   const [duration, setDuration] = useState<number | null>(poll ? poll.duration : 24);
   const [isPublic, setIsPublic] = useState(poll?.isPublic ?? false);
+  /** Publier en anonyme : interrupteur toujours là, et proposé quand le texte semble limite. */
+  const [anonymous, setAnonymous] = useState(false);
   useEffect(() => {
     // Ouverte depuis le jeu ou les Reels : on ne touche pas au brouillon gardé.
     if (keepsCaption) save(CAPTION_KEY, text.trim() ? text : null);
@@ -191,8 +193,9 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
   const uploadOne = async (f: File, base = 0, share = 1) =>
     upload<MediaRef>('/api/media', f, f.name || 'media', (p) => setProgress(base + p * share));
 
-  const publish = async () => {
-    if (!valid || busy) return;
+  const publish = async (anon: boolean) => {
+    // Le pool du jeu affiche à qui est l'image : jamais avec un post anonyme.
+    const poolScope = pool && !anon ? 'public' : null;
     setProgress(0);
     try {
       if (kind === 0) {
@@ -200,15 +203,15 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
         const ids: string[] = [];
         for (const [i, f] of photos.entries()) ids.push((await uploadOne(f, i / photos.length, 1 / photos.length)).id);
         await api<Post>('/api/posts', {
-          body: { kind: 'photo', mediaId: ids[0], extraMediaIds: ids.slice(1), text: text.trim(), pool: pool ? 'public' : null },
+          body: { kind: 'photo', mediaId: ids[0], extraMediaIds: ids.slice(1), text: text.trim(), pool: poolScope, anonymous: anon },
         });
-        toast(photos.length > 1 ? `Post publié (${photos.length} photos)` : 'Post publié');
+        toast(`${photos.length > 1 ? `Post publié (${photos.length} photos)` : 'Post publié'}${anon ? ' en anonyme' : ''}`);
       } else if (kind === 1) {
         const m = await uploadOne(file!);
         await api<Post>('/api/posts', {
-          body: { kind: 'video', mediaId: m.id, text: text.trim(), pool: pool ? 'public' : null },
+          body: { kind: 'video', mediaId: m.id, text: text.trim(), pool: poolScope, anonymous: anon },
         });
-        toast('Post publié');
+        toast(anon ? 'Post publié en anonyme' : 'Post publié');
       } else {
         let options: { label: string; mediaId?: string }[] = [];
         if (pollKind === 'text') options = labels.map((label) => ({ label }));
@@ -220,8 +223,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
             { label: opts[1].trim() || 'Option 2', mediaId: b.id },
           ];
         }
-        await api<Post>('/api/posts', { body: { kind: 'poll', pollKind, text: q.trim(), options, durationHours: duration, isPublic } });
-        toast('Sondage publié');
+        await api<Post>('/api/posts', { body: { kind: 'poll', pollKind, text: q.trim(), options, durationHours: duration, isPublic, anonymous: anon } });
+        toast(anon ? 'Sondage publié en anonyme' : 'Sondage publié');
       }
       if (mode === 'post') {
         for (const k of [['feed'], ['reels'], ['user-posts'], ['pool-stats']]) qc.invalidateQueries({ queryKey: k });
@@ -237,7 +240,52 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
     }
   };
 
-  const pubLabel = busy ? (progress! < 1 ? `Envoi… ${Math.round(progress! * 100)} %` : 'Publication…') : 'Publier';
+  /** Texte limite (liste de mots, sans accents ni casse) : on propose l'anonymat avant d'envoyer. */
+  const onPublish = async () => {
+    if (!valid || busy) return;
+    const texts = kind === 2 ? [q, ...opts] : [text];
+    if (!anonymous && borderlineHits(...texts).length > 0) {
+      const choice = await chooseAction({
+        title: 'Ce message semble limite',
+        message: 'Le publier en anonyme ? Ton nom ne s’affichera nulle part ; seuls les admins pourront voir que c’est toi.',
+        actions: [
+          { label: 'Publier en anonyme', value: 'anon' },
+          { label: 'Publier quand même', value: 'named' },
+        ],
+        cancelLabel: 'Modifier',
+      });
+      if (choice === null) {
+        (kind === 2 ? qRef : textRef).current?.focus();
+        return;
+      }
+      if (choice === 'anon') {
+        setAnonymous(true);
+        return publish(true);
+      }
+      return publish(false);
+    }
+    return publish(anonymous);
+  };
+
+  const pubLabel = busy ? (progress! < 1 ? `Envoi… ${Math.round(progress! * 100)} %` : 'Publication…') : anonymous ? 'Publier en anonyme' : 'Publier';
+  const anonToggle = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={anonymous}
+      onClick={() => setAnonymous(!anonymous)}
+      className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
+    >
+      <Detective size={22} weight={anonymous ? 'fill' : 'regular'} />
+      <span className="flex flex-1 flex-col">
+        <span>Publier en anonyme</span>
+        {anonymous && (
+          <span className="text-[0.8125rem] font-normal text-mute">Signé « Anonyme », visible par tous les membres. Les admins peuvent voir que c’est toi.</span>
+        )}
+      </span>
+      <Switch on={anonymous} />
+    </button>
+  );
 
   return (
     <Sheet
@@ -289,15 +337,19 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
               placeholder="Ajoute une légende, @mentionne un ami, #hashtag…"
             />
             <MentionSuggestions value={text} onChange={setText} inputRef={textRef} className="-mt-1" />
-            <button
-              type="button"
-              onClick={() => setPool(!pool)}
-              className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
-            >
-              <Sticker size={22} />
-              <span className="flex-1">Envoyer aussi dans le pool Make It Friends</span>
-              <Switch on={pool} />
-            </button>
+            {anonToggle}
+            {/* Le pool affiche à qui est l'image : caché pour un post anonyme. */}
+            {!anonymous && (
+              <button
+                type="button"
+                onClick={() => setPool(!pool)}
+                className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
+              >
+                <Sticker size={22} />
+                <span className="flex-1">Envoyer aussi dans le pool Make It Friends</span>
+                <Switch on={pool} />
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -391,12 +443,13 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
               <span className="flex-1">Montrer qui a voté quoi</span>
               <Switch on={isPublic} />
             </button>
+            {anonToggle}
           </>
         )}
       </>
       <button
         type="button"
-        onClick={publish}
+        onClick={onPublish}
         disabled={!valid || busy}
         className={cx(
           'tap h-[54px] flex-none rounded-[27px] border-0 text-base font-bold transition-[background,color,transform] duration-300 active:scale-[.97]',

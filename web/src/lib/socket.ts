@@ -1,4 +1,4 @@
-import type { ClientToServerEvents, ConversationDetail, GameRoom, Message, ServerToClientEvents, WhoisRoom } from '@mandrix/shared';
+import { ANONYMOUS_AUTHOR, type ClientToServerEvents, type ConversationDetail, type GameRoom, type Message, type ServerToClientEvents, type WhoisRoom } from '@mandrix/shared';
 import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { qc } from './data';
@@ -104,7 +104,8 @@ export function connectSocket() {
     );
   });
   socket.on('presence', (e) => setPresence(e.userId, { online: e.online, lastSeenAt: e.lastSeenAt }));
-  socket.on('feed:new', (e) => useFeedFresh.setState((s) => ({ count: s.count + 1, authors: [...new Set([e.authorId, ...s.authors])].slice(0, 3) })));
+  // Post anonyme : pas d'auteur, la pastille s'affiche sans visage.
+  socket.on('feed:new', (e) => useFeedFresh.setState((s) => ({ count: s.count + 1, authors: [...new Set([e.authorId ?? ANONYMOUS_AUTHOR.id, ...s.authors])].slice(0, 3) })));
   socket.on('dm:update', (m: Message) => {
     qc.setQueryData<Message[]>(['messages', m.conversationId], (old) => old?.map((x) => (x.id === m.id ? m : x)));
     qc.invalidateQueries({ queryKey: ['conversations'] });
