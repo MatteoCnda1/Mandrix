@@ -78,6 +78,8 @@ async function transcode(m: MediaRow) {
   const r = await run('ffmpeg', [
     '-y', '-i', src,
     '-map', '0:v:0', '-map', '0:a:0?',
+    // Sans les métadonnées de l'original (position GPS, appareil, date) : rien ne trahit l'auteur d'un post anonyme.
+    '-map_metadata', '-1',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
     // Côté le plus long limité à 1280 px, 30 images/s max ; l'orientation de l'iPhone est appliquée automatiquement.
     '-vf', "scale=w='if(gt(iw,ih),min(1280,iw),-2)':h='if(gt(iw,ih),-2,min(1280,ih))'",

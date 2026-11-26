@@ -34,8 +34,9 @@ interface Row {
 }
 
 function describe(n: AppNotification, nav: (to: string) => void): Row {
-  const who = <b>{n.actor?.displayName ?? 'Quelqu’un'}</b>;
-  const d = n.data as Record<string, string | number | null>;
+  const d = n.data as Record<string, string | number | boolean | null>;
+  // Contenu anonyme : ni nom ni lien vers un profil.
+  const who = <b>{n.actor?.displayName ?? (d.anonymous ? (n.type === 'comment' ? 'L’auteur anonyme' : 'Anonyme') : 'Quelqu’un')}</b>;
   const what = WHAT[String(d.kind)] ?? 'ton post';
   switch (n.type) {
     case 'like':

@@ -76,27 +76,28 @@ export function CommentsSheet({ postId }: { postId: string }) {
 
   const row = (c: Comment, reply = false) => (
     <div key={c.id} className={cx('flex animate-in items-center gap-2.5', reply && 'pl-12')} style={{ animationDuration: '.35s' }}>
-      <Avatar user={c.author} size={reply ? 30 : 38} />
+      <Avatar user={c.author} size={reply ? 30 : 38} anonymous={c.anonymous} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span className="text-sm font-bold">{c.author.displayName}</span>
+          {c.anonymous && (c.mine || c.realAuthor) && <span className="text-xs font-semibold text-mute">{c.mine ? 'toi' : `admin : ${c.realAuthor!.displayName}`}</span>}
           <span className="text-xs text-mute">{timeAgo(c.createdAt)}</span>
           {me && (
             <button type="button" className="tap border-0 bg-transparent p-0 text-xs font-semibold text-mute hover:text-ink" onClick={() => startReply(c)}>
               Répondre
             </button>
           )}
-          {me && (c.author.id === me.id || me.isAdmin) && (
+          {me && (c.mine || c.author.id === me.id || me.isAdmin) && (
             <button type="button" className="tap border-0 bg-transparent p-0 text-xs font-semibold text-mute hover:text-heart" onClick={() => remove(c)}>
               Supprimer
             </button>
           )}
-          {me && c.author.id !== me.id && (
+          {me && !c.mine && c.author.id !== me.id && (
             <button
               type="button"
               aria-label={`Signaler le commentaire de ${c.author.displayName}`}
               className="tap grid h-7 w-7 place-items-center border-0 bg-transparent p-0 text-mute hover:text-heart"
-              onClick={() => openReport({ targetType: 'comment', targetId: c.id, authorName: c.author.displayName.split(' ')[0] })}
+              onClick={() => openReport({ targetType: 'comment', targetId: c.id, authorName: c.anonymous ? undefined : c.author.displayName.split(' ')[0] })}
             >
               <Flag size={14} />
             </button>
@@ -125,7 +126,7 @@ export function CommentsSheet({ postId }: { postId: string }) {
         <div className="flex flex-none items-center gap-2 rounded-2xl bg-soft px-3 py-2 text-[0.8125rem]">
           <ArrowBendDownRight size={16} className="flex-none text-mute" />
           <span className="min-w-0 flex-1 truncate">
-            Réponse à <b>{replyTo.author.id === me?.id ? 'toi' : replyTo.author.displayName.split(' ')[0]}</b> · <span className="text-mute">{replyTo.text}</span>
+            Réponse à <b>{replyTo.mine ? 'toi' : replyTo.anonymous ? 'l’auteur anonyme' : replyTo.author.displayName.split(' ')[0]}</b> · <span className="text-mute">{replyTo.text}</span>
           </span>
           <button type="button" aria-label="Annuler la réponse" onClick={() => setReplyTo(null)} className="tap grid h-7 w-7 flex-none place-items-center rounded-full border-0 bg-transparent text-mute">
             <X size={16} />

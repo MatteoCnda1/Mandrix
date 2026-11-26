@@ -180,7 +180,29 @@ export interface Post {
   gallery: MediaRef[] | null;
   /** Date de tri dans le fil (curseur de pagination). */
   sortAt?: string;
+  /** Publié en anonyme : `author` vaut alors `ANONYMOUS_AUTHOR` pour tout le monde. */
+  anonymous: boolean;
+  /** Le lecteur en est l'auteur (seul moyen de le savoir pour un post anonyme). */
+  mine: boolean;
+  /** Post anonyme lu par un admin : l'auteur réel, pour la modération. Absent sinon. */
+  realAuthor?: UserLite;
 }
+
+/**
+ * Auteur affiché d'un post anonyme. Identifiant et pseudo factices : aucun lien vers un profil,
+ * et rien qui permette de remonter au compte.
+ */
+export const ANONYMOUS_AUTHOR: UserLite = {
+  id: 'anonyme',
+  username: '',
+  displayName: 'Anonyme',
+  avatarUrl: null,
+  initials: '?',
+  tone: 1,
+};
+
+/** L'auteur d'un post anonyme quand il commente son propre post. */
+export const ANONYMOUS_OP: UserLite = { ...ANONYMOUS_AUTHOR, displayName: 'Anonyme · auteur' };
 
 export interface PostSearch {
   posts: Post[];
@@ -205,6 +227,54 @@ export function extractMentions(text: string): string[] {
 /** Hashtags (#mot) d'un texte, sans doublon, en minuscules. */
 export function extractHashtags(text: string): string[] {
   return [...new Set([...text.matchAll(HASHTAG_RE)].map((m) => m[2].toLowerCase()))];
+}
+
+// ——— Contenu « limite » : proposer la publication anonyme ———
+
+/**
+ * Mots et expressions qui font proposer l'anonymat avant de publier. Fragments d'expression
+ * régulière, en minuscules et sans accents, comparés en mots entiers au texte « replié »
+ * (sans accents ni casse). Ce n'est pas de la modération : on propose, on n'interdit rien.
+ */
+export const BORDERLINE_TERMS: readonly string[] = [
+  // Insultes
+  'connard(e)?s?', 'connasses?', 'salopes?', 'salauds?', 'putes?', 'fils de pute', 'fdp', 'encule(e)?s?', 'ntm',
+  'nique', 'niquer', 'batard(e)?s?', 'abruti(e)?s?', 'debiles?', 'cretin(e)?s?', 'bouffon(ne)?s?', 'tocard(e)?s?',
+  'gros(se)? con(ne)?', 'pauvre con(ne)?', '(ferme )?ta gueule', 'tg', 'ftg', 'pd', 'pedes?', 'tarlouzes?', 'gouines?',
+  'negros?', 'bougnoules?',
+  // Sexe
+  'sexe', 'nsfw', 'nudes?', 'pornos?', 'porn', 'bites?', 'chattes?', 'seins', 'sucer', 'suce', 'baise', 'baiser',
+  'plan cul', 'coucher avec', 'couche avec', 'orgasmes?', 'cul',
+  // Drogue, alcool
+  'drogue(e)?s?', 'beuh', 'weed', 'shit', 'un joint', 'des joints', 'bedos?', 'coke', 'cocaine', 'mdma', 'ecsta',
+  'ketamine', 'defonce(e)?s?', 'bourre(e)?s?', 'cuite', 'gueule de bois',
+  // Ragots, confessions, cœur
+  'secrets?', 'rumeurs?', 'ragots?', 'potins?', 'je balance', 'je vais balancer', 'il parait que', 'entre nous',
+  'confessions?', "j'avoue", 'je deteste', 'crush(es)?', 'je kiffe', 'amoureu(x|se) de', 'cocu(e)?s?', 'infideles?',
+  'trompe (sa|son)', 'tromper (sa|son)', '(il|elle) (la|le) trompe', 'les dossiers', 'gros dossier', 'clash',
+  'embrouilles?', '(mon|ton|son) ex', 'avis impopulaire', 'unpopular opinion', 'hot take',
+];
+
+/** Émojis « limite », cherchés tels quels. */
+export const BORDERLINE_EMOJI: readonly string[] = ['🍆', '🍑', '💦', '🖕', '🔞', '🤫'];
+
+/** Texte sans accents ni casse, apostrophes et espaces normalisés. */
+export const foldText = (s: string) =>
+  s.normalize('NFD').replace(/\p{M}+/gu, '').replace(/[’‘`]/g, "'").replace(/\s+/g, ' ').toLowerCase();
+
+// Sans lookbehind (Safari < 16.4) : la limite gauche est capturée, la droite regardée.
+let borderlineRe: RegExp | null = null;
+
+/** Mots « limite » trouvés dans ces textes (sans doublon) ; vide si rien ne l'est. */
+export function borderlineHits(...texts: string[]): string[] {
+  borderlineRe ??= new RegExp(`(^|[^\\p{L}\\p{N}])(${BORDERLINE_TERMS.join('|')})(?=$|[^\\p{L}\\p{N}])`, 'gu');
+  const hits = new Set<string>();
+  for (const t of texts) {
+    if (!t) continue;
+    for (const m of foldText(t).matchAll(borderlineRe)) hits.add(m[2]);
+    for (const e of BORDERLINE_EMOJI) if (t.includes(e)) hits.add(e);
+  }
+  return [...hits];
 }
 
 export type TextPart =
@@ -275,6 +345,12 @@ export interface Comment {
   liked: boolean;
   /** Réponse à ce commentaire (un seul niveau de réponses). */
   parentId: ID | null;
+  /** Commentaire de l'auteur d'un post anonyme sur ce post : signé `ANONYMOUS_OP`. */
+  anonymous: boolean;
+  /** Le lecteur en est l'auteur. */
+  mine: boolean;
+  /** Commentaire anonyme lu par un admin : l'auteur réel. */
+  realAuthor?: UserLite;
 }
 
 /** Posts d'un profil : le post épinglé à part, en tête. */
@@ -449,6 +525,8 @@ export interface SharedPost {
   author: UserLite;
   text: string;
   media: MediaRef | null;
+  /** Post anonyme : `author` vaut `ANONYMOUS_AUTHOR`. */
+  anonymous?: boolean;
 }
 
 export const SHARED_POST_LABEL = '↗️ Post partagé';
@@ -691,6 +769,8 @@ export interface ModerationCase {
   hidden: boolean;
   authorSuspended: boolean;
   createdAt: string;
+  /** Publié en anonyme : `author` est l'auteur réel, que seuls les admins voient. */
+  anonymous?: boolean;
 }
 
 export interface BlockedUser extends UserLite {
@@ -914,8 +994,8 @@ export interface ServerToClientEvents {
   'notif:new': (n: AppNotification) => void;
   'dm:new': (m: Message) => void;
   presence: (e: Presence & { userId: ID }) => void;
-  /** Un ami vient de publier : pastille « Nouveaux posts » sur le fil. */
-  'feed:new': (e: { postId: ID; authorId: ID }) => void;
+  /** Un ami vient de publier : pastille « Nouveaux posts » sur le fil (`authorId` null : post anonyme). */
+  'feed:new': (e: { postId: ID; authorId: ID | null }) => void;
   /** Message modifié (supprimé pour tout le monde…). */
   'dm:update': (m: Message) => void;
   'dm:typing': (e: TypingEvent) => void;

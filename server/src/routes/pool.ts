@@ -34,6 +34,8 @@ async function resolveTarget(body: { postId?: string; shotId?: string; storyId?:
     const [p] = await db.select().from(posts).where(eq(posts.id, body.postId)).limit(1);
     if (!p || !p.mediaId) return fail(404, 'Ce post ne contient pas de média');
     if (p.kind === 'meme') return fail(400, 'Ce mème vient déjà du pool');
+    // Le pool affiche à qui est l'image : un post anonyme n'y entre pas.
+    if (p.anonymous) return fail(400, 'Un post anonyme ne part pas dans le pool du jeu');
     return { mediaId: p.mediaId, ownerId: p.authorId };
   }
   if (body.shotId) {

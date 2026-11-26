@@ -1,5 +1,5 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
-import { ArrowClockwise, CircleNotch, X } from '@phosphor-icons/react';
+import { ArrowClockwise, CircleNotch, Detective, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { lockScroll } from '../lib/scrollLock';
@@ -32,9 +32,17 @@ export function Logo({ size = 42, className }: { size?: number; className?: stri
 
 const TONES = ['bg-tint text-ink', 'bg-ink text-inv', 'bg-azure text-white'];
 
-export function Avatar({ user, size = 44, ring, className }: { user: Pick<UserLite, 'initials' | 'tone' | 'avatarUrl' | 'displayName' | 'birthdayToday'>; size?: number; ring?: boolean; className?: string }) {
+export function Avatar({ user, size = 44, ring, className, anonymous }: { user: Pick<UserLite, 'initials' | 'tone' | 'avatarUrl' | 'displayName' | 'birthdayToday'>; size?: number; ring?: boolean; className?: string; anonymous?: boolean }) {
   const style: CSSProperties = { width: size, height: size, fontSize: Math.round(size * 0.34) };
   if (ring) style.boxShadow = '0 0 0 4px var(--card), 0 0 0 7px #2A9DF4';
+  // Contenu anonyme : un détective à la place de la photo.
+  if (anonymous) {
+    return (
+      <div aria-hidden="true" className={cx('grid flex-none place-items-center rounded-full bg-ink text-inv', className)} style={style}>
+        <Detective size={Math.round(size * 0.56)} weight="fill" />
+      </div>
+    );
+  }
   // 🎂 le jour de son anniversaire (à partir d'une taille lisible).
   if (user.birthdayToday && size >= 36) {
     return (
@@ -291,21 +299,38 @@ export function Portal({ children }: { children: ReactNode }) {
 
 // ——— Feuille d'actions de confirmation (remplace window.confirm, HIG) ———
 
+interface ActionChoice {
+  label: string;
+  value: string;
+  destructive?: boolean;
+}
+
 interface ConfirmReq {
   title: string;
   message?: string;
-  confirmLabel: string;
-  destructive?: boolean;
-  resolve: (ok: boolean) => void;
+  /** Du choix conseillé (en premier, avec le focus) au moins conseillé. */
+  actions: ActionChoice[];
+  cancelLabel: string;
+  resolve: (value: string | null) => void;
 }
 
 let confirmSetter: ((r: ConfirmReq | null) => void) | null = null;
 
-export function confirmAction(opts: Omit<ConfirmReq, 'resolve'>): Promise<boolean> {
+/**
+ * Feuille d'actions à plusieurs choix : la valeur du bouton touché, ou null pour le bouton
+ * d'annulation (Échap, toucher le fond).
+ */
+export function chooseAction(opts: { title: string; message?: string; actions: ActionChoice[]; cancelLabel?: string }): Promise<string | null> {
   return new Promise((resolve) => {
-    if (!confirmSetter) return resolve(window.confirm(opts.title));
-    confirmSetter({ ...opts, resolve });
+    if (!confirmSetter) return resolve(window.confirm(opts.title) ? (opts.actions[0]?.value ?? null) : null);
+    confirmSetter({ ...opts, cancelLabel: opts.cancelLabel ?? 'Annuler', resolve });
   });
+}
+
+export function confirmAction(opts: { title: string; message?: string; confirmLabel: string; destructive?: boolean }): Promise<boolean> {
+  return chooseAction({ title: opts.title, message: opts.message, actions: [{ label: opts.confirmLabel, value: 'ok', destructive: opts.destructive }] }).then(
+    (v) => v === 'ok',
+  );
 }
 
 export function ConfirmHost() {
@@ -318,31 +343,39 @@ export function ConfirmHost() {
   }, []);
   useEffect(() => {
     if (!req) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && answer(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && answer(null);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
   if (!req) return null;
-  const answer = (ok: boolean) => {
-    req.resolve(ok);
+  const answer = (value: string | null) => {
+    req.resolve(value);
     setReq(null);
   };
-  const row = 'tap flex h-14 w-full items-center justify-center border-0 bg-transparent text-[1.0625rem] transition-colors active:bg-soft';
+  const row = 'tap flex min-h-14 w-full items-center justify-center border-0 bg-transparent px-4 text-[1.0625rem] transition-colors active:bg-soft';
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center p-2.5" role="alertdialog" aria-modal="true" aria-label={req.title} style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
-      <div onClick={() => answer(false)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
+      <div onClick={() => answer(null)} className="absolute inset-0 animate-fade bg-[rgba(8,12,17,.45)]" />
       <div className="relative flex w-full max-w-[420px] animate-sheet flex-col gap-2">
         <div className="overflow-hidden rounded-[24px] bg-card text-center">
           <div className="flex flex-col gap-1 px-5 pt-4 pb-3.5">
             <div className="text-[0.8125rem] font-bold text-mute">{req.title}</div>
             {req.message && <div className="text-[0.8125rem] leading-snug text-mute">{req.message}</div>}
           </div>
-          <button type="button" autoFocus onClick={() => answer(true)} className={cx(row, 'border-t border-line font-semibold', req.destructive ? 'text-heart' : 'text-acc')}>
-            {req.confirmLabel}
-          </button>
+          {req.actions.map((a, i) => (
+            <button
+              key={a.value}
+              type="button"
+              autoFocus={i === 0}
+              onClick={() => answer(a.value)}
+              className={cx(row, 'border-t border-line', i === 0 ? 'font-semibold' : 'font-normal', a.destructive ? 'text-heart' : 'text-acc')}
+            >
+              {a.label}
+            </button>
+          ))}
         </div>
-        <button type="button" onClick={() => answer(false)} className={cx(row, 'rounded-[24px] bg-card font-bold text-acc')}>
-          Annuler
+        <button type="button" onClick={() => answer(null)} className={cx(row, 'rounded-[24px] bg-card font-bold text-acc')}>
+          {req.cancelLabel}
         </button>
       </div>
     </div>

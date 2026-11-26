@@ -1,4 +1,5 @@
 import {
+  ANONYMOUS_AUTHOR,
   attachmentLabel,
   GROUP_MAX_MEMBERS,
   MESSAGE_REACTIONS,
@@ -71,7 +72,10 @@ async function sharedPosts(ids: string[]) {
   const authors = await usersByIds(list.map((x) => x.p.authorId));
   for (const { p, m } of list) {
     const author = authors.get(p.authorId);
-    if (author) map.set(p.id, { id: p.id, kind: p.kind as PostKind, author, text: p.text, media: mediaRef(m) });
+    if (!author) continue;
+    map.set(p.id, p.anonymous
+      ? { id: p.id, kind: p.kind as PostKind, author: ANONYMOUS_AUTHOR, text: p.text, media: mediaRef(m), anonymous: true }
+      : { id: p.id, kind: p.kind as PostKind, author, text: p.text, media: mediaRef(m) });
   }
   return map;
 }
@@ -745,7 +749,9 @@ export default async function messageRoutes(app: FastifyInstance) {
       const others = (await memberIds(conv.id)).filter((id) => id !== me.id);
       if (!conv.isGroup && others[0] && (await isBlockedBetween(me.id, others[0]))) continue;
       const blind: string[] = [];
-      for (const uid of others) if (!(await canSeePost(uid, postId))) blind.push(uid);
+      // Post anonyme : tout le monde le voit, sauf les comptes bloqués avec son auteur ; les refuser
+      // dirait à qui partage qui sont ces comptes, donc l'auteur. Le partage passe.
+      if (!post.anonymous) for (const uid of others) if (!(await canSeePost(uid, postId))) blind.push(uid);
       if (blind.length) {
         const names = await usersByIds(blind);
         for (const uid of blind) refused.add(names.get(uid)?.displayName ?? 'Quelqu’un');

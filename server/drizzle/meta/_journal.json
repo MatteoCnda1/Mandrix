@@ -99,6 +99,13 @@
       "when": 1795704410209,
       "tag": "0013_can_invite",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795705352501,
+      "tag": "0014_anonymous_posts",
+      "breakpoints": true
     }
   ]
 }

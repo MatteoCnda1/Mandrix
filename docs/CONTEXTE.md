@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 24 novembre 2026 (lot 8, issues #92 et #93).
+> Dernière mise à jour : 26 novembre 2026 (posts anonymes).
 
 ## 1. L'idée
 
@@ -61,7 +61,7 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 - **Réactions emoji** (#5) : tap sur le cœur = j'aime, appui long = 😂 😍 😮 😢 🔥 👏 (une par personne, notification regroupée par post).
 - **@mentions et #hashtags** (#6) : suggestions d'amis en tapant « @ », notification aux amis mentionnés qui voient le post, hashtags cliquables vers la recherche.
 - Sondages : choix (jusqu'à **6 options**), photos, curseur emoji ; **durée** (1 h, 24 h, 3 jours, sans fin), **votes publics** facultatifs, vote bloqué côté serveur à la fin et résultat envoyé à l'auteur (#7).
-- **Visibilité** (#34) : un post n'est lisible (et commentable, aimable…) que par son auteur, ses amis, les amis de qui l'a republié, et par tous pour les mèmes (`visibleTo` / `visiblePost` dans `server/src/lib/posts.ts`).
+- **Visibilité** (#34) : un post n'est lisible (et commentable, aimable…) que par son auteur, ses amis, les amis de qui l'a republié, et par tous pour les mèmes et les posts anonymes (`visibleTo` / `visiblePost` dans `server/src/lib/posts.ts`).
 - **Carrousel** : jusqu'à 10 photos par post (`post_media`, la première reste dans `posts.media_id`).
 - **Anniversaires** (MM-JJ, sans l'année) : 🎂 sur l'avatar le jour J, notification aux amis à 9 h.
 - **Apparence** : Clair / Sombre / Automatique. **Administration** (`/admin`) : membres, contenus, stockage, disque du NAS.
@@ -88,6 +88,32 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
   exact puis publication d'une image rendue en 1080 × 1920 (`web/src/lib/storyImage.ts`). Vidéos : aperçu puis envoi tel quel.
 - Répondre à une story envoie un message privé qui **affiche la photo de la story** des deux côtés (instantané dans `messages.meta`).
 - Tirer pour rafraîchir.
+
+### Posts anonymes
+Choix du propriétaire (26/11/2026) : posts du fil seulement (photo, vidéo, sondage ; pas les commentaires, stories ni messages),
+auteur visible des **seuls admins**, détection par mots-clés **et** interrupteur toujours là, post visible de **tous les membres**.
+
+- **Publier** : interrupteur « Publier en anonyme » dans `Composer.tsx`. Si le texte (légende, ou question et options du sondage)
+  semble **limite**, « Publier » ouvre la feuille « Ce message semble limite » : *Publier en anonyme*, *Publier quand même*,
+  *Modifier* (`chooseAction` dans `ui.tsx`, feuille d'actions à plusieurs choix ; `confirmAction` s'appuie dessus).
+- **Détection** côté téléphone, sans rien interdire : `borderlineHits()` dans `shared` compare le texte sans accents ni casse
+  (`foldText`) à `BORDERLINE_TERMS` (insultes, sexe, drogue et alcool, ragots et confessions, en mots entiers) et
+  `BORDERLINE_EMOJI`. Pas de lookbehind dans l'expression (Safari < 16.4). Ajouter un mot : un fragment d'expression en minuscules sans accents.
+- **Colonne** `posts.anonymous` (migration `0014`). L'API renvoie `author = ANONYMOUS_AUTHOR` (identifiant `anonyme`, pas de
+  pseudo), `anonymous`, `mine` (seul moyen pour l'auteur de reconnaître son post) et, **pour les admins seulement**, `realAuthor`.
+- **Visible de tous** (`visibleTo`, fil, Reels, recherche) : un cercle de lecteurs restreint aux amis trahirait l'auteur. Pour la
+  même raison, rang et « republié par » d'un post anonyme ne dépendent pas de l'auteur (`selectPosts`). Les blocages s'appliquent quand même.
+- **Rien ne fuit** : pas sur le profil des autres ni dans le compte de ses posts (sur son propre profil, oui), pas d'épinglage,
+  pas de pool du jeu (le pool affiche le propriétaire), aperçu de partage en message signé « Anonyme » (et le partage ne refuse
+  personne : refuser dirait qui est bloqué avec l'auteur). Mentions : notification sans acteur (`data.anonymous`), push signé
+  « Anonyme », à toute personne mentionnée. `feed:new` part à tous avec `authorId: null`, sauf à l'auteur (qui reçoit son id) et
+  aux comptes bloqués avec lui (qui ne voient pas le post).
+- **L'auteur répond sous son post** : ses commentaires y sont signés « Anonyme · auteur » (`ANONYMOUS_OP`), notifications
+  « t'a répondu » et mentions comprises.
+- **Signaler** : pas d'option « Bloquer » (le serveur l'ignore aussi : l'auteur apparaîtrait dans « Comptes bloqués »).
+  La file de modération montre l'auteur réel avec l'étiquette « Publié en anonyme ».
+- Les vidéos sont transcodées **sans métadonnées** (`-map_metadata -1` : ni GPS ni appareil) ; les photos perdent déjà l'EXIF.
+- Limite connue : dans un sondage **public** anonyme, le vote de l'auteur apparaît sous son nom parmi les votants.
 
 ### Reels
 Vidéos verticales plein écran, défilement tactile, molette et clavier.
@@ -304,6 +330,10 @@ déploiement automatique facultatif (dépôt public : aucune clé à créer), al
 - Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
 - Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block`.
 - `toLite(u, withBirthday)` : ne jamais écrire `.map(toLite)` (l'index passerait pour `withBirthday`).
+- **Posts anonymes** : pour savoir si un post est le sien, `post.mine` (et `comment.mine`), jamais `post.author.id === me.id`.
+  Toute nouvelle route, notification ou évènement qui parle d'un post doit tester `anonymous` avant de citer son auteur.
+- Deux sessions qui lancent les tests en même temps se vident la base l'une à l'autre : en lancer une sur une autre base
+  (`DATABASE_URL=postgres://mandrix:mandrix@localhost:5433/mandrix_test_x npx vitest run`, créée toute seule).
 - Supprimer un fichier média : passer par `mediaReferenced()` (`server/src/lib/media.ts`), la même règle que le ménage nocturne.
 - Le navigateur intégré de l'app Claude n'enregistre pas de service worker sur `localhost` : à vérifier sur téléphone.
 - `gh pr update-branch` n'existe pas ici : `gh api -X PUT repos/MatteoCnda1/Mandrix/pulls/<n>/update-branch`.
@@ -329,6 +359,7 @@ déploiement automatique facultatif (dépôt public : aucune clé à créer), al
 | `0012_story_music` | musique des stories (`music_media_id`, `music`) |
 | `0011_guess_whois` | « Qui a pris ça ? » (`shot_guesses`, `guess_rounds`), questions de « Qui de nous… ? » (`whois_questions`) |
 | `0013_can_invite` | droit de parrainer (`users.can_invite`, faux par défaut) |
+| `0014_anonymous_posts` | posts anonymes (`posts.anonymous`) |
 
 ## 9. Pistes ouvertes
 

@@ -67,9 +67,14 @@ export default async function userRoutes(app: FastifyInstance) {
     const me = requireUser(req);
     const { postId } = parse(z.object({ postId: z.string().uuid().nullable() }), req.body);
     if (postId) {
-      const [p] = await db.select({ authorId: schema.posts.authorId, kind: schema.posts.kind }).from(schema.posts).where(eq(schema.posts.id, postId)).limit(1);
+      const [p] = await db
+        .select({ authorId: schema.posts.authorId, kind: schema.posts.kind, anonymous: schema.posts.anonymous })
+        .from(schema.posts)
+        .where(eq(schema.posts.id, postId))
+        .limit(1);
       if (!p || p.authorId !== me.id) return fail(404, 'Post introuvable');
       if (p.kind === 'meme') fail(400, 'Les mèmes ne s’épinglent pas');
+      if (p.anonymous) fail(400, 'Un post anonyme ne s’épingle pas sur ton profil');
     }
     await db.update(users).set({ pinnedPostId: postId }).where(eq(users.id, me.id));
     return { pinnedPostId: postId };
@@ -147,7 +152,7 @@ export default async function userRoutes(app: FastifyInstance) {
         (select count(*)::int from friendships f2
           where f2.status = 'accepted' and (f2.requester_id = u.id or f2.addressee_id = u.id)
             and (case when f2.requester_id = u.id then f2.addressee_id else f2.requester_id end) in (select id from mine)) as mutual,
-        (select count(*)::int from posts p where p.author_id = u.id and p.hidden_at is null and p.kind <> 'meme') as posts,
+        (select count(*)::int from posts p where p.author_id = u.id and p.hidden_at is null and p.kind <> 'meme' and not p.anonymous) as posts,
         (select count(*)::int from friendships f3 where f3.status = 'accepted' and (f3.requester_id = u.id or f3.addressee_id = u.id)) as friends
       from users u left join rel on rel.id = u.id
       where u.id <> ${me.id} and u.suspended_at is null and ${notBlocked(me.id, sql`u.id`)} ${search}
@@ -206,7 +211,7 @@ export default async function userRoutes(app: FastifyInstance) {
     if (blockRow && blockRow.blockerId === u.id) return fail(404, 'Utilisateur introuvable');
     const [stats] = await db.execute<{ posts: number; memesWon: number }>(sql`
       select
-        (select count(*)::int from posts where author_id = ${u.id}) as posts,
+        (select count(*)::int from posts where author_id = ${u.id} and not anonymous) as posts,
         (select count(*)::int from memes where author_id = ${u.id} and is_winner) as "memesWon"`);
     const friends = await friendIds(u.id);
     const fm = await friendshipMap(me.id, [u.id]);
@@ -237,12 +242,14 @@ export default async function userRoutes(app: FastifyInstance) {
     if (!visible) return { items: [], next: null, locked: true, pinned: null };
     // Onglet « Posts » : le post épinglé passe en tête, à part.
     const pinId = tab === 'posts' ? u.pinnedPostId : null;
+    // Posts anonymes : jamais sur le profil des autres ; sur le sien, pour les retrouver.
+    const anonFilter = u.id === me.id ? sql`` : sql`and not p.anonymous`;
     const items = await selectPosts(me.id, {
-      where: sql`p.author_id = ${u.id} and ${kindFilter} ${pinId ? sql`and p.id <> ${pinId}` : sql``}`,
+      where: sql`p.author_id = ${u.id} and ${kindFilter} ${anonFilter} ${pinId ? sql`and p.id <> ${pinId}` : sql``}`,
       limit: 30,
       offset: page * 30,
     });
-    const pinned = pinId && page === 0 ? ((await selectPosts(me.id, { where: sql`p.id = ${pinId} and p.author_id = ${u.id}`, limit: 1 }))[0] ?? null) : null;
+    const pinned = pinId && page === 0 ? ((await selectPosts(me.id, { where: sql`p.id = ${pinId} and p.author_id = ${u.id} and not p.anonymous`, limit: 1 }))[0] ?? null) : null;
     return { items, next: items.length === 30 ? page + 1 : null, locked: false, pinned };
   });
 

@@ -1,4 +1,4 @@
-import { POLL_MAX_OPTIONS, REACTIONS, type Comment, type Page, type Post, type PostSearch } from '@mandrix/shared';
+import { ANONYMOUS_OP, POLL_MAX_OPTIONS, REACTIONS, type Comment, type Page, type Post, type PostSearch, type UserLite } from '@mandrix/shared';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -8,10 +8,10 @@ import { fail, isUuid, parse, uuidParam } from '../lib/http.js';
 import { mediaRef, saveUpload } from '../lib/media.js';
 import { notify } from '../lib/notify.js';
 import { notifyMentions } from '../lib/mentions.js';
-import { getPost, loadPolls, notBlocked, selectPosts, visiblePost, visibleTo } from '../lib/posts.js';
+import { getPost, isAdminId, loadPolls, notBlocked, selectPosts, visiblePost, visibleTo } from '../lib/posts.js';
 import { extractMentions } from '@mandrix/shared';
 import { friendIds, usersByIds, uuidArray } from '../lib/users.js';
-import { emitToUser } from '../realtime/io.js';
+import { emitToUser, getIO } from '../realtime/io.js';
 import { upsertPoolItem } from './pool.js';
 import { perMinute } from '../lib/limits.js';
 
@@ -21,6 +21,8 @@ const PAGE = 15;
 const uuid = z.string().uuid('Média invalide');
 const pool = z.enum(['public', 'friends']).nullable().optional();
 const location = z.string().trim().max(60).nullable().optional();
+/** Publier en anonyme (posts du fil seulement). */
+const anonymous = z.boolean().default(false);
 
 const createSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -31,8 +33,9 @@ const createSchema = z.discriminatedUnion('kind', [
     text: z.string().trim().max(280).default(''),
     location,
     pool,
+    anonymous,
   }),
-  z.object({ kind: z.literal('video'), mediaId: uuid, text: z.string().trim().max(280).default(''), location, pool }),
+  z.object({ kind: z.literal('video'), mediaId: uuid, text: z.string().trim().max(280).default(''), location, pool, anonymous }),
   z.object({
     kind: z.literal('poll'),
     text: z.string().trim().min(1, 'Écris ta question').max(120),
@@ -44,6 +47,7 @@ const createSchema = z.discriminatedUnion('kind', [
     /** Durée en heures (null ou absent : sans fin). */
     durationHours: z.number().int().min(1).max(24 * 30).nullable().optional(),
     isPublic: z.boolean().default(false),
+    anonymous,
   }),
 ]);
 
@@ -60,12 +64,33 @@ async function reactionsOf(postId: string, viewerId: string) {
   return { reactions: post?.reactions ?? [], myReaction: post?.myReaction ?? null };
 }
 
-/** Prévient l'auteur et ses amis qu'un post vient d'arriver (pastille « Nouveaux posts »). */
-async function announcePost(authorId: string, postId: string) {
-  for (const id of [authorId, ...(await friendIds(authorId))]) emitToUser(id, 'feed:new', { postId, authorId });
+/**
+ * Prévient l'auteur et ses amis qu'un post vient d'arriver (pastille « Nouveaux posts »).
+ * Post anonyme : tout le monde le voit, donc tout le monde est prévenu, sans `authorId` ; seuls
+ * l'auteur (qui le sait) et les comptes bloqués dans un sens ou dans l'autre (qui ne le verront
+ * pas) sont laissés de côté, sinon le cercle des destinataires trahirait l'auteur.
+ */
+async function announcePost(authorId: string, postId: string, anonymous = false) {
+  if (!anonymous) {
+    for (const id of [authorId, ...(await friendIds(authorId))]) emitToUser(id, 'feed:new', { postId, authorId });
+    return;
+  }
+  emitToUser(authorId, 'feed:new', { postId, authorId });
+  const blocked = await db.execute<{ id: string }>(sql`
+    select case when blocker_id = ${authorId} then blocked_id else blocker_id end as id
+    from blocks where blocker_id = ${authorId} or blocked_id = ${authorId}`);
+  getIO()
+    ?.except([authorId, ...[...blocked].map((b) => b.id)].map((id) => `u:${id}`))
+    .emit('feed:new', { postId, authorId: null });
 }
 
 const KIND_LABEL: Record<string, string> = { photo: 'ta photo', video: 'ta vidéo', poll: 'ton sondage', meme: 'ton mème' };
+
+/** Signature d'un commentaire : masquée pour l'auteur d'un post anonyme (sauf pour les admins, qui voient `realAuthor`). */
+function commentAuthor(author: UserLite, masked: boolean, admin: boolean) {
+  if (!masked) return { author, anonymous: false };
+  return { author: ANONYMOUS_OP, anonymous: true, ...(admin ? { realAuthor: author } : {}) };
+}
 
 export default async function postRoutes(app: FastifyInstance) {
   app.post('/api/media', perMinute(30), async (req) => {
@@ -91,7 +116,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const circle = [me.id, ...(await friendIds(me.id))];
     const c = uuidArray(circle);
     const items = await selectPosts(me.id, {
-      where: sql`p.author_id = any(${c}) or exists(select 1 from reposts r where r.post_id = p.id and r.user_id = any(${c}))`,
+      where: sql`p.author_id = any(${c}) or p.anonymous or exists(select 1 from reposts r where r.post_id = p.id and r.user_id = any(${c}))`,
       circle,
       limit: PAGE,
       after,
@@ -105,7 +130,7 @@ export default async function postRoutes(app: FastifyInstance) {
     const page = pageOf(req);
     const circle = uuidArray([me.id, ...(await friendIds(me.id))]);
     const items = await selectPosts(me.id, {
-      where: sql`p.kind = 'video' and p.author_id = any(${circle}) and coalesce(m.status, 'ready') <> 'processing'`,
+      where: sql`p.kind = 'video' and (p.author_id = any(${circle}) or p.anonymous) and coalesce(m.status, 'ready') <> 'processing'`,
       limit: PAGE,
       offset: page * PAGE,
     });
@@ -130,6 +155,9 @@ export default async function postRoutes(app: FastifyInstance) {
   app.post('/api/posts', perMinute(10), async (req) => {
     const me = requireUser(req);
     const body = parse(createSchema, req.body);
+    // Le pool du jeu garde le nom de qui a ajouté l'image : incompatible avec l'anonymat.
+    if (body.anonymous && body.kind !== 'poll' && body.pool) fail(400, 'Un post anonyme ne part pas dans le pool du jeu');
+    const mention = { anonymous: body.anonymous };
 
     if (body.kind === 'photo' || body.kind === 'video') {
       const [m] = await db.select().from(media).where(eq(media.id, body.mediaId)).limit(1);
@@ -142,13 +170,13 @@ export default async function postRoutes(app: FastifyInstance) {
       }
       const [p] = await db
         .insert(posts)
-        .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null })
+        .values({ authorId: me.id, kind: body.kind, text: body.text, mediaId: body.mediaId, location: body.location || null, anonymous: body.anonymous })
         .returning();
       if (extra.length) await db.insert(schema.postMedia).values(extra.map((mediaId, i) => ({ postId: p.id, mediaId, position: i + 1 })));
       // Pool du jeu : toutes les photos du carrousel, pas seulement la première.
       if (body.pool) for (const mediaId of [body.mediaId, ...extra]) await upsertPoolItem({ mediaId, ownerId: me.id, addedById: me.id, scope: body.pool });
-      await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id });
-      await announcePost(me.id, p.id);
+      await notifyMentions(me, body.text, { postId: p.id, kind: p.kind, where: 'post', id: p.id, ...mention });
+      await announcePost(me.id, p.id, body.anonymous);
       return getPost(me.id, p.id);
     }
 
@@ -169,15 +197,15 @@ export default async function postRoutes(app: FastifyInstance) {
     const pollEndsAt = body.durationHours ? new Date(Date.now() + body.durationHours * 3600_000) : null;
     const [p] = await db
       .insert(posts)
-      .values({ authorId: me.id, kind: 'poll', pollKind: body.pollKind, text: body.text, pollEndsAt, pollPublic: body.isPublic })
+      .values({ authorId: me.id, kind: 'poll', pollKind: body.pollKind, text: body.text, pollEndsAt, pollPublic: body.isPublic, anonymous: body.anonymous })
       .returning();
-    await notifyMentions(me, body.text, { postId: p.id, kind: 'poll', where: 'post', id: p.id });
+    await notifyMentions(me, body.text, { postId: p.id, kind: 'poll', where: 'post', id: p.id, ...mention });
     if (options.length) {
       await db.insert(pollOptions).values(
         options.map((o, i) => ({ postId: p.id, label: o.label || `Option ${i + 1}`, mediaId: o.mediaId ?? null, position: i })),
       );
     }
-    await announcePost(me.id, p.id);
+    await announcePost(me.id, p.id, body.anonymous);
     return getPost(me.id, p.id);
   });
 
@@ -200,7 +228,7 @@ export default async function postRoutes(app: FastifyInstance) {
       await db.update(posts).set({ text, editedAt: new Date() }).where(eq(posts.id, id));
       const before = new Set(extractMentions(p.text));
       const added = extractMentions(text).filter((u) => !before.has(u));
-      if (added.length) await notifyMentions(me, added.map((u) => `@${u}`).join(' '), { postId: id, kind: p.kind, where: 'post', id: `${id}:edit` });
+      if (added.length) await notifyMentions(me, added.map((u) => `@${u}`).join(' '), { postId: id, kind: p.kind, where: 'post', id: `${id}:edit`, anonymous: p.anonymous });
     }
     return getPost(me.id, id);
   });
@@ -318,7 +346,7 @@ export default async function postRoutes(app: FastifyInstance) {
   app.get('/api/posts/:id/comments', async (req): Promise<Comment[]> => {
     const me = requireUser(req);
     const id = uuidParam(req.params);
-    await visiblePost(me.id, id);
+    const post = await visiblePost(me.id, id);
     const rows = await db.execute<{ id: string; authorId: string; text: string; createdAt: Date; likes: number; liked: boolean; parentId: string | null }>(sql`
       select c.id, c.author_id as "authorId", c.text, c.created_at as "createdAt", c.parent_id as "parentId",
         (select count(*)::int from comment_likes cl where cl.comment_id = c.id) as likes,
@@ -329,10 +357,14 @@ export default async function postRoutes(app: FastifyInstance) {
       order by c.created_at asc limit 300`);
     const list = [...rows];
     const authors = await usersByIds(list.map((r) => r.authorId), me.id);
+    // Post anonyme : son auteur commente sous « Anonyme · auteur ».
+    const masked = (authorId: string) => post.anonymous && authorId === post.authorId;
+    const admin = list.some((r) => masked(r.authorId)) && (await isAdminId(me.id));
     return list.map((r) => ({
       id: r.id,
       postId: id,
-      author: authors.get(r.authorId)!,
+      ...commentAuthor(authors.get(r.authorId)!, masked(r.authorId), admin),
+      mine: r.authorId === me.id,
       text: r.text,
       createdAt: new Date(r.createdAt).toISOString(),
       likes: r.likes,
@@ -347,6 +379,8 @@ export default async function postRoutes(app: FastifyInstance) {
     const body = parse(z.object({ text: z.string().trim().min(1, 'Commentaire vide').max(200), parentId: z.string().uuid().optional() }), req.body);
     const { text } = body;
     const p = await visiblePost(me.id, id);
+    // L'auteur d'un post anonyme qui le commente reste anonyme (notifications et push compris).
+    const asOp = p.anonymous && p.authorId === me.id;
     // Réponse : un seul niveau, une réponse à une réponse se range sous le même commentaire.
     let parent: { id: string; authorId: string } | null = null;
     if (body.parentId) {
@@ -359,9 +393,9 @@ export default async function postRoutes(app: FastifyInstance) {
         await notify({
           userId: c0.authorId,
           type: 'comment',
-          actorId: me.id,
-          data: { postId: id, kind: p.kind, text: text.slice(0, 80), reply: true },
-          push: { title: me.displayName, body: `t’a répondu : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `reply:${c0.id}` },
+          actorId: asOp ? null : me.id,
+          data: { postId: id, kind: p.kind, text: text.slice(0, 80), reply: true, ...(asOp ? { anonymous: true } : {}) },
+          push: { title: asOp ? ANONYMOUS_OP.displayName : me.displayName, body: `t’a répondu : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `reply:${c0.id}` },
         });
       }
     }
@@ -373,12 +407,14 @@ export default async function postRoutes(app: FastifyInstance) {
       data: { postId: id, kind: p.kind, text: text.slice(0, 80) },
       push: { title: me.displayName, body: `a commenté ${KIND_LABEL[p.kind] ?? 'ton post'} : ${text.slice(0, 80)}`, url: `/p/${id}`, tag: `comment:${id}` },
     });
-    await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id, postAuthorId: p.authorId });
+    // Post anonyme : visible de tous, donc pas de restriction au cercle de son auteur.
+    await notifyMentions(me, text, { postId: id, kind: p.kind, where: 'comment', id: c.id, postAuthorId: p.anonymous ? undefined : p.authorId, anonymous: asOp });
     const authors = await usersByIds([me.id], me.id);
     return {
       id: c.id,
       postId: id,
-      author: authors.get(me.id)!,
+      ...commentAuthor(authors.get(me.id)!, asOp, false),
+      mine: true,
       text: c.text,
       createdAt: c.createdAt.toISOString(),
       likes: 0,

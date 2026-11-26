@@ -41,7 +41,10 @@ async function setHidden(type: ReportTarget, id: string, hidden: boolean) {
 }
 
 /** Auteur, texte et média d'un contenu signalé (null s'il n'existe plus). */
-async function describe(type: ReportTarget, id: string): Promise<{ authorId: string; text: string; media: MediaRef | null; url: string | null; hidden: boolean } | null> {
+async function describe(
+  type: ReportTarget,
+  id: string,
+): Promise<{ authorId: string; text: string; media: MediaRef | null; url: string | null; hidden: boolean; anonymous?: boolean } | null> {
   if (type === 'post') {
     const [p] = await db
       .select({ p: schema.posts, m: schema.media })
@@ -49,11 +52,20 @@ async function describe(type: ReportTarget, id: string): Promise<{ authorId: str
       .leftJoin(schema.media, eq(schema.media.id, schema.posts.mediaId))
       .where(eq(schema.posts.id, id))
       .limit(1);
-    return p ? { authorId: p.p.authorId, text: p.p.text, media: p.m ? mediaRef(p.m) : null, url: `/p/${id}`, hidden: !!p.p.hiddenAt } : null;
+    return p
+      ? { authorId: p.p.authorId, text: p.p.text, media: p.m ? mediaRef(p.m) : null, url: `/p/${id}`, hidden: !!p.p.hiddenAt, anonymous: p.p.anonymous }
+      : null;
   }
   if (type === 'comment') {
-    const [c] = await db.select().from(schema.comments).where(eq(schema.comments.id, id)).limit(1);
-    return c ? { authorId: c.authorId, text: c.text, media: null, url: `/p/${c.postId}`, hidden: !!c.hiddenAt } : null;
+    const [c] = await db
+      .select({ c: schema.comments, post: { authorId: schema.posts.authorId, anonymous: schema.posts.anonymous } })
+      .from(schema.comments)
+      .innerJoin(schema.posts, eq(schema.posts.id, schema.comments.postId))
+      .where(eq(schema.comments.id, id))
+      .limit(1);
+    // Commentaire de l'auteur d'un post anonyme sur ce post : signé « Anonyme · auteur ».
+    const anonymous = !!c && c.post.anonymous && c.post.authorId === c.c.authorId;
+    return c ? { authorId: c.c.authorId, text: c.c.text, media: null, url: `/p/${c.c.postId}`, hidden: !!c.c.hiddenAt, anonymous } : null;
   }
   if (type === 'story') {
     const [s] = await db
@@ -116,7 +128,7 @@ export default async function socialRoutes(app: FastifyInstance) {
     const page = Math.max(0, Number((req.query as { page?: string }).page ?? 0) || 0);
     if (raw.replace(/^#/, '').length < 2) return { posts: [], users: [] };
     const circle = uuidArray([me.id, ...(await friendIds(me.id))]);
-    const visible = sql`(p.author_id = any(${circle}) or p.kind = 'meme')`;
+    const visible = sql`(p.author_id = any(${circle}) or p.kind = 'meme' or p.anonymous)`;
 
     if (raw.startsWith('#')) {
       const tag = raw.slice(1).toLowerCase().replace(/[^\p{L}\p{N}_]/gu, '');
@@ -224,7 +236,8 @@ export default async function socialRoutes(app: FastifyInstance) {
       .values({ reporterId: me.id, targetType: body.targetType, targetId: body.targetId, reason: body.reason })
       .onConflictDoNothing()
       .returning();
-    if (body.block) await block(me, target!.authorId);
+    // Bloquer l'auteur d'un contenu anonyme le ferait apparaître dans « Comptes bloqués » : jamais.
+    if (body.block && !target!.anonymous) await block(me, target!.authorId);
     if (!inserted.length) return { ok: true, hidden: target!.hidden };
 
     const [{ n }] = await db
@@ -275,6 +288,7 @@ export default async function socialRoutes(app: FastifyInstance) {
         hidden: t.hidden,
         authorSuspended: !!author?.suspendedAt,
         createdAt: new Date(r.first).toISOString(),
+        ...(t.anonymous ? { anonymous: true } : {}),
       });
     }
     return cases;
