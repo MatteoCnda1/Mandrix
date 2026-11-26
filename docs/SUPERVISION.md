@@ -77,15 +77,17 @@ Journal : `/var/log/mandrix-restore-check.log` dans le LXC.
 `mandrix-auto-deploy.sh` tourne dans le LXC : toutes les 5 minutes, si `main` a avancé sur GitHub, il copie le
 nouveau code dans `/opt/mandrix` et reconstruit. Les PR n'étant fusionnées qu'avec une CI verte, `main` est toujours testée.
 
-Le dépôt est privé : il faut une **clé de déploiement en lecture seule**, à créer par le propriétaire du dépôt.
+Le dépôt est public : le script le récupère en HTTPS, sans clé ni compte GitHub.
 
 ```bash
 # Dans le LXC 107
-ssh-keygen -t ed25519 -N '' -C mandrix-deploy -f /root/.ssh/mandrix_deploy
-cat /root/.ssh/mandrix_deploy.pub
-# → GitHub, dépôt Mandrix › Settings › Deploy keys › Add deploy key (lecture seule)
+apt-get install -y git
 install -m 644 /opt/mandrix/deploy/homelab/mandrix-auto-deploy.service /opt/mandrix/deploy/homelab/mandrix-auto-deploy.timer /etc/systemd/system/
 systemctl daemon-reload && systemctl enable --now mandrix-auto-deploy.timer
 ```
 
 Journal : `journalctl -u mandrix-auto-deploy`.
+
+Si le dépôt redevenait privé : créer une clé en lecture seule (`ssh-keygen -t ed25519 -N '' -C mandrix-deploy -f
+/root/.ssh/mandrix_deploy`), l'ajouter dans GitHub › Settings › Deploy keys, et passer `REPO=git@github.com:MatteoCnda1/Mandrix.git`
+au service ; le script utilise la clé dès qu'elle existe.
