@@ -12,7 +12,8 @@ On y poste, on vote, on joue ; et toute la semaine, on prend des photos avec **L
 qui restent scellées (même pour leur auteur) jusqu'au **dimanche 20h**, heure du **Déballage** collectif.
 
 - Public : le propriétaire du projet et ses amis. Le site n'est pas ouvert au public : pas de démarche RGPD.
-- Inscription uniquement sur **parrainage** (code personnel dans le profil, lien `/?parrain=CODE`).
+- Inscription uniquement sur **parrainage** (code personnel dans le profil, lien `/?parrain=CODE`). Seuls quelques membres
+  parrainent (`users.can_invite`, depuis le 26/11/2026) ; voir « Profil et compte ».
 - Maquette d'origine : `Mandrix.dc.html` (Landing, Fil, Reels, Make It Friends, Galerie des mèmes, Pellicule, Déballage, Profil, Messages, notifications).
 
 ## 2. Choix techniques
@@ -177,6 +178,12 @@ puis podium des mèmes les plus aimés.
 ### Profil et compte
 Statistiques, série, amis, code de parrainage (`InviteCard`), mode sombre, installation guidée, modération (admin).
 
+**Parrainage restreint** : seuls les membres avec `can_invite` ont une carte de parrainage (code, lien, QR code) ;
+`GET /api/me/invite` répond 403 aux autres et `findSponsor` n'accepte que le code d'un parrain autorisé et non suspendu.
+Le tout premier compte parraine d'office ; les autres s'activent à la main :
+`docker compose exec app node server/dist/cli.js invite <pseudo|email> on|off` (`off` efface aussi le code, donc les
+liens déjà partagés). Le code « maître » `INVITE_CODE` du `.env`, s'il est défini, reste une autre porte d'entrée.
+
 **Tous les membres** (#93, onglet de la feuille Amis, `GET /api/users/directory?q=&page=`) : cartes façon Instagram (photo, nom,
 ville, bio, amis en commun, posts et amis, bouton Ajouter). Demandes reçues d'abord, puis non-amis par amis en commun, puis demandes
 envoyées et amis ; bloqués et suspendus exclus ; recherche sans accents (`server/src/lib/text.ts`, partagé avec la recherche dans
@@ -321,6 +328,7 @@ déploiement automatique facultatif (dépôt public : aucune clé à créer), al
 | `0010_share_replies_group_photo` | réponses aux commentaires (`parent_id`), photo de groupe, post épinglé du profil |
 | `0012_story_music` | musique des stories (`music_media_id`, `music`) |
 | `0011_guess_whois` | « Qui a pris ça ? » (`shot_guesses`, `guess_rounds`), questions de « Qui de nous… ? » (`whois_questions`) |
+| `0013_can_invite` | droit de parrainer (`users.can_invite`, faux par défaut) |
 
 ## 9. Pistes ouvertes
 

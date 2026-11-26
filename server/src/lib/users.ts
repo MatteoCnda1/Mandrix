@@ -42,6 +42,7 @@ export function toMe(u: typeof users.$inferSelect): Me {
     city: u.city,
     bio: u.bio,
     isAdmin: u.isAdmin,
+    canInvite: u.canInvite,
     createdAt: u.createdAt.toISOString(),
     notificationPrefs: u.notificationPrefs ?? {},
     showPresence: u.showPresence,

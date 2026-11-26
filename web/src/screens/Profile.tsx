@@ -104,10 +104,12 @@ function Row({ icon, label, onClick, right, danger }: { icon: ReactNode; label: 
   );
 }
 
+/** Carte de parrainage (code, lien, QR code) : seulement pour les membres autorisés à parrainer. */
 function InviteCard() {
-  const { data } = useInvite();
+  const { data: me } = useMe();
+  const { data } = useInvite(!!me?.canInvite);
   const [qr, setQr] = useState(false);
-  if (!data) return null;
+  if (!me?.canInvite || !data) return null;
   const copy = () => navigator.clipboard?.writeText(data.code).then(() => toast('Code copié'));
   const share = async () => {
     const text = `Rejoins-moi sur Mandrix ! Mon code de parrainage : ${data.code}`;

@@ -64,6 +64,8 @@ export default async function authRoutes(app: FastifyInstance) {
     if (existing[0]) fail(409, existing[0].email === body.email ? 'Cette adresse e-mail a déjà un compte' : 'Ce pseudo est déjà pris');
 
     const isAdmin = count === 0 || env.adminEmails.includes(body.email);
+    // Le parrainage est réservé à quelques membres : le tout premier compte, puis ceux qu'on autorise (CLI `invite`).
+    const canInvite = count === 0;
     const [user] = await db
       .insert(schema.users)
       .values({
@@ -72,10 +74,11 @@ export default async function authRoutes(app: FastifyInstance) {
         email: body.email,
         passwordHash: await hashPassword(body.password),
         isAdmin,
+        canInvite,
         invitedBy: sponsor?.id ?? null,
       })
       .returning();
-    await ensureInviteCode(user.id, user.username);
+    if (canInvite) await ensureInviteCode(user.id, user.username);
     if (sponsor) {
       // Parrain et filleul deviennent amis d'office : le fil du nouveau venu n'est pas vide.
       await db.insert(schema.friendships).values({ requesterId: sponsor.id, addresseeId: user.id, status: 'accepted' }).onConflictDoNothing();

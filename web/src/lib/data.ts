@@ -123,7 +123,9 @@ export const useMessages = (id: string) =>
 export const useNotifications = (enabled = true) =>
   useQuery({ queryKey: ['notifications'], queryFn: () => api<AppNotification[]>('/api/notifications'), enabled });
 export const useBadges = () => useQuery({ queryKey: ['badges'], queryFn: () => api<Badges>('/api/badges'), refetchInterval: 120_000 });
-export const useInvite = () => useQuery({ queryKey: ['invite'], queryFn: () => api<InviteInfo>('/api/me/invite'), staleTime: 5 * 60_000 });
+/** Code de parrainage : seulement pour les membres autorisés à parrainer (sinon 403). */
+export const useInvite = (enabled: boolean) =>
+  useQuery({ queryKey: ['invite'], queryFn: () => api<InviteInfo>('/api/me/invite'), staleTime: 5 * 60_000, enabled });
 export const useReports = (enabled: boolean) =>
   useQuery({ queryKey: ['reports'], queryFn: () => api<ReportedItem[]>('/api/admin/reports'), enabled });
 

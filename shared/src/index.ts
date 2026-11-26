@@ -21,6 +21,8 @@ export interface Me extends UserLite {
   city: string | null;
   bio: string | null;
   isAdmin: boolean;
+  /** Peut parrainer (code, lien et QR code) : réservé à quelques membres. */
+  canInvite: boolean;
   createdAt: string;
   notificationPrefs: NotificationPrefs;
   showPresence: boolean;
