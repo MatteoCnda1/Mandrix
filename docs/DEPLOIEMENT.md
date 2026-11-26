@@ -90,8 +90,9 @@ Le plan gratuit limite chaque envoi à 100 Mo, d'où `MAX_UPLOAD_MB=100`.
 
 - Le **premier compte créé** sur l'instance devient administrateur (modération du pool) et s'inscrit sans code.
   Les e-mails listés dans `ADMIN_EMAILS` deviennent aussi administrateurs à l'inscription.
-- Ensuite, **l'inscription se fait par parrainage** : chaque membre a un code dans son profil
-  (bouton « Inviter » = lien `https://…/?parrain=CODE`). Le filleul devient automatiquement ami avec son parrain.
+- Ensuite, **l'inscription se fait par parrainage** : les membres autorisés à parrainer (le premier compte, puis ceux
+  qu'on active avec `cli.js invite`) ont un code dans leur profil (bouton « Inviter » = lien `https://…/?parrain=CODE`).
+  Le filleul devient automatiquement ami avec son parrain.
 - `INVITE_CODE` (optionnel) est un code « maître » accepté en plus des codes de parrainage.
 
 Commandes utiles :
@@ -99,6 +100,7 @@ Commandes utiles :
 ```bash
 docker compose exec app node server/dist/cli.js users                      # liste des comptes
 docker compose exec app node server/dist/cli.js make-admin <pseudo|email>  # promouvoir un admin
+docker compose exec app node server/dist/cli.js invite <pseudo|email> on|off  # droit de parrainer (off efface le code)
 docker compose exec app node server/dist/cli.js reset-password <pseudo|email> [nouveau-mdp]
 docker compose logs -f app                                                 # journaux
 ```

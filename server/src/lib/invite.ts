@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 
 // Sans 0/O ni 1/I/L pour éviter les confusions quand on recopie un code.
@@ -33,11 +33,12 @@ export async function ensureInviteCode(userId: string, username: string): Promis
   throw new Error('Impossible de générer un code de parrainage');
 }
 
+/** Parrain d'un code : seulement un membre autorisé à parrainer et non suspendu. */
 export async function findSponsor(code: string) {
   const [u] = await db
     .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
     .from(schema.users)
-    .where(eq(schema.users.inviteCode, normalizeCode(code)))
+    .where(and(eq(schema.users.inviteCode, normalizeCode(code)), eq(schema.users.canInvite, true), isNull(schema.users.suspendedAt)))
     .limit(1);
   return u ?? null;
 }

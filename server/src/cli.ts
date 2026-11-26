@@ -2,6 +2,7 @@
 import { eq, or } from 'drizzle-orm';
 import { db, schema, sql } from './db/index.js';
 import { hashPassword, randomToken } from './lib/auth.js';
+import { ensureInviteCode } from './lib/invite.js';
 import { importPool } from './lib/poolImport.js';
 
 const [cmd, arg, arg2, arg3] = process.argv.slice(2);
@@ -34,6 +35,19 @@ async function main() {
       console.log(`@${u.username} est maintenant administrateur.`);
       break;
     }
+    case 'invite': {
+      // Le parrainage est réservé à quelques membres. « off » efface aussi le code : les liens déjà partagés ne marchent plus.
+      if (!arg || (arg2 !== 'on' && arg2 !== 'off')) throw new Error('Usage : invite <email|pseudo> on|off');
+      const u = await findUser(arg);
+      if (arg2 === 'on') {
+        await db.update(schema.users).set({ canInvite: true }).where(eq(schema.users.id, u.id));
+        console.log(`@${u.username} peut parrainer (code ${await ensureInviteCode(u.id, u.username)}).`);
+      } else {
+        await db.update(schema.users).set({ canInvite: false, inviteCode: null }).where(eq(schema.users.id, u.id));
+        console.log(`@${u.username} ne peut plus parrainer ; son code est supprimé.`);
+      }
+      break;
+    }
     case 'import-pool': {
       // Toutes les images d'un dossier rejoignent le pool du jeu (public par défaut), au nom d'un membre.
       if (!arg || !arg2) throw new Error('Usage : import-pool <dossier> <email|pseudo> [public|friends]');
@@ -45,12 +59,16 @@ async function main() {
       break;
     }
     case 'users': {
-      const rows = await db.select({ username: schema.users.username, email: schema.users.email, admin: schema.users.isAdmin }).from(schema.users);
+      const rows = await db
+        .select({ username: schema.users.username, email: schema.users.email, admin: schema.users.isAdmin, parrain: schema.users.canInvite })
+        .from(schema.users);
       console.table(rows);
       break;
     }
     default:
-      console.log('Commandes : reset-password <email|pseudo> [mdp] · make-admin <email|pseudo> · users · import-pool <dossier> <email|pseudo> [public|friends]');
+      console.log(
+        'Commandes : reset-password <email|pseudo> [mdp] · make-admin <email|pseudo> · invite <email|pseudo> on|off · users · import-pool <dossier> <email|pseudo> [public|friends]',
+      );
   }
 }
 

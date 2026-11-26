@@ -52,8 +52,9 @@ npm run db:up      # PostgreSQL de dev sur le port 5433
 npm run dev        # API sur :3000 + PWA sur http://localhost:5173
 ```
 
-Le premier compte créé est administrateur. Ensuite, l'inscription se fait sur parrainage : chaque membre
-trouve son code dans son profil (lien de partage `/?parrain=CODE`), et parrain et filleul deviennent amis.
+Le premier compte créé est administrateur. Ensuite, l'inscription se fait sur parrainage : les membres autorisés à
+parrainer trouvent leur code dans leur profil (lien de partage `/?parrain=CODE`), et parrain et filleul deviennent amis.
+Le droit de parrainer se donne ou se retire avec `npm run cli -w server -- invite <pseudo> on|off`.
 
 Autres commandes :
 

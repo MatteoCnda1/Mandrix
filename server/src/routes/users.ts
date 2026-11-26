@@ -77,6 +77,7 @@ export default async function userRoutes(app: FastifyInstance) {
 
   app.get('/api/me/invite', async (req): Promise<InviteInfo> => {
     const me = requireUser(req);
+    if (!me.canInvite) fail(403, 'Le parrainage est réservé à certains membres');
     const code = await ensureInviteCode(me.id, me.username);
     const [r] = await db.execute<{ n: number }>(sql`select count(*)::int as n from users where invited_by = ${me.id}`);
     return { code, link: `${env.appUrl}/?parrain=${encodeURIComponent(code)}`, invited: r?.n ?? 0 };
