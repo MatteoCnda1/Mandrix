@@ -230,7 +230,8 @@ Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli
 
 Secrets : le mot de passe PostgreSQL et le jeton du tunnel Cloudflare sont **uniquement** dans le `.env` du serveur. Ne jamais les commiter ni les afficher.
 
-**Déployer** (le dépôt GitHub est privé, pas de `git clone` sur le serveur) :
+**Déployer** depuis le poste, par `git archive` (le serveur n'a pas de copie Git du dépôt ; le déploiement automatique
+de SUPERVISION.md §4, non installé, peut s'en charger) :
 
 ```bash
 git archive --format=tar main | gzip | ssh pve 'cat > /tmp/mandrix-src.tgz \
@@ -257,13 +258,16 @@ Cause de fond : la place des fichiers supprimés dans les conteneurs n'est pas r
 le 26/11). Depuis le 26/11, `homelab-fstrim.timer` le fait chaque dimanche sur tous les conteneurs (voir SUPERVISION.md).
 
 **Supervision** (#18) : watchdog NAS/disque/pool LVM/site sur le Proxmox, restauration test hebdomadaire des sauvegardes,
-déploiement automatique facultatif (clé de déploiement GitHub), alertes en push chez les admins. Voir [SUPERVISION.md](SUPERVISION.md).
+déploiement automatique facultatif (dépôt public : aucune clé à créer), alertes en push chez les admins. Voir [SUPERVISION.md](SUPERVISION.md).
 
 ## 6. Qualité et flux de travail
 
 - **CI GitHub Actions** (`.github/workflows/ci.yml`) sur `main` et chaque PR : types (serveur + PWA), tests d'API Vitest sur PostgreSQL 17 + ffmpeg, build, image Docker.
 - Tests : `server/test/` (auth, posts, pellicule, messages, vidéo, jeu). Helpers : `useApp`, `resetDb`, `register`, `makeUser`, `befriend`, `upload`, `jpeg`.
-- Branches + PR, puis **merge manuel une fois la CI verte** : GitHub refuse l'auto-merge sur ce dépôt privé (offre gratuite). Ensuite on redéploie `main`.
+- Branches + PR, puis **merge manuel une fois la CI verte** (pas d'auto-merge sur ce dépôt). Ensuite on redéploie `main`.
+- **Dépôt public** depuis le 26/11/2026 (https://github.com/MatteoCnda1/Mandrix) : tout ce qui est commité est lisible
+  par tous. Jamais de secret ni de `.env` réel dans le dépôt, seulement des valeurs d'exemple (`.env.example`) et les
+  identifiants de la base de test de la CI. L'historique a été vérifié au passage en public : aucun secret.
 - Un collaborateur (Solal-Kruczynski) ouvre aussi des PR (logo #19).
 - Commits en français, messages descriptifs.
 
@@ -296,6 +300,9 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 - Supprimer un fichier média : passer par `mediaReferenced()` (`server/src/lib/media.ts`), la même règle que le ménage nocturne.
 - Le navigateur intégré de l'app Claude n'enregistre pas de service worker sur `localhost` : à vérifier sur téléphone.
 - `gh pr update-branch` n'existe pas ici : `gh api -X PUT repos/MatteoCnda1/Mandrix/pulls/<n>/update-branch`.
+- **CI refusée** (« recent account payments have failed or your spending limit needs to be increased ») : tant que le
+  dépôt était privé, GitHub Actions bloquait les jobs pour facturation (26/11/2026). Le dépôt public a des minutes
+  gratuites. Relancer une exécution : `gh run rerun <id>` ou `gh workflow run ci.yml --ref <branche>`.
 
 ## 8. Migrations
 
@@ -318,4 +325,5 @@ déploiement automatique facultatif (clé de déploiement GitHub), alertes en pu
 ## 9. Pistes ouvertes
 
 Les issues #1 à #18 sont traitées. Restent à faire à la main : l'audit VoiceOver / TalkBack sur téléphone (#16) et,
-pour le déploiement automatique (#18), la clé de déploiement GitHub en lecture seule (voir SUPERVISION.md).
+l'installation, facultative, du déploiement automatique (#18), qui n'a plus besoin de clé GitHub depuis que le dépôt
+est public (voir SUPERVISION.md).

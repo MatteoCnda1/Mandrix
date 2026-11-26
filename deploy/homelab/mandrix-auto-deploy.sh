@@ -1,13 +1,17 @@
 #!/bin/sh
 # Déploiement automatique (dans le LXC Mandrix, toutes les 5 minutes via mandrix-auto-deploy.timer) :
 # si la branche main du dépôt GitHub a avancé, on copie le nouveau code dans /opt/mandrix et on
-# reconstruit. Le dépôt étant privé, il faut une clé de déploiement en lecture seule
-# (voir docs/SUPERVISION.md). Les PR ne sont fusionnées qu'une fois la CI verte.
+# reconstruit. Le dépôt est public : récupération en HTTPS, sans clé (voir docs/SUPERVISION.md).
+# Les PR ne sont fusionnées qu'une fois la CI verte.
 set -eu
-REPO=${REPO:-git@github.com:MatteoCnda1/Mandrix.git}
+REPO=${REPO:-https://github.com/MatteoCnda1/Mandrix.git}
 SRC=/opt/mandrix-src
 DEST=/opt/mandrix
-export GIT_SSH_COMMAND="ssh -i /root/.ssh/mandrix_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+# Clé de déploiement, seulement si le dépôt redevient privé (REPO en git@github.com:…).
+KEY=/root/.ssh/mandrix_deploy
+if [ -f "$KEY" ]; then
+  export GIT_SSH_COMMAND="ssh -i $KEY -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+fi
 
 [ -d "$SRC/.git" ] || git clone --quiet --branch main "$REPO" "$SRC"
 git -C "$SRC" fetch --quiet origin main
