@@ -248,7 +248,9 @@ le nom du fichier change à chaque compilation, `__BUILD_ID__`), le NAS est joig
 **Incident du 24 novembre 2026** : pool `pve/data` plein à 100 % pendant un `docker compose build` → écritures refusées
 sur tous les disques, LXC 107 en `emergency_ro` (PostgreSQL ne pouvait plus écrire), erreurs sur 102 et 104. Réparé par
 `lvextend -L +12G pve/data` (66,2 Go ; il reste ~2,75 Go libres dans le groupe `pve`), `pct stop 107 && pct fsck 107 --force 1
-&& pct start 107`, nettoyage Docker et `pct fstrim 107`. Le pool est surréservé (96 Go de disques déclarés pour 66 Go réels).
+&& pct start 107`, nettoyage Docker et `pct fstrim 107`. Le pool est surréservé (82 Go de disques déclarés pour 66 Go réels).
+Cause de fond : la place des fichiers supprimés dans les conteneurs n'est pas rendue au pool sans `fstrim` (8,7 Go pour Plex
+le 26/11). Depuis le 26/11, `homelab-fstrim.timer` le fait chaque dimanche sur tous les conteneurs (voir SUPERVISION.md).
 
 **Supervision** (#18) : watchdog NAS/disque/pool LVM/site sur le Proxmox, restauration test hebdomadaire des sauvegardes,
 déploiement automatique facultatif (clé de déploiement GitHub), alertes en push chez les admins. Voir [SUPERVISION.md](SUPERVISION.md).
