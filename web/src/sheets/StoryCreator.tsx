@@ -4,6 +4,7 @@ import { Avatar, Portal, cx, useFilePicker } from '../components/ui';
 import { api, errMsg, upload } from '../lib/api';
 import { useCamera } from '../lib/camera';
 import { isAnimated } from '../lib/image';
+import { checkVideoLength } from '../lib/videoCheck';
 import { qc, useConfig, useMe } from '../lib/data';
 import { useObjectUrl } from '../lib/hooks';
 import { useScrollLock } from '../lib/scrollLock';
@@ -59,6 +60,7 @@ function CameraStep({ onPicked }: { onPicked: (p: Picked) => void }) {
   const maxMb = config?.maxUploadMb ?? 100;
   const accept = async (f: File) => {
     if (f.size > maxMb * 1024 * 1024) return toast(`Fichier trop volumineux (max ${maxMb} Mo)`, 'error');
+    if (!(await checkVideoLength(f, 'story'))) return;
     onPicked({ blob: f, kind: f.type.startsWith('video/') ? 'video' : (await isAnimated(f)) ? 'animated' : 'image' });
   };
   const gallery = useFilePicker('image/*,video/mp4,video/webm,video/quicktime', accept);

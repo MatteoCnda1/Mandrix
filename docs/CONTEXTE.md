@@ -86,6 +86,10 @@ docs/     DEPLOIEMENT.md (guide générique), logo/ (masters SVG), ce fichier
 Vidéos verticales plein écran, défilement tactile, molette et clavier.
 
 ### Vidéos (issue #1)
+**Durée maximale** (`VIDEO_LIMITS` dans `shared`) : 3 min pour un post ou un message, 1 min pour une story. Vérifiée sur le
+téléphone dès le choix du fichier (`web/src/lib/videoCheck.ts`) puis par le serveur (ffprobe à l'envoi, refus 413 avec la raison ;
+`POST /api/stories` refuse au-delà d'1 min).
+
 Toute vidéo envoyée passe par une **file de transcodage** (une à la fois pour ménager le CPU) :
 H.264 720p max, 30 i/s (`-fpsmax 30`), AAC, `+faststart`, miniature WebP, durée.
 Statut `processing → ready | failed` (en cas d'échec on garde l'original). Le socket `media:ready` rafraîchit l'interface.
@@ -123,6 +127,10 @@ celles des joueurs et de leurs amis, au plus la moitié du paquet). Invitations 
 (#90, `/retro`, `server/src/lib/retro.ts`) Diapositives plein écran : posts et j'aime reçus, post le plus aimé, Pellicule (série record),
 mèmes, Qui a pris ça ?, messages et acolyte, réaction préférée, amis, mois le plus actif, chiffres de la bande. Carte sur le fil du
 1er décembre au 31 janvier (`retroYear()` dans `shared`), ligne « Ma rétro » dans le profil, notification `retro` le 1er décembre à 10 h.
+
+**Images en entier** : dans le jeu (légende, vote, gagnant), le mème du jour, la galerie et les mèmes du fil, l'image n'est
+jamais rognée (`WholeMedia` / `TapMedia whole` dans `web/src/components`) : cadre au format de l'image (9:16 à 1,91:1),
+hauteur plafonnée, fond flouté dans les bandes.
 
 ### Galerie des mèmes
 Classement de la **saison** (mois en cours : somme des `memes.score`, parties et mèmes du jour, + 20 points par bonne réponse à

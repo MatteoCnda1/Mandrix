@@ -484,6 +484,41 @@ export function ratioOf(m: MediaRef | null, fallback = '4 / 5') {
   return String(r);
 }
 
+/** Format d'un média montré en entier : le sien, entre 9:16 et 1,91:1 (4:3 s'il est inconnu). */
+export function wholeRatio(media: MediaRef) {
+  return String(media.width && media.height ? Math.min(1.91, Math.max(0.5625, media.width / media.height)) : 4 / 3);
+}
+
+/**
+ * Image ou vidéo montrée **en entier** (jeu, mèmes) : le cadre prend le format du média (9:16 à 1,91:1),
+ * sa hauteur est plafonnée, et les bandes éventuelles sont remplies par un fond flouté du média.
+ */
+export function WholeMedia({
+  media,
+  className,
+  autoPlay,
+  sizes,
+  maxH = 'min(58svh, 520px)',
+  children,
+}: {
+  media: MediaRef;
+  className?: string;
+  autoPlay?: boolean;
+  sizes?: string;
+  maxH?: string;
+  children?: ReactNode;
+}) {
+  const ratio = wholeRatio(media);
+  const backdrop = media.kind === 'video' ? media.poster : media.url;
+  return (
+    <div className={cx('relative w-full overflow-hidden rounded-3xl bg-[#0b0f14]', className)} style={{ aspectRatio: ratio, maxHeight: maxH }}>
+      {backdrop && <img src={backdrop} alt="" aria-hidden loading="lazy" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-2xl" />}
+      <MediaView media={media} fit="contain" autoPlay={autoPlay} sizes={sizes} className="relative" />
+      {children}
+    </div>
+  );
+}
+
 /** Hauteur maximale d'une photo ou vidéo dans le fil : jamais plus haute qu'une bonne part de l'écran. */
 export const POST_MEDIA_MAX_H = 'min(64svh, 560px)';
 

@@ -4,13 +4,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { MultipartFile } from '@fastify/multipart';
-import type { MediaRef } from '@mandrix/shared';
+import { videoTooLong, type MediaRef } from '@mandrix/shared';
 import sharp, { type OutputInfo } from 'sharp';
 import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { mediaDir } from '../env.js';
 import { fail } from './http.js';
-import { enqueueVideo, transcodeVoice } from './video.js';
+import { enqueueVideo, probe, transcodeVoice } from './video.js';
 
 /**
  * Condition SQL « ce média sert encore » (post, carrousel, sondage, story récente, Pellicule, pool, mème,
@@ -226,6 +226,13 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
     fail(413, 'Fichier trop volumineux');
   }
   const { size } = await fs.stat(abs);
+  // Durée lue tout de suite : une vidéo trop longue est refusée avec la raison, avant toute conversion.
+  const info = await probe(abs);
+  const tooLong = videoTooLong(info.duration, 'post');
+  if (tooLong) {
+    await fs.rm(abs, { force: true });
+    fail(413, tooLong);
+  }
   const [row] = await db
     .insert(schema.media)
     .values({
@@ -236,8 +243,9 @@ export async function saveUpload(file: MultipartFile, ownerId: string, opts: Sav
       path: path.join(rel, `${id}.mp4`),
       sourcePath: sourceRel,
       status: 'processing',
-      width: null,
-      height: null,
+      width: info.width,
+      height: info.height,
+      duration: info.duration,
       size,
       sealedUntil: opts.sealedUntil ?? null,
     })

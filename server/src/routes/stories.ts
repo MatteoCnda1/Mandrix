@@ -1,4 +1,4 @@
-import type { StoryGroup, StoryView } from '@mandrix/shared';
+import { videoTooLong, type StoryGroup, type StoryView } from '@mandrix/shared';
 import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -58,6 +58,8 @@ export default async function storyRoutes(app: FastifyInstance) {
     const [m] = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
     if (!m || m.ownerId !== me.id) fail(404, 'Média introuvable');
     if (m!.kind === 'audio') fail(400, 'Une story est une photo ou une vidéo');
+    const tooLong = m!.kind === 'video' ? videoTooLong(m!.duration, 'story') : null;
+    if (tooLong) fail(400, tooLong);
     const [s] = await db
       .insert(stories)
       .values({ authorId: me.id, mediaId, expiresAt: new Date(Date.now() + 24 * 3600_000) })

@@ -49,7 +49,7 @@ export function Memes() {
           {items.map((m) => (
             <article key={m.id} className="card flex flex-col gap-2.5 p-3">
               <div className="grid min-h-11 place-items-center px-1.5 py-0.5 text-center text-[1.0625rem] leading-tight font-extrabold tracking-[-.02em] text-balance">{m.text}</div>
-              <TapMedia post={m} ratio="4 / 3" className="rounded-[20px]" sizes="(max-width: 600px) 100vw, 340px" />
+              <TapMedia post={m} ratio="4 / 3" whole className="rounded-[20px]" sizes="(max-width: 600px) 100vw, 340px" />
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap truncate border-0 bg-transparent pl-1 text-[0.8125rem] text-mute">
                   Légende de {m.author.displayName}
