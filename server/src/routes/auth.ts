@@ -11,6 +11,7 @@ import { mailEnabled, sendMail } from '../lib/mail.js';
 import { notify } from '../lib/notify.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { toMe } from '../lib/users.js';
+import { plexEnabled } from '../lib/plex.js';
 
 const password = z.string().min(8, 'Le mot de passe doit faire au moins 8 caractères').max(200);
 const username = z
@@ -43,6 +44,7 @@ export default async function authRoutes(app: FastifyInstance) {
     revealHour: env.revealHour,
     roundSeconds: env.roundSeconds,
     maxUploadMb: env.maxUploadMb,
+    music: plexEnabled(),
   }));
 
   app.post('/api/auth/register', limited, async (req, reply) => {

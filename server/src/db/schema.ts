@@ -1,4 +1,15 @@
 import type { NotificationPrefs } from '@mandrix/shared';
+
+/** Informations gardées avec l'extrait musical d'une story. */
+export interface StoryMusicInfo {
+  trackId: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  coverMediaId: string | null;
+  start: number;
+  duration: number;
+}
 import {
   boolean,
   date,
@@ -222,6 +233,9 @@ export const stories = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     authorId: uuid('author_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     mediaId: uuid('media_id').notNull().references(() => media.id, { onDelete: 'cascade' }),
+    /** Musique de la story : extrait audio découpé (AAC) et ses informations (titre, artiste, pochette). */
+    musicMediaId: uuid('music_media_id').references(() => media.id, { onDelete: 'set null' }),
+    music: jsonb('music').$type<StoryMusicInfo>(),
     hiddenAt: ts('hidden_at'),
     createdAt: created(),
     expiresAt: ts('expires_at').notNull(),

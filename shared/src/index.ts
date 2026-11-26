@@ -292,6 +292,40 @@ export interface Story {
   views: number | null;
   /** Dans le pool de Make It Friends (public ou amis), sinon null. */
   pool: PoolScope | null;
+  /** Musique (stories photo) : extrait à lire et ce qu'on affiche. */
+  music: StoryMusic | null;
+}
+
+export interface StoryMusic {
+  title: string;
+  artist: string;
+  cover: MediaRef | null;
+  clip: MediaRef;
+  /** Durée de l'extrait (secondes) : la photo reste affichée tout ce temps. */
+  duration: number;
+}
+
+// ——— Musique (Plex) ———
+
+/** Longueurs d'extrait proposées pour une story (secondes). */
+export const MUSIC_CLIP_LENGTHS = [15, 30] as const;
+
+export interface MusicTrack {
+  id: ID;
+  title: string;
+  artist: string;
+  album: string | null;
+  /** Durée du titre en secondes. */
+  duration: number;
+  /** Pochette servie par Mandrix (null sans pochette). */
+  cover: string | null;
+}
+
+/** Musique choisie pour une story : le titre et le passage. */
+export interface StoryMusicChoice {
+  trackId: ID;
+  start: number;
+  duration: (typeof MUSIC_CLIP_LENGTHS)[number];
 }
 
 export interface StoryView {
@@ -622,6 +656,8 @@ export interface AppConfig {
   revealHour: number;
   roundSeconds: number;
   maxUploadMb: number;
+  /** Bibliothèque musicale (Plex) branchée : musique possible sur les stories. */
+  music: boolean;
 }
 
 export interface InviteInfo {

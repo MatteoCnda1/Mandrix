@@ -1,5 +1,5 @@
 import type { StoryView } from '@mandrix/shared';
-import { CheckCircle, Eye, PaperPlaneRight, Sticker, Trash, X } from '@phosphor-icons/react';
+import { CheckCircle, Eye, MusicNotes, PaperPlaneRight, SpeakerHigh, SpeakerSlash, Sticker, Trash, X } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar, MediaView, Sheet, confirmAction } from '../components/ui';
@@ -44,6 +44,13 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
   const halted = paused || poolOpen;
   // État « dans le pool » lu en direct (la liste affichée est figée à l'ouverture).
   const pool = live?.flatMap((g) => g.stories).find((s) => s.id === story?.id)?.pool ?? story?.pool ?? null;
+  // Musique (#104) : la photo reste affichée le temps de l'extrait, qui joue en même temps.
+  const music = story?.media.kind === 'image' ? (story.music ?? null) : null;
+  const storyMs = music ? music.duration * 1000 : IMAGE_MS;
+  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const [muted, setMuted] = useState(false);
+  /** Le navigateur a refusé le son sans geste : un bouton propose de l'activer. */
+  const [needsTap, setNeedsTap] = useState(false);
 
   const next = () => {
     if (!groups || !group) return close();
@@ -85,7 +92,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
       // Écart plafonné : une app restée en arrière-plan ne saute pas plusieurs stories au retour.
       elapsed.current += Math.min(250, Math.max(0, now - last));
       last = now;
-      const p = elapsed.current / IMAGE_MS;
+      const p = elapsed.current / storyMs;
       if (p >= 1) {
         clearInterval(t);
         nextRef.current();
@@ -114,6 +121,18 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
         v.play().catch(() => {});
       });
   }, [halted, story?.id]);
+
+  // Extrait musical : joue avec la story, s'arrête avec elle (pause, appui long, feuille ouverte).
+  useEffect(() => {
+    const a = musicRef.current;
+    if (!a || !music) return;
+    if (halted) return void a.pause();
+    a.muted = muted;
+    a.play().then(
+      () => setNeedsTap(false),
+      () => setNeedsTap(true),
+    );
+  }, [halted, story?.id, muted, !!music]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -187,6 +206,33 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
           videoRef={videoRef}
           className="absolute inset-0"
         />
+        {music && (
+          <>
+            <audio key={story.id} ref={musicRef} src={music.clip.url} loop preload="auto" />
+            {/* Pastille de la musique : pochette, titre, artiste ; son coupé ou à activer. */}
+            <div className="absolute top-[84px] left-[18px] z-[1] flex max-w-[calc(100%-36px)] items-center gap-2 rounded-full bg-black/45 py-1 pr-1 pl-1 text-white backdrop-blur">
+              {music.cover ? <img src={music.cover.url} alt="" className="h-8 w-8 flex-none rounded-full object-cover motion-safe:animate-[spin_8s_linear_infinite]" /> : <MusicNotes size={18} className="ml-1.5 flex-none" />}
+              <span className="min-w-0 truncate text-[0.8125rem] font-bold">
+                {music.title} <span className="font-semibold text-white/70">· {music.artist}</span>
+              </span>
+              <button
+                type="button"
+                aria-label={needsTap ? 'Activer le son' : muted ? 'Remettre le son' : 'Couper le son'}
+                onClick={() => {
+                  if (needsTap) {
+                    musicRef.current?.play().then(
+                      () => setNeedsTap(false),
+                      () => {},
+                    );
+                  } else setMuted(!muted);
+                }}
+                className="tap grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white"
+              >
+                {needsTap || muted ? <SpeakerSlash size={15} weight="bold" /> : <SpeakerHigh size={15} weight="bold" />}
+              </button>
+            </div>
+          </>
+        )}
         <div className="absolute top-3.5 right-[18px] left-[18px] flex gap-1">
           {group.stories.map((s, i) => (
             <div key={s.id} className="h-1 flex-1 overflow-hidden rounded-sm bg-white/20">
