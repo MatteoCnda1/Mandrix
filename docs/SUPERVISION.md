@@ -41,6 +41,23 @@ pour chaque conteneur (rend la place libérée au pool), puis si besoin `lvexten
 **Disque en lecture seule** : libérer ou agrandir le pool d'abord, puis `pct stop 107 && pct fsck 107 --force 1 && pct start 107`.
 Journal : `journalctl -t mandrix-watchdog`.
 
+## 2 bis. fstrim hebdomadaire des conteneurs (dimanche 4 h 30)
+
+Un fichier supprimé dans un conteneur (transcodage Plex, téléchargements, construction Docker…) reste compté comme
+occupé dans le pool LVM « thin » `pve/data` : Proxmox ne rend pas tout seul cette place. `homelab-fstrim.sh` lance
+`pct fstrim --ignore-mountpoints` sur chaque conteneur en marche (repli par `nsenter … fstrim /` quand `pct` refuse,
+comme le 105) et note l'état du pool. Ne supprime aucun fichier. Premier passage le 26/11/2026 : 30 Go rendus,
+pool de 88 % à 60 %.
+
+```bash
+install -m 755 deploy/homelab/homelab-fstrim.sh /usr/local/sbin/homelab-fstrim
+install -m 644 deploy/homelab/homelab-fstrim.service deploy/homelab/homelab-fstrim.timer /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now homelab-fstrim.timer
+systemctl start homelab-fstrim.service   # passage immédiat
+```
+
+Journal : `journalctl -t homelab-fstrim`.
+
 ## 3. Restauration test des sauvegardes (chaque lundi à 5 h)
 
 `mandrix-restore-check.sh` restaure la dernière sauvegarde `mandrix-AAAA-MM-JJ.dump` dans une base jetable,

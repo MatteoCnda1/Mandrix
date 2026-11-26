@@ -1,0 +1,8 @@
+[Unit]
+Description=Rend au pool LVM thin la place libérée dans les conteneurs (pct fstrim)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/homelab-fstrim
+Nice=10
+IOSchedulingClass=idle
