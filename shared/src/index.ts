@@ -718,7 +718,8 @@ export const GAME = {
   minPlayers: 2,
   roundOptions: [3, 5, 7] as const,
   shufflesPerRound: 3,
-  voteSecondsPerMeme: 12,
+  /** Temps pour noter chaque mème (tout le monde note le même en même temps). */
+  voteSecondsPerMeme: 15,
   captionMax: 90,
   ratings: [
     { value: 0, label: 'Bof', points: 10 },
@@ -795,6 +796,7 @@ export interface GamePlayer {
   roundScore: number;
   connected: boolean;
   submitted: boolean;
+  /** Vote en cours : a noté le mème affiché (ou en est l'auteur). */
   voted: boolean;
 }
 
@@ -819,8 +821,10 @@ export interface GameRoom {
   round: number;
   deadline: string | null;
   me: { image: PoolImage | null; caption: string | null; shufflesLeft: number; memeId: ID | null; published: boolean };
-  /** Mèmes à noter (vote) ou de la manche (results). */
+  /** Mèmes de la manche (résultats). */
   memes: GameMeme[];
+  /** Vote : tout le monde note le même mème, en même temps ; on passe au suivant quand tous ont voté. */
+  vote: { index: number; total: number; meme: GameMeme; voted: number; voters: number } | null;
   winner: GameMeme | null;
   error: string | null;
 }
