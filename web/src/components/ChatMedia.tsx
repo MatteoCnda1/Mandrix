@@ -1,5 +1,5 @@
 import type { MediaRef } from '@mandrix/shared';
-import { Pause, Play, X } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, Pause, Play, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { useSwipeDown } from '../lib/gestures';
 import { useScrollLock } from '../lib/scrollLock';
@@ -82,7 +82,7 @@ export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean })
         aria-label={playing ? 'Mettre en pause' : 'Écouter le message vocal'}
         onClick={toggle}
         className={cx(
-          'tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 transition-transform active:scale-90',
+          'tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 transition-transform active:scale-90',
           mine ? 'bg-white text-brand' : 'bg-brand text-white',
         )}
       >
@@ -100,7 +100,7 @@ export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean })
           />
         ))}
       </div>
-      <span className={cx('w-9 flex-none text-right text-xs font-bold tabular-nums', mine ? 'text-white/90' : 'text-mute')}>
+      <span className={cx('w-9 flex-none text-right text-xs font-bold tabular-nums', mine ? 'text-white' : 'text-mute')}>
         {fmtDuration(playing || time ? time : duration) ?? '0:00'}
       </span>
       {(playing || time > 0) && (
@@ -109,7 +109,8 @@ export function VoicePlayer({ media, mine }: { media: MediaRef; mine: boolean })
           onClick={nextRate}
           aria-label={`Vitesse de lecture ${rateLabel(rate)}, toucher pour changer`}
           className={cx(
-            'tap h-6 flex-none rounded-full border-0 px-2 text-[0.6875rem] font-extrabold tabular-nums',
+            // Pastille de 24 px, cible de 44 px (pseudo-élément) : elle se touche sans viser.
+            "tap relative h-6 flex-none rounded-full border-0 px-2 text-[0.6875rem] font-extrabold tabular-nums after:absolute after:-inset-x-1 after:-inset-y-2.5 after:content-['']",
             mine ? 'bg-white/25 text-white' : 'bg-ink/10 text-ink',
           )}
         >
@@ -187,6 +188,13 @@ export function MediaLightbox({ media: start, onClose, gallery }: { media: Media
   const go = (d: number) => gallery && setIndex((i) => Math.max(0, Math.min(gallery.length - 1, i + d)));
   const swipe = useSwipeDown(onClose);
   useScrollLock();
+  // Clavier et lecteur d'écran : le focus va sur « Fermer », puis revient d'où il venait.
+  const closeBtn = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    closeBtn.current?.focus({ preventScroll: true });
+    return () => prev?.focus?.({ preventScroll: true });
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -199,8 +207,13 @@ export function MediaLightbox({ media: start, onClose, gallery }: { media: Media
   return (
     <Portal>
       <div
-        className="fixed inset-0 z-[55] grid animate-fade place-items-center p-2"
-        style={{ background: `rgba(0,0,0,${0.95 * (1 - Math.min(swipe.dy, 300) / 400)})` }}
+        className="fixed inset-0 z-[55] grid animate-fade place-items-center px-2"
+        style={{
+          background: `rgba(0,0,0,${0.95 * (1 - Math.min(swipe.dy, 300) / 400)})`,
+          // Encoche et indicateur d'accueil : les commandes de la vidéo restent atteignables.
+          paddingTop: 'calc(8px + env(safe-area-inset-top))',
+          paddingBottom: 'calc(8px + env(safe-area-inset-bottom))',
+        }}
         role="dialog"
         aria-modal="true"
         aria-label={media.kind === 'video' ? 'Vidéo' : 'Photo'}
@@ -219,21 +232,47 @@ export function MediaLightbox({ media: start, onClose, gallery }: { media: Media
           )}
         </div>
         <button
+          ref={closeBtn}
           type="button"
           aria-label="Fermer"
           onClick={onClose}
-          className="tap absolute right-4 grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur"
+          className="tap absolute right-4 grid h-11 w-11 place-items-center rounded-full border-0 bg-black/45 text-white backdrop-blur"
           style={{ top: 'calc(14px + env(safe-area-inset-top))' }}
         >
           <X size={20} />
         </button>
         {gallery && gallery.length > 1 && (
           <span
-            className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1.5 text-sm font-bold text-white tabular-nums backdrop-blur"
+            className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-black/45 px-3 py-1.5 text-sm font-bold text-white tabular-nums backdrop-blur"
             style={{ top: 'calc(20px + env(safe-area-inset-top))' }}
           >
             {index + 1}/{gallery.length}
           </span>
+        )}
+        {/* Souris (bureau) : flèches précédente / suivante ; au doigt, on glisse. */}
+        {gallery && gallery.length > 1 && (
+          <>
+            {index > 0 && (
+              <button
+                type="button"
+                aria-label="Photo précédente"
+                onClick={(e) => (e.stopPropagation(), go(-1))}
+                className="tap absolute top-1/2 left-4 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full border-0 bg-black/45 text-white backdrop-blur pointer-fine:grid"
+              >
+                <CaretLeft size={20} weight="bold" />
+              </button>
+            )}
+            {index < gallery.length - 1 && (
+              <button
+                type="button"
+                aria-label="Photo suivante"
+                onClick={(e) => (e.stopPropagation(), go(1))}
+                className="tap absolute top-1/2 right-4 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full border-0 bg-black/45 text-white backdrop-blur pointer-fine:grid"
+              >
+                <CaretRight size={20} weight="bold" />
+              </button>
+            )}
+          </>
         )}
       </div>
     </Portal>

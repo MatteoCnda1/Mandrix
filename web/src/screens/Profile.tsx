@@ -23,17 +23,18 @@ import {
   ShieldCheck,
   SignOut,
   Sun,
+  User,
   UsersThree,
 } from '@phosphor-icons/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ReactionPicker } from '../components/Reactions';
 import { openReport } from '../components/Report';
-import { Avatar, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx } from '../components/ui';
-import { api, errMsg } from '../lib/api';
+import { Avatar, EmptyCard, ErrorCard, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx } from '../components/ui';
+import { api, ApiError, errMsg } from '../lib/api';
 import { logout, qc, useFriends, useInvite, useMe, useProfile, useReports, useUserPosts } from '../lib/data';
 import { useSwipeX } from '../lib/gestures';
-import { usePullToRefresh, type Point } from '../lib/hooks';
+import { usePullToRefresh, useSentinel, type Point } from '../lib/hooks';
 import { isStandalone } from '../lib/push';
 import { disconnectSocket } from '../lib/socket';
 import { openSheet, toast, useUI } from '../lib/store';
@@ -47,12 +48,15 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'memes', label: 'Mèmes' },
 ];
 
+const TILE_KIND: Record<string, string> = { photo: 'Photo', video: 'Vidéo', poll: 'Sondage', meme: 'Mème' };
+
 function Tile({ post, ratio, pinned = false }: { post: Post; ratio: string; pinned?: boolean }) {
   const nav = useNavigate();
   return (
     <button
       type="button"
       onClick={() => nav(`/p/${post.id}`)}
+      aria-label={`${pinned ? 'Post épinglé · ' : ''}${post.text || TILE_KIND[post.kind] || 'Post'}`}
       className="tap ph relative grid place-items-center overflow-hidden rounded-[20px] border-0 p-0 font-mono text-xs text-phink transition-[aspect-ratio] duration-[400ms]"
       style={{ aspectRatio: ratio }}
     >
@@ -131,21 +135,24 @@ function InviteCard() {
         </span>
         <div className="min-w-0">
           <div className="text-lg font-extrabold">Parraine tes amis</div>
-          <div className="text-[0.8125rem] text-white/80">
+          <div className="text-[0.8125rem] text-white">
             {data.invited > 0 ? `${data.invited} ami${data.invited > 1 ? 's' : ''} parrainé${data.invited > 1 ? 's' : ''}` : 'Ils deviennent tes amis dès leur inscription'}
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 rounded-[26px] bg-card p-2 pl-4 text-ink">
-        <span className="min-w-0 flex-1 truncate font-mono text-[1.0625rem] font-bold tracking-wider">{data.code}</span>
-        <button type="button" aria-label="Copier le code" onClick={copy} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
-          <Copy size={18} />
-        </button>
-        <button type="button" aria-label="Afficher le QR code" onClick={() => setQr(true)} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
-          <QrCode size={18} />
-        </button>
-        <button type="button" aria-label="Partager l’invitation" onClick={share} className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
-          <ShareNetwork size={18} /> Inviter
+      {/* Le code entier reste lisible sur téléphone : « Inviter » passe sur sa propre ligne. */}
+      <div className="flex flex-col gap-2 rounded-[26px] bg-card p-2 text-ink">
+        <div className="flex items-center gap-2 pl-2">
+          <span className="min-w-0 flex-1 font-mono text-[1.0625rem] font-bold tracking-wider break-all">{data.code}</span>
+          <button type="button" aria-label="Copier le code" onClick={copy} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
+            <Copy size={18} />
+          </button>
+          <button type="button" aria-label="Afficher le QR code" onClick={() => setQr(true)} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-ink active:scale-90">
+            <QrCode size={18} />
+          </button>
+        </div>
+        <button type="button" onClick={share} className="tap flex h-11 items-center justify-center gap-1.5 rounded-[22px] border-0 bg-ink px-3.5 text-sm font-bold text-inv active:scale-[.97]">
+          <ShareNetwork size={18} /> Inviter un ami
         </button>
       </div>
       {qr && <QrSheet link={data.link} code={data.code} onClose={() => setQr(false)} />}
@@ -164,7 +171,7 @@ function QrSheet({ link, code, onClose }: { link: string; code: string; onClose:
     <Sheet title="Inviter avec un QR code" onClose={onClose}>
       <div className="flex flex-col items-center gap-3 pb-2">
         <div className="grid aspect-square w-[min(280px,70vw)] place-items-center rounded-[28px] bg-white p-3 shadow-pill">
-          {src ? <img src={src} alt={`QR code du lien d’invitation (code ${code})`} className="h-full w-full" /> : <span className="text-sm text-mute">Préparation…</span>}
+          {src ? <img src={src} alt={`QR code du lien d’invitation (code ${code})`} className="h-full w-full" /> : <span className="text-sm text-[#52606f]">Préparation…</span>}
         </div>
         <div className="font-mono text-lg font-bold tracking-wider">{code}</div>
         <p className="m-0 text-center text-[0.9375rem] text-mute">Ton ami scanne le code avec l’appareil photo de son téléphone : il arrive sur l’inscription avec ton parrainage.</p>
@@ -268,7 +275,11 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
       toast(errMsg(e), 'error');
     }
   };
-  const { data: posts, isLoading } = useUserPosts(profile.username, tab);
+  const userPosts = useUserPosts(profile.username, tab);
+  const { isLoading, isError } = userPosts;
+  const first = userPosts.data?.pages[0];
+  const posts = first && { locked: first.locked, pinned: first.pinned, items: userPosts.data!.pages.flatMap((pg) => pg.items) };
+  const sentinel = useSentinel(() => userPosts.hasNextPage && !userPosts.isFetchingNextPage && userPosts.fetchNextPage(), !!userPosts.hasNextPage);
   const ti = TABS.findIndex((t) => t.id === tab);
   const tabSwipe = useSwipeX((dir) => setTab(TABS[Math.min(TABS.length - 1, Math.max(0, ti - dir))].id), { threshold: 60 });
   const ratio = tab === 'reels' ? '9 / 14' : '1';
@@ -337,7 +348,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
           <div className="flex items-center gap-3 rounded-[22px] bg-soft p-3.5">
             <Prohibit size={22} className="flex-none text-heart" />
             <span className="flex-1 text-sm font-semibold">Tu as bloqué @{profile.username}.</span>
-            <button type="button" onClick={() => void unblock()} className="tap h-10 rounded-[20px] border-0 bg-card px-3.5 text-[0.8125rem] font-bold text-ink">
+            <button type="button" onClick={() => void unblock()} className="tap h-11 flex-none rounded-[22px] border-0 bg-card px-3.5 text-[0.8125rem] font-bold text-ink">
               Débloquer
             </button>
           </div>
@@ -370,17 +381,24 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             [profile.stats.posts, 'Posts', undefined],
             [profile.stats.friends, 'Amis', isMe ? () => openSheet('friends') : undefined],
             [profile.stats.memesWon, 'Mèmes gagnés', undefined],
-          ].map(([n, l, onClick]) => (
-            <button
-              key={l as string}
-              type="button"
-              onClick={onClick as (() => void) | undefined}
-              className={cx('rounded-[22px] border-0 bg-soft px-3.5 py-3 text-left text-ink', onClick ? 'tap' : 'cursor-default')}
-            >
-              <div className="text-[1.375rem] font-extrabold">{n as number}</div>
-              <div className="text-[0.8125rem] text-mute">{l as string}</div>
-            </button>
-          ))}
+          ].map(([n, l, onClick]) => {
+            const body = (
+              <>
+                <div className="text-[1.375rem] font-extrabold">{n as number}</div>
+                <div className="text-[0.8125rem] leading-tight text-mute">{l as string}</div>
+              </>
+            );
+            const cls = 'min-w-0 rounded-[22px] border-0 bg-soft px-3.5 py-3 text-left text-ink';
+            return onClick ? (
+              <button key={l as string} type="button" onClick={onClick as () => void} className={cx(cls, 'tap')}>
+                {body}
+              </button>
+            ) : (
+              <div key={l as string} className={cls}>
+                {body}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -404,7 +422,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
           </div>
         </div>
         {isMe && (
-          <button type="button" onClick={toggleDark} className="tap card flex items-center gap-3 border-0 p-[18px] text-left text-ink">
+          <button type="button" role="switch" aria-checked={dark} onClick={toggleDark} className="tap card flex items-center gap-3 border-0 p-[18px] text-left text-ink">
             <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-soft">{dark ? <Sun size={22} /> : <Moon size={22} />}</span>
             <span className="flex-1 text-lg font-extrabold">Mode sombre</span>
             <Switch on={dark} />
@@ -425,6 +443,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
+            aria-pressed={t.id === tab}
             className={cx('tap relative h-[46px] rounded-3xl border-0 bg-transparent text-sm font-bold transition-colors duration-300', t.id === tab ? 'text-inv' : 'text-ink')}
           >
             {t.label}
@@ -445,6 +464,8 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
               <div key={i} className="skel rounded-[20px]" style={{ aspectRatio: ratio }} />
             ))}
           </div>
+        ) : isError && !posts ? (
+          <ErrorCard onRetry={() => void userPosts.refetch()} />
         ) : posts?.items.length === 0 && !posts.pinned ? (
           <div className="card p-8 text-center text-sm text-mute">{tab === 'memes' ? 'Aucun mème publié.' : tab === 'reels' ? 'Aucune vidéo.' : 'Aucun post pour l’instant.'}</div>
         ) : (
@@ -453,6 +474,8 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             {posts?.items.map((p) => <Tile key={p.id} post={p} ratio={ratio} />)}
           </div>
         )}
+        <div ref={sentinel} aria-hidden />
+        {userPosts.isFetchingNextPage && <div className="py-3 text-center text-sm text-mute">Chargement…</div>}
       </div>
     </div>
   );
@@ -462,8 +485,9 @@ export function Profile() {
   const { username } = useParams();
   const { data: me } = useMe();
   const target = username ?? me?.username ?? '';
-  const { data: profile, isLoading, error } = useProfile(target);
+  const { data: profile, isLoading, error, refetch } = useProfile(target);
   if (isLoading || !me) return <ScreenLoader />;
-  if (error || !profile) return <div className="card p-8 text-center text-[0.9375rem] text-mute">Utilisateur introuvable.</div>;
+  if (error && !(error instanceof ApiError && error.status === 404)) return <ErrorCard onRetry={() => void refetch()} />;
+  if (!profile) return <EmptyCard icon={<User size={28} />} title="Utilisateur introuvable" text="Ce compte n’existe pas ou n’est plus disponible." />;
   return <ProfileView key={profile.id} profile={profile} isMe={profile.id === me.id} />;
 }

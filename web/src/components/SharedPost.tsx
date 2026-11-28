@@ -8,7 +8,7 @@ export function SharedPostCard({ post, mine }: { post: SharedPost | null; mine: 
   const nav = useNavigate();
   if (!post) {
     return (
-      <span className={cx('block w-[min(240px,62vw)] rounded-[18px] px-3 py-2.5 text-sm italic', mine ? 'bg-white/15 text-white/90' : 'bg-card/70 text-mute')}>
+      <span className={cx('block w-[min(240px,62vw)] rounded-[18px] px-3 py-2.5 text-sm italic', mine ? 'bg-black/15 text-white' : 'bg-card/70 text-mute')}>
         Ce post n’est plus disponible
       </span>
     );
@@ -19,7 +19,8 @@ export function SharedPostCard({ post, mine }: { post: SharedPost | null; mine: 
       type="button"
       onClick={() => nav(`/p/${post.id}`)}
       aria-label={post.anonymous ? 'Voir le post anonyme' : `Voir le post de ${post.author.displayName}`}
-      className={cx('tap block w-[min(240px,62vw)] overflow-hidden rounded-[18px] border-0 p-0 text-left', mine ? 'bg-white/15 text-white' : 'bg-card text-ink')}
+      // Dans ma bulle bleue : un voile sombre (et non clair) garde le texte blanc lisible (6:1 au lieu de 3,7:1).
+      className={cx('tap block w-[min(240px,62vw)] overflow-hidden rounded-[18px] border-0 p-0 text-left', mine ? 'bg-black/15 text-white' : 'bg-card text-ink')}
     >
       <span className="flex items-center gap-2 px-2.5 py-2">
         <Avatar user={post.author} size={24} anonymous={post.anonymous} />
@@ -42,7 +43,7 @@ export function SharedPostCard({ post, mine }: { post: SharedPost | null; mine: 
         </span>
       ) : (
         post.kind === 'poll' && (
-          <span className={cx('mx-2.5 flex items-center gap-1.5 text-xs font-bold', mine ? 'text-white/80' : 'text-mute')}>
+          <span className={cx('mx-2.5 flex items-center gap-1.5 text-xs font-bold', mine ? 'text-white' : 'text-mute')}>
             <ChartBar size={16} weight="bold" /> Sondage
           </span>
         )

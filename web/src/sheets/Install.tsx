@@ -25,7 +25,7 @@ export function InstallSheet() {
           </div>
           <div className={step}>
             <span className={num}>3</span>
-            <span className="flex-1">Ouvre Mandrix depuis l’icône, puis active les notifications dans ton profil</span>
+            <span className="flex-1">Ouvre Mandrix depuis l’icône, puis active les notifications dans Réglages</span>
           </div>
         </>
       ) : (

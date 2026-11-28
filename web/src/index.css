@@ -72,7 +72,8 @@ html[data-theme='dark'] {
   --color-brand: #0e76c6;
   --color-brand2: #2a9df4;
   --color-azure: #1a8de6;
-  --color-heart: #e5484d;
+  /* Rouge des actions destructives et du cœur : texte blanc dessus et texte rouge sur blanc ≥ 4,5:1. */
+  --color-heart: #d1373c;
   --color-heartlite: #ff6b70;
   --color-ice: #6fc0ff;
   --color-ember: #ff8a5c;
@@ -272,7 +273,7 @@ html[data-theme='dark'] {
     color: var(--mute);
   }
   &:focus {
-    box-shadow: inset 0 0 0 2px #0e76c6;
+    box-shadow: inset 0 0 0 2px var(--acc);
   }
 }
 
@@ -552,13 +553,6 @@ html[data-theme='dark'] {
       linear-gradient(180deg, #3d3f7c, #ff9e6b);
   }
 
-  /* Accessibilité (HIG) : « Réduire la transparence » rend les surfaces opaques. */
-  @media (prefers-reduced-transparency: reduce) {
-    :root {
-      --glass-card: var(--card);
-      --glass: var(--card);
-    }
-  }
   *,
   *::before,
   *::after {
@@ -579,8 +573,26 @@ html[data-theme='dark'] {
     display: block;
   }
   :focus-visible {
-    outline: 2px solid #0e76c6;
+    /* --acc : bleu foncé en clair, bleu clair en sombre (≥ 3:1 sur les cartes dans les deux thèmes). */
+    outline: 2px solid var(--acc);
     outline-offset: 2px;
+  }
+}
+
+/* Accessibilité (HIG) : « Réduire la transparence » rend les surfaces opaques, dans les deux thèmes.
+ * Hors couche et après les jetons : une règle dans @layer base perdrait contre les jetons non classés. */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  html[data-theme='dark'] {
+    --glass-card: var(--card);
+    --glass: var(--card);
+  }
+}
+
+@layer utilities {
+  /* Mode sombre : le rouge foncé des textes (Supprimer, erreurs, cœur aimé) passe sous 4,5:1 sur les cartes sombres. */
+  :root[data-theme='dark'] .text-heart {
+    color: #ff6b70;
   }
 }
 

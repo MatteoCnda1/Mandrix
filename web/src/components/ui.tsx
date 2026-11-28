@@ -1,5 +1,5 @@
 import type { MediaRef, UserLite } from '@mandrix/shared';
-import { ArrowClockwise, CircleNotch, Detective, X } from '@phosphor-icons/react';
+import { ArrowClockwise, CircleNotch, Detective, WifiSlash, X } from '@phosphor-icons/react';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { lockScroll } from '../lib/scrollLock';
@@ -30,7 +30,8 @@ export function Logo({ size = 42, className }: { size?: number; className?: stri
   );
 }
 
-const TONES = ['bg-tint text-ink', 'bg-ink text-inv', 'bg-azure text-white'];
+// Bleu « brand » plutôt qu'« azure » : initiales blanches lisibles (4,7:1 au lieu de 3,5:1).
+const TONES = ['bg-tint text-ink', 'bg-ink text-inv', 'bg-brand text-white'];
 
 export function Avatar({ user, size = 44, ring, className, anonymous }: { user: Pick<UserLite, 'initials' | 'tone' | 'avatarUrl' | 'displayName' | 'birthdayToday'>; size?: number; ring?: boolean; className?: string; anonymous?: boolean }) {
   const style: CSSProperties = { width: size, height: size, fontSize: Math.round(size * 0.34) };
@@ -74,7 +75,8 @@ export function Seg<T extends string | number>({ options, value, onChange, class
           onClick={() => onChange(o.value)}
           className={cx(
             'tap flex-1 border-0 font-bold transition-colors duration-300',
-            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-10 rounded-[20px] px-3 text-[0.8125rem]',
+            // 44 px de haut dans les deux tailles (HIG) ; la petite taille resserre le texte et les marges.
+            size === 'md' ? 'h-11 rounded-[22px] px-4 text-sm' : 'h-11 rounded-[22px] px-2 text-[0.8125rem] leading-tight',
             o.value === value ? 'bg-ink text-inv' : 'bg-transparent text-ink',
           )}
         >
@@ -95,6 +97,12 @@ export function Switch({ on }: { on: boolean }) {
     </span>
   );
 }
+
+/** Feuilles ouvertes, de la plus ancienne à celle du dessus : seule la dernière répond au clavier. */
+const sheetStack: number[] = [];
+let sheetSeq = 0;
+/** Une confirmation ou un menu est ouvert par-dessus : c'est lui qui gère Échap et Tab. */
+const overlayAbove = () => !!document.querySelector('[role="alertdialog"], [role="menu"]');
 
 /** Feuille du bas (HIG) : poignée, fermeture par glissement vers le bas, Échap ou tap sur le fond. */
 export function Sheet({
@@ -118,13 +126,17 @@ export function Sheet({
   const drag = useRef<{ y: number; t: number } | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
+  const sheetId = useRef(0);
+  const isTop = () => sheetStack[sheetStack.length - 1] === sheetId.current && !overlayAbove();
 
   // Lecteur d'écran et clavier : le focus entre dans la feuille, y reste, et revient d'où il venait.
   useEffect(() => {
+    sheetId.current = ++sheetSeq;
+    sheetStack.push(sheetId.current);
     const prev = document.activeElement as HTMLElement | null;
     panel.current?.focus({ preventScroll: true });
     const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !panel.current) return;
+      if (e.key !== 'Tab' || !panel.current || !isTop()) return;
       const items = panel.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])');
       if (!items.length) return;
       const first = items[0];
@@ -140,13 +152,15 @@ export function Sheet({
     window.addEventListener('keydown', trap);
     return () => {
       window.removeEventListener('keydown', trap);
+      sheetStack.splice(sheetStack.indexOf(sheetId.current), 1);
       prev?.focus?.({ preventScroll: true });
     };
   }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      // Échap ferme la feuille du dessus seulement (pas celle d'en dessous, ni sous une confirmation).
+      if (e.key !== 'Escape' || !isTop()) return;
       if (lockedRef.current) onLockedClose?.();
       else onClose();
     };
@@ -256,7 +270,8 @@ export function Sheet({
         ref={panel}
         tabIndex={-1}
         className={cx(
-          'no-scrollbar relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] outline-none w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)]',
+          // `*:shrink-0` : quand le contenu dépasse, la feuille défile au lieu d'écraser champs et boutons.
+          'no-scrollbar relative flex max-h-[calc(var(--vvh,100dvh)*0.9)] outline-none w-full flex-col gap-3 overflow-auto overscroll-contain rounded-t-[32px] bg-card px-4 pt-2.5 text-ink shadow-[0_-10px_40px_rgba(11,15,20,.2)] *:shrink-0',
           wide ? 'max-w-[640px]' : 'max-w-[560px]',
         )}
         style={{
@@ -288,6 +303,19 @@ export function Sheet({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Bas de feuille collant (bouton principal, champ de saisie) : il reste visible quand une longue liste défile.
+ * Les marges annulent le bas de la feuille (`18px + --safe-b`) pour garder l'indicateur d'accueil dégagé.
+ */
+export function SheetFooter({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    // Le collant se cale sur le bas du contenu (marge intérieure exclue) : `bottom` négatif pour toucher le bord de la feuille.
+    <div className={cx('sticky -bottom-[calc(18px+var(--safe-b))] z-[1] -mx-4 -mb-[calc(18px+var(--safe-b))] flex flex-col gap-2 bg-card px-4 pt-2 pb-[calc(18px+var(--safe-b))]', className)}>
+      {children}
+    </div>
   );
 }
 
@@ -412,7 +440,7 @@ export function Toast() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed left-1/2 z-[85] flex h-12 max-w-[calc(100vw-32px)] items-center gap-2 rounded-3xl bg-hero px-[18px] text-sm font-bold whitespace-nowrap text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
+      className="pointer-events-none fixed left-1/2 z-[85] flex min-h-12 w-max max-w-[min(440px,calc(100vw-32px))] items-center gap-2 rounded-3xl bg-hero px-[18px] py-3 text-sm font-bold text-white shadow-hero transition-[transform,opacity] duration-[400ms] ease-spring"
       style={{
         bottom: 'calc(var(--toast-bottom, 28px) + env(safe-area-inset-bottom))',
         transform: `translate(-50%, ${t ? '0px' : '20px'})`,
@@ -420,7 +448,8 @@ export function Toast() {
       }}
     >
       <span className={cx('h-2.5 w-2.5 flex-none rounded-full', shown?.tone === 'error' ? 'bg-heartlite' : 'bg-ice')} />
-      <span className="overflow-hidden text-ellipsis">{shown?.msg}</span>
+      {/* Message long (erreur du serveur…) : sur trois lignes au plus, plutôt que coupé au bout d'une. */}
+      <span className="line-clamp-3 leading-snug">{shown?.msg}</span>
     </div>
   );
 }
@@ -598,6 +627,29 @@ export function EmptyCard({ icon, title, text, children }: { icon: ReactNode; ti
       <div className="text-xl font-extrabold tracking-[-.02em]">{title}</div>
       <p className="m-0 max-w-[360px] text-[0.9375rem] leading-normal text-pretty text-mute">{text}</p>
       {children}
+    </div>
+  );
+}
+
+/** Écran ou bloc qui n'a pas pu se charger (réseau coupé, serveur…) : explication et « Réessayer ». */
+export function ErrorCard({ onRetry, title = 'Chargement impossible', text = 'Vérifie ta connexion, puis réessaie.' }: { onRetry: () => void; title?: string; text?: string }) {
+  return (
+    <EmptyCard icon={<WifiSlash size={28} />} title={title} text={text}>
+      <PrimaryBtn onClick={onRetry} className="px-6">
+        Réessayer
+      </PrimaryBtn>
+    </EmptyCard>
+  );
+}
+
+/** Variante en ligne, dans une liste ou une section de réglages. */
+export function ErrorLine({ onRetry, text = 'Chargement impossible.' }: { onRetry: () => void; text?: string }) {
+  return (
+    <div role="alert" className="flex items-center gap-2 px-3 py-1 text-sm text-mute">
+      <span className="min-w-0 flex-1">{text}</span>
+      <button type="button" onClick={onRetry} className="tap h-11 flex-none rounded-[22px] border-0 bg-soft px-3.5 text-[0.8125rem] font-bold text-acc">
+        Réessayer
+      </button>
     </div>
   );
 }

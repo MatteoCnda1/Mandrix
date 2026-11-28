@@ -106,8 +106,11 @@ function Thumb({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <div className="relative h-16 w-16 flex-none overflow-hidden rounded-[16px] bg-soft">
       {url && <img src={url} alt="" className="h-full w-full object-cover" />}
-      <button type="button" aria-label="Retirer la photo" onClick={onRemove} className="tap absolute top-0.5 right-0.5 grid h-6 w-6 place-items-center rounded-full border-0 bg-black/60 text-white">
-        <X size={12} weight="bold" />
+      {/* Cible de 44 px dans le coin de la vignette (la pastille visible reste petite). */}
+      <button type="button" aria-label="Retirer la photo" onClick={onRemove} className="tap absolute top-0 right-0 grid h-11 w-11 place-items-start justify-items-end border-0 bg-transparent p-0.5">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-black/60 text-white">
+          <X size={12} weight="bold" />
+        </span>
       </button>
     </div>
   );
@@ -335,6 +338,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
               onChange={(e) => setText(e.target.value)}
               maxLength={140}
               placeholder="Ajoute une légende, @mentionne un ami, #hashtag…"
+              aria-label="Légende"
             />
             <MentionSuggestions value={text} onChange={setText} inputRef={textRef} className="-mt-1" />
             {anonToggle}
@@ -342,6 +346,8 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
             {!anonymous && (
               <button
                 type="button"
+                role="switch"
+                aria-checked={pool}
                 onClick={() => setPool(!pool)}
                 className="tap flex min-h-14 items-center gap-3 rounded-[28px] border-0 bg-soft px-3.5 py-2 text-left text-sm font-semibold text-ink"
               >
@@ -363,7 +369,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                 { value: 'slider' as const, label: 'Curseur' },
               ]}
             />
-            <input ref={qRef} className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" />
+            <input ref={qRef} className="field font-bold" value={q} onChange={(e) => setQ(e.target.value)} maxLength={90} placeholder="Ta question" aria-label="Question du sondage" />
             <MentionSuggestions value={q} onChange={setQ} inputRef={qRef} className="-mt-1" />
             {pollKind === 'text' && (
               <>
@@ -374,6 +380,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                       value={o}
                       maxLength={30}
                       placeholder={`Option ${i + 1}${i > 1 ? ' (facultatif)' : ''}`}
+                      aria-label={`Option ${i + 1}`}
                       onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
                     />
                     {i > 1 && (
@@ -415,6 +422,7 @@ export function Composer({ mode, initialKind, initialPool }: { mode: 'post' | 's
                       value={opts[i]}
                       maxLength={30}
                       placeholder={`Option ${i + 1}`}
+                      aria-label={`Option ${i + 1}`}
                       onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))}
                     />
                   </div>

@@ -1,6 +1,6 @@
 import { CheckCircle, Copy, ShareNetwork } from '@phosphor-icons/react';
 import { useState } from 'react';
-import { Avatar, PrimaryBtn, Sheet, cx } from '../components/ui';
+import { Avatar, ErrorLine, PrimaryBtn, Sheet, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { useFriends } from '../lib/data';
 import { useGame, useWhois } from '../lib/socket';
@@ -12,7 +12,7 @@ export function InviteSheet() {
   const whois = useWhois((s) => s.room);
   const room = game === 'whois' ? whois : mif;
   const gameName = game === 'whois' ? 'Qui de nous… ?' : 'Make It Friends';
-  const { data } = useFriends();
+  const { data, isLoading, isError, refetch } = useFriends();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   if (!room) return null;
@@ -60,16 +60,18 @@ export function InviteSheet() {
         <button
           type="button"
           aria-label="Copier le code"
-          className="tap ml-auto grid h-10 w-10 place-items-center rounded-full border-0 bg-card text-ink"
+          className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-card text-ink"
           onClick={() => navigator.clipboard?.writeText(room.code).then(() => toast('Code copié'))}
         >
           <Copy size={18} />
         </button>
-        <button type="button" aria-label="Partager" className="tap grid h-10 w-10 place-items-center rounded-full border-0 bg-ink text-inv" onClick={share}>
+        <button type="button" aria-label="Partager" className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-ink text-inv" onClick={share}>
           <ShareNetwork size={18} />
         </button>
       </div>
-      {friends.length === 0 && <p className="m-0 px-1 text-sm text-mute">Tous tes amis sont déjà là — ou ajoute-en depuis ton profil.</p>}
+      {isLoading && <p className="m-0 px-1 text-sm text-mute">Chargement de tes amis…</p>}
+      {isError && !data && <ErrorLine onRetry={() => void refetch()} />}
+      {data && friends.length === 0 && <p className="m-0 px-1 text-sm text-mute">Tous tes amis sont déjà là — ou ajoute-en depuis ton profil.</p>}
       <div className="flex flex-col gap-0.5">
         {friends.map((f) => {
           const on = picked.has(f.id);
@@ -78,6 +80,7 @@ export function InviteSheet() {
               key={f.id}
               type="button"
               onClick={() => toggle(f.id)}
+              aria-pressed={on}
               className={cx('tap flex items-center gap-3 rounded-3xl border-0 p-2 text-left text-ink transition-colors', on ? 'bg-tint' : 'bg-transparent hover:bg-soft')}
             >
               <Avatar user={f} size={44} />

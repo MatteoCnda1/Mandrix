@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api, errMsg } from '../lib/api';
 import { qc, useGuess } from '../lib/data';
 import { toast } from '../lib/store';
-import { Avatar, MediaView, PrimaryBtn, ScreenLoader, cx } from './ui';
+import { Avatar, ErrorCard, PrimaryBtn, ScreenLoader, WholeMedia, cx } from './ui';
 
 const firstName = (name: string) => name.split(' ')[0];
 
@@ -18,10 +18,14 @@ export function GuessRanking({ state, meId }: { state: GuessState; meId: string 
           <span className="w-5 text-mute">{i + 1}</span>
           <Avatar user={r.user} size={30} />
           <span className="min-w-0 flex-1 truncate">{r.user.id === meId ? 'Toi' : r.user.displayName}</span>
-          <span className="text-mute">
-            {r.hits} bonne{r.hits > 1 ? 's' : ''} réponse{r.hits > 1 ? 's' : ''}
+          {/* Sur téléphone, « 3 ✓ » : le prénom garde la place (« 3 bonnes réponses » ne laissait que « M… »). */}
+          <span className="flex-none text-mute tabular-nums" aria-label={`${r.hits} bonne${r.hits > 1 ? 's' : ''} réponse${r.hits > 1 ? 's' : ''}`}>
+            <span aria-hidden className="sm:hidden">{r.hits} ✓</span>
+            <span aria-hidden className="hidden sm:inline">
+              {r.hits} bonne{r.hits > 1 ? 's' : ''} réponse{r.hits > 1 ? 's' : ''}
+            </span>
           </span>
-          <span className="w-14 text-right font-extrabold">{r.score} pts</span>
+          <span className="w-14 flex-none text-right font-extrabold whitespace-nowrap">{r.score} pts</span>
         </li>
       ))}
     </ol>
@@ -33,10 +37,11 @@ export function GuessRanking({ state, meId }: { state: GuessState; meId: string 
  * Le serveur garde les photos cachées tant que le quiz n'est ni fini ni passé.
  */
 export function GuessQuiz({ meId }: { meId: string }) {
-  const { data, isLoading } = useGuess();
+  const { data, isLoading, isError, refetch } = useGuess();
   const [busy, setBusy] = useState(false);
   /** Photo dont on affiche le résultat (avant de passer à la suivante). */
   const [shown, setShown] = useState<string | null>(null);
+  if (isError && !data) return <ErrorCard onRetry={() => void refetch()} />;
   if (isLoading || !data) return <ScreenLoader />;
 
   const set = (s: GuessState) => qc.setQueryData(['guess'], s);
@@ -117,9 +122,8 @@ export function GuessQuiz({ meId }: { meId: string }) {
           {index + 1}/{data.items.length}
         </span>
       </div>
-      <div className="ph mx-auto aspect-[3/4] w-full max-w-[360px] overflow-hidden rounded-[26px]">
-        <MediaView media={current.media} sizes="360px" />
-      </div>
+      {/* Photo en entier : un détail coupé peut être l'indice. */}
+      <WholeMedia key={current.shotId} media={current.media} sizes="360px" maxH="min(52svh, 480px)" className="mx-auto max-w-[360px] rounded-[26px]" />
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Qui a pris cette photo ?">
         {current.options.map((o) => {
           const isAnswer = done && current.answer?.id === o.id;
@@ -147,13 +151,13 @@ export function GuessQuiz({ meId }: { meId: string }) {
       </div>
       {done ? (
         <div className="flex flex-col gap-2" aria-live="polite">
-          <div className={cx('text-center text-[0.9375rem] font-extrabold', right ? 'text-[#1f9d4b]' : 'text-heart')}>
+          <div className={cx('text-center text-[0.9375rem] font-extrabold', right ? 'text-[#1f9d4b] dark:text-[#4ade80]' : 'text-heart')}>
             {right ? `Bien vu ! +${GUESS.pointsPerHit} points` : `Raté : c’était ${current.answer ? firstName(current.answer.displayName) : '…'}`}
           </div>
           <PrimaryBtn onClick={() => setShown(null)}>{answered < data.items.length ? 'Photo suivante' : 'Voir mon score'}</PrimaryBtn>
         </div>
       ) : (
-        <button type="button" disabled={busy} onClick={skip} className="tap self-center border-0 bg-transparent text-sm font-bold text-mute underline underline-offset-4">
+        <button type="button" disabled={busy} onClick={skip} className="tap min-h-11 self-center border-0 bg-transparent px-2 text-sm font-bold text-mute underline underline-offset-4">
           Passer et déballer tout de suite
         </button>
       )}

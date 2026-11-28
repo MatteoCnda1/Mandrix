@@ -38,10 +38,10 @@ export function ReactionPicker({
     const { width, height } = el.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.visualViewport?.height ?? window.innerHeight;
-    const left = Math.min(Math.max(12, at.x - width / 2), vw - width - 12);
-    // Au-dessus du doigt si possible, sinon en dessous.
+    const left = Math.max(12, Math.min(at.x - width / 2, vw - width - 12));
+    // Au-dessus du doigt si possible, sinon en dessous ; toujours dans l'écran.
     const above = at.y - height - 18;
-    const top = above > 12 ? above : Math.min(at.y + 18, vh - height - 12);
+    const top = Math.max(12, above > 12 ? above : Math.min(at.y + 18, vh - height - 12));
     setPos({ left, top });
   }, [at.x, at.y]);
 
@@ -50,6 +50,13 @@ export function ReactionPicker({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Clavier et lecteur d'écran : le focus entre dans le menu et revient d'où il venait.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    ref.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+    return () => prev?.focus?.({ preventScroll: true });
+  }, []);
 
   return (
     <Portal>
@@ -76,7 +83,8 @@ export function ReactionPicker({
                     onClose();
                   }}
                   className={cx(
-                    'tap grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-[1.625rem] leading-none transition-transform hover:scale-125 active:scale-90',
+                    // Sept réactions tiennent aussi sur un écran de 320 px (iPhone SE, zoom d'affichage).
+                    'tap grid h-11 w-[min(44px,calc((100vw-48px)/7))] place-items-center rounded-full border-0 bg-transparent text-[1.625rem] leading-none transition-transform hover:scale-125 active:scale-90',
                     current === e && 'bg-tint',
                   )}
                 >
@@ -114,7 +122,7 @@ export function ReactionPicker({
 }
 
 /** Résumé compact : les trois réactions les plus fréquentes et le total. */
-export function ReactionSummary({ reactions, onClick, className }: { reactions: ReactionCount[]; onClick?: () => void; className?: string }) {
+export function ReactionSummary({ reactions, onClick, className }: { reactions: ReactionCount[]; onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; className?: string }) {
   const total = reactions.reduce((n, r) => n + r.count, 0);
   if (total === 0) return null;
   return (
@@ -122,7 +130,7 @@ export function ReactionSummary({ reactions, onClick, className }: { reactions: 
       type="button"
       onClick={onClick}
       aria-label={`${total} réaction${total > 1 ? 's' : ''} : ${reactions.map((r) => `${r.emoji} ${r.count}`).join(', ')}`}
-      className={cx('tap flex h-8 items-center gap-1 rounded-full border-0 bg-soft px-2.5 text-[0.8125rem] font-bold text-ink', className)}
+      className={cx('tap flex h-11 items-center gap-1 rounded-full border-0 bg-soft px-2.5 text-[0.8125rem] font-bold text-ink', className)}
     >
       <span className="flex -space-x-0.5 text-[0.9375rem] leading-none">
         {reactions.slice(0, 3).map((r) => (

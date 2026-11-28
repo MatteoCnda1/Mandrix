@@ -96,7 +96,7 @@ function NoRoom({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
       options={[
         { value: 'live' as const, label: 'Mèmes en direct' },
         { value: 'jour' as const, label: 'Mème du jour' },
-        { value: 'qdn' as const, label: 'Qui de nous ?' },
+        { value: 'qdn' as const, label: 'Qui de nous ?' },
       ]}
     />
   );
@@ -139,7 +139,7 @@ function NoRoom({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
             if (code.trim()) run('game:join', code.trim());
           }}
         >
-          <input className="field flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code du salon (MDRX-482)" maxLength={8} autoCapitalize="characters" />
+          <input className="field flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="MDRX-482" aria-label="Code du salon" maxLength={8} autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
           <button type="submit" disabled={busy || !connected || !code.trim()} className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[0.9375rem] font-bold text-inv active:scale-95 disabled:bg-line disabled:text-mute">
             Rejoindre
           </button>
@@ -172,7 +172,7 @@ function Lobby({ room, meId }: { room: GameRoom; meId: string }) {
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(room.code).then(() => toast('Code copié'))}
-            className="tap ml-auto flex items-center gap-1.5 rounded-[14px] border-0 bg-soft px-3 py-2 font-mono text-[0.8125rem] font-semibold text-ink"
+            className="tap ml-auto flex min-h-11 items-center gap-1.5 rounded-[16px] border-0 bg-soft px-3 py-2 font-mono text-[0.8125rem] font-semibold text-ink"
             aria-label="Copier le code du salon"
           >
             {room.code} <Copy size={14} />
@@ -246,7 +246,7 @@ function LeaveLink() {
     <button
       type="button"
       onClick={() => gameEmit('game:leave')}
-      className="tap flex items-center gap-1.5 self-center border-0 bg-transparent px-2 py-2 text-sm font-semibold text-mute underline underline-offset-4"
+      className="tap flex min-h-11 items-center gap-1.5 self-center border-0 bg-transparent px-2 py-2 text-sm font-semibold text-mute underline underline-offset-4"
     >
       <SignOut size={16} /> Quitter le salon
     </button>
@@ -286,7 +286,9 @@ function Caption({ room }: { room: GameRoom }) {
         {room.me.image ? (
           <WholeMedia media={room.me.image.media} autoPlay>
             {room.me.image && (
-              <span className="absolute bottom-2.5 left-2.5 flex h-9 items-center rounded-[18px] bg-card px-3 text-[0.8125rem] font-bold text-ink">du pool · {room.me.image.by}</span>
+              <span className="absolute bottom-2.5 left-2.5 flex h-9 max-w-[calc(100%-130px)] items-center rounded-[18px] bg-card px-3 text-[0.8125rem] font-bold text-ink">
+                <span className="truncate">du pool · {room.me.image.by}</span>
+              </span>
             )}
             {!submitted && (
               <>
@@ -487,7 +489,7 @@ function Results({ room, meId }: { room: GameRoom; meId: string }) {
         )}
       </div>
       {final && (
-        <button type="button" onClick={() => nav('/jeu/galerie')} className="tap self-center border-0 bg-transparent text-sm font-bold text-acc underline underline-offset-4">
+        <button type="button" onClick={() => nav('/jeu/galerie')} className="tap min-h-11 self-center border-0 bg-transparent px-2 text-sm font-bold text-acc underline underline-offset-4">
           Voir la galerie des mèmes
         </button>
       )}

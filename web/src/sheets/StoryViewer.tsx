@@ -2,7 +2,7 @@ import type { StoryView } from '@mandrix/shared';
 import { CheckCircle, Eye, MusicNotes, PaperPlaneRight, SpeakerHigh, SpeakerSlash, Sticker, Trash, X } from '@phosphor-icons/react';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, MediaView, Sheet, confirmAction } from '../components/ui';
+import { Avatar, ErrorLine, MediaView, Sheet, confirmAction } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, removeFromPool, useMe, useStories } from '../lib/data';
 import { timeAgo } from '../lib/format';
@@ -136,6 +136,8 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Une feuille (vues, pool, signalement) ou une confirmation par-dessus gère ses propres touches.
+      if (viewersOpen || poolOpen || document.querySelector('[role="alertdialog"], [role="dialog"][aria-modal="true"]:not([aria-label^="Story"])')) return;
       if (e.key === 'Escape') close();
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
       if (e.key === 'ArrowRight') next();
@@ -186,14 +188,15 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
 
   return (
     <div
-      className="fixed inset-x-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.92)] p-3"
-      style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}
+      className="fixed inset-x-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.92)] px-3"
+      // Encoche et indicateur d'accueil : la carte (et le champ de réponse) restent dans la zone sûre.
+      style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)', paddingTop: 'max(12px, env(safe-area-inset-top))', paddingBottom: 'max(12px, var(--safe-b))' }}
       role="dialog"
       aria-modal="true"
       aria-label={`Story de ${group.user.displayName}`}
     >
       <div
-        className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-24px),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]"
+        className="phdark relative grid h-[min(calc(var(--vvh,100dvh)-max(12px,env(safe-area-inset-top))-max(12px,var(--safe-b))),760px)] w-full max-w-[420px] animate-drop place-items-center overflow-hidden rounded-[36px]"
         style={gestures.style}
       >
         <MediaView
@@ -206,6 +209,9 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
           videoRef={videoRef}
           className="absolute inset-0"
         />
+        {/* Voiles : en-tête, barre de progression et champ de réponse lisibles sur une photo claire. */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-black/50 to-transparent" />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black/45 to-transparent" />
         {music && (
           <>
             <audio key={story.id} ref={musicRef} src={music.clip.url} loop preload="auto" />
@@ -226,7 +232,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
                     );
                   } else setMuted(!muted);
                 }}
-                className="tap grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white"
+                className="tap relative grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white after:absolute after:-inset-1.5 after:content-['']"
               >
                 {needsTap || muted ? <SpeakerSlash size={15} weight="bold" /> : <SpeakerHigh size={15} weight="bold" />}
               </button>
@@ -257,23 +263,24 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
         </button>
         <div className="absolute top-[30px] right-3.5 left-[18px] flex items-center gap-2.5 text-white">
           <Avatar user={group.user} size={40} />
-          <span className="text-[0.9375rem] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>
-          <span className="text-[0.8125rem] text-fog">{timeAgo(story.createdAt)}</span>
+          {/* Nom tronqué plutôt que sur plusieurs lignes : les trois boutons gardent leurs 44 px. */}
+          <span className="min-w-0 truncate text-[0.9375rem] font-bold [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{mine ? 'Ta story' : group.user.displayName}</span>
+          <span className="flex-none text-[0.8125rem] whitespace-nowrap text-fog [text-shadow:0_1px_8px_rgba(0,0,0,.4)]">{timeAgo(story.createdAt)}</span>
           <button
             type="button"
             aria-label={pool ? 'Retirer la story du pool' : 'Envoyer la story dans le pool'}
             aria-pressed={!!pool}
             onClick={() => (pool ? void removeFromPool({ storyId: story.id }) : openPool({ storyId: story.id }))}
-            className={`tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 text-white ${pool ? 'bg-brand' : 'bg-white/15'}`}
+            className={`tap ml-auto grid h-11 w-11 flex-none place-items-center rounded-full border-0 text-white ${pool ? 'bg-brand' : 'bg-white/15'}`}
           >
             {pool ? <CheckCircle size={20} weight="fill" /> : <Sticker size={20} />}
           </button>
           {mine && (
-            <button type="button" aria-label="Supprimer la story" onClick={remove} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
+            <button type="button" aria-label="Supprimer la story" onClick={remove} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
               <Trash size={20} />
             </button>
           )}
-          <button type="button" aria-label="Fermer" onClick={close} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">
+          <button type="button" aria-label="Fermer" onClick={close} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
             <X size={20} />
           </button>
         </div>
@@ -297,7 +304,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
                 type="button"
                 aria-label={`Réagir ${e}`}
                 onClick={() => void quickReact(e)}
-                className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-[24px] leading-none backdrop-blur transition-transform active:scale-125"
+                className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-black/25 text-[24px] leading-none backdrop-blur transition-transform active:scale-125"
               >
                 {e}
               </button>
@@ -323,6 +330,7 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
               onFocus={() => setPaused(true)}
               onBlur={() => !reply && setPaused(false)}
               placeholder={`Répondre à ${group.user.displayName}…`}
+              aria-label={`Répondre à ${group.user.displayName}`}
               className="h-12 min-w-0 flex-1 rounded-3xl border-0 bg-white/15 px-[18px] text-base text-white outline-none placeholder:text-white/70"
             />
             <button type="submit" aria-label="Envoyer" className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-white text-night">
@@ -347,11 +355,12 @@ export function StoryViewer({ start }: { start: { group: number; index: number }
 
 /** Qui a vu ma story. */
 function ViewersSheet({ storyId, onClose }: { storyId: string; onClose: () => void }) {
-  const { data, isLoading } = useQuery({ queryKey: ['story-viewers', storyId], queryFn: () => api<StoryView[]>(`/api/stories/${storyId}/viewers`) });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['story-viewers', storyId], queryFn: () => api<StoryView[]>(`/api/stories/${storyId}/viewers`) });
   return (
-    <Sheet title={`Vue par ${data?.length ?? '…'}`} onClose={onClose}>
+    <Sheet title={data ? `Vue par ${data.length}` : 'Vues'} onClose={onClose}>
       <div className="flex flex-col gap-0.5">
         {isLoading && <div className="py-6 text-center text-sm text-mute">Chargement…</div>}
+        {isError && !data && <ErrorLine onRetry={() => void refetch()} />}
         {data?.length === 0 && <div className="py-6 text-center text-sm text-mute">Personne ne l’a encore vue.</div>}
         {data?.map((v) => (
           <div key={v.user.id} className="flex items-center gap-3 rounded-3xl p-2">

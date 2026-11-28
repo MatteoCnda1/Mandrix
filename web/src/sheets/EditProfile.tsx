@@ -63,11 +63,11 @@ export function EditProfileSheet() {
         </span>
       </button>
       <span className={label}>Nom affiché</span>
-      <input className="field" value={displayName} maxLength={40} onChange={(e) => setDisplayName(e.target.value)} />
+      <input className="field" value={displayName} maxLength={40} onChange={(e) => setDisplayName(e.target.value)} aria-label="Nom affiché" autoComplete="name" />
       <span className={label}>Pseudo</span>
-      <input className="field" value={username} maxLength={20} onChange={(e) => setUsername(e.target.value.toLowerCase())} autoCapitalize="none" />
+      <input className="field" value={username} maxLength={20} onChange={(e) => setUsername(e.target.value.toLowerCase())} aria-label="Pseudo" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" />
       <span className={label}>Ville</span>
-      <input className="field" value={city} maxLength={60} placeholder="Aix-en-Provence" onChange={(e) => setCity(e.target.value)} />
+      <input className="field" value={city} maxLength={60} placeholder="Aix-en-Provence" onChange={(e) => setCity(e.target.value)} aria-label="Ville" />
       <span className={label}>Anniversaire (facultatif, l’année n’est pas demandée)</span>
       <div className="flex gap-2">
         <select className="field w-24 flex-none px-3" value={bDay} onChange={(e) => setBDay(e.target.value)} aria-label="Jour">
@@ -93,6 +93,7 @@ export function EditProfileSheet() {
         value={bio}
         maxLength={160}
         placeholder="Quelques mots sur toi"
+        aria-label="Bio"
         onChange={(e) => setBio(e.target.value)}
       />
       <PrimaryBtn className="h-[54px] flex-none text-base" onClick={save} disabled={busy || !displayName.trim()}>

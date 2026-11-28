@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUp, LockSimple, MagnifyingGlass, Plus, UsersThree } fr
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { PostCard } from '../components/PostCard';
-import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx, PullIndicator } from '../components/ui';
+import { Avatar, EmptyCard, ErrorCard, PrimaryBtn, ScreenLoader, cx, PullIndicator } from '../components/ui';
 import { qc, useFeed, useFriends, useMe, usePellicule, useStories } from '../lib/data';
 import { useFeedFresh } from '../lib/socket';
 import { countdown } from '../lib/format';
@@ -18,7 +18,7 @@ const storyPreview = (g: StoryGroup) => {
   return next.media.kind === 'image' ? next.media.url : next.media.poster;
 };
 
-function StoryTile({ group, label, ring, onClick, badge }: { group: StoryGroup; label: string; ring: boolean; onClick: () => void; badge?: React.ReactNode }) {
+function StoryTile({ group, label, ring, onClick }: { group: StoryGroup; label: string; ring: boolean; onClick: () => void }) {
   const preview = storyPreview(group);
   return (
     <button
@@ -38,7 +38,6 @@ function StoryTile({ group, label, ring, onClick, badge }: { group: StoryGroup; 
           <span className="pointer-events-none absolute inset-0 rounded-[23px] shadow-[inset_0_0_0_2px_var(--card)]" />
           <Avatar user={group.user} size={26} className="absolute top-1.5 left-1.5 shadow-[0_0_0_2px_var(--card)]" />
         </span>
-        {badge}
       </span>
       <span className="max-w-full truncate text-xs font-semibold">{label}</span>
     </button>
@@ -54,25 +53,18 @@ function Stories() {
   return (
     <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-0.5 pt-1 pb-1.5">
       {mine ? (
-        <StoryTile
-          group={mine}
-          label="Ta story"
-          ring={false}
-          onClick={() => useUI.setState({ story: { group: mineIdx, index: 0 } })}
-          badge={
-            <span
-              role="button"
-              aria-label="Ajouter une story"
-              onClick={(e) => {
-                e.stopPropagation();
-                addStory();
-              }}
-              className="absolute -right-1.5 -bottom-1.5 grid h-8 w-8 place-items-center rounded-full bg-brand text-white shadow-[0_0_0_3px_var(--card)] after:absolute after:-inset-2 after:content-['']"
-            >
-              <Plus size={14} weight="bold" />
-            </span>
-          }
-        />
+        // « + » à côté de la tuile (et non dedans) : un vrai bouton, au clavier et pour VoiceOver.
+        <div className="relative flex-none">
+          <StoryTile group={mine} label="Ta story" ring={false} onClick={() => useUI.setState({ story: { group: mineIdx, index: 0 } })} />
+          <button
+            type="button"
+            aria-label="Ajouter une story"
+            onClick={addStory}
+            className="tap absolute top-[78px] left-[50px] grid h-8 w-8 place-items-center rounded-full border-0 bg-brand p-0 text-white shadow-[0_0_0_3px_var(--card)] after:absolute after:-inset-2 after:content-['']"
+          >
+            <Plus size={14} weight="bold" />
+          </button>
+        </div>
       ) : (
         <button type="button" onClick={addStory} className="tap flex w-[76px] flex-none flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-ink">
           <span className="relative grid h-[104px] w-[76px] place-items-center overflow-hidden rounded-[26px] bg-card shadow-pill">
@@ -185,7 +177,8 @@ export function Feed() {
           <ArrowRight size={20} />
         </button>
       )}
-      {items.length === 0 && (
+      {items.length === 0 && feed.isError && <ErrorCard onRetry={() => void feed.refetch()} />}
+      {items.length === 0 && !feed.isError && (
         <EmptyCard icon={<UsersThree size={30} weight="fill" />} title="Ton fil est vide" text="Ajoute des amis pour voir leurs photos, vidéos et sondages — ou publie ton premier post.">
           <div className="flex flex-wrap justify-center gap-2">
             <PrimaryBtn onClick={() => openSheet('friends')}>Trouver des amis</PrimaryBtn>

@@ -40,7 +40,7 @@ export interface Countdown {
 }
 
 export function countdown(targetIso: string | undefined, now = Date.now()): Countdown {
-  if (!targetIso) return { d: '–', h: '––', m: '––', s: '––', line: 'Déballage dimanche à 20h', done: false };
+  if (!targetIso) return { d: '–', h: '––', m: '––', s: '––', line: 'Déballage dimanche à 20 h', done: false };
   let r = Math.max(0, Math.floor((new Date(targetIso).getTime() - now) / 1000));
   if (r === 0) return { d: '0', h: '00', m: '00', s: '00', line: 'Le déballage est ouvert', done: true };
   const dd = Math.floor(r / 86400);

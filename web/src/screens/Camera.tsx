@@ -131,7 +131,8 @@ export function Camera() {
           <button
             type="button"
             onClick={() => void undoLast(pel.undo!.shotId)}
-            className="tap absolute right-3.5 bottom-3.5 z-10 flex h-10 animate-pop items-center gap-2 rounded-[20px] border-0 bg-black/55 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur"
+            // Au-dessus de la rangée du déclencheur (elle ne recouvre plus ni le déclencheur ni le bouton caméra).
+            className="tap absolute inset-x-0 bottom-[112px] z-10 mx-auto flex h-11 w-max max-w-[calc(100%-28px)] animate-pop items-center gap-2 rounded-[22px] border-0 bg-black/55 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur"
           >
             <ArrowCounterClockwise size={16} weight="bold" />
             Annuler la dernière photo · {(() => {
@@ -141,19 +142,20 @@ export function Camera() {
           </button>
         )}
         {pel?.moment && momentLeft > 0 ? (
-          <div className="absolute top-3.5 left-3.5 flex h-10 animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[0.8125rem] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">
-            <Lightning size={16} weight="fill" />
-            <span>
+          <div className="absolute top-3.5 left-3.5 flex h-10 max-w-[calc(100%-124px)] animate-pop items-center gap-2 rounded-[20px] bg-gradient-to-r from-ember to-heart px-3.5 text-[0.8125rem] font-extrabold text-white tabular-nums shadow-[0_8px_22px_rgba(229,72,77,.4)]">
+            <Lightning size={16} weight="fill" className="flex-none" />
+            <span className="truncate">
               Moment Mandrix · {Math.floor(momentLeft / 60)}:{String(momentLeft % 60).padStart(2, '0')}
             </span>
           </div>
         ) : (
-          <div className="absolute top-3.5 left-3.5 flex h-10 items-center gap-2 rounded-[20px] bg-white/15 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur">
-            <LockSimple size={16} weight="fill" />
-            <span>{cd.line}</span>
+          // Voile sombre : lisible même face à un ciel ou un mur blanc.
+          <div className="absolute top-3.5 left-3.5 flex h-10 max-w-[calc(100%-124px)] items-center gap-2 rounded-[20px] bg-black/40 px-3.5 text-[0.8125rem] font-bold text-white tabular-nums backdrop-blur">
+            <LockSimple size={16} weight="fill" className="flex-none" />
+            <span className="truncate">{cd.line}</span>
           </div>
         )}
-        <div className="absolute top-3.5 right-3.5 flex h-10 items-center gap-1.5 rounded-[20px] bg-white/15 px-3.5 text-[0.8125rem] font-bold text-white backdrop-blur">
+        <div className="absolute top-3.5 right-3.5 flex h-10 items-center gap-1.5 rounded-[20px] bg-black/40 px-3.5 text-[0.8125rem] font-bold text-white backdrop-blur">
           <Fire size={16} weight="fill" className="text-ember" />
           <span>{pel?.streak.weeks ?? 0} sem.</span>
         </div>
@@ -211,13 +213,13 @@ export function Camera() {
             <span className="flex-1">
               {pending} photo{pending > 1 ? 's' : ''} en attente d’envoi
             </span>
-            <button type="button" onClick={retryPending} className="tap h-10 rounded-[20px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
+            <button type="button" onClick={retryPending} className="tap h-11 rounded-[22px] border-0 bg-ink px-3.5 text-[0.8125rem] font-bold text-inv active:scale-95">
               Réessayer
             </button>
           </div>
         )}
         <p className="m-0 text-sm leading-normal text-pretty text-mute">
-          Tes photos restent cachées, même pour toi, jusqu’à dimanche 20h. Elles rejoignent la pellicule publique de Mandrix. Sans réseau, elles partent dès que la connexion revient.
+          Tes photos restent cachées, même pour toi, jusqu’à dimanche 20 h. Elles rejoignent la pellicule publique de Mandrix. Sans réseau, elles partent dès que la connexion revient.
         </p>
       </div>
       <button

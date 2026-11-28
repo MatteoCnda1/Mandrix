@@ -5,11 +5,12 @@ import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { NotificationList } from '../components/Notifications';
 import { PostCard } from '../components/PostCard';
-import { Avatar, confirmAction, cx, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader } from '../components/ui';
+import { Avatar, confirmAction, cx, EmptyCard, ErrorCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader } from '../components/ui';
 import { usePullToRefresh } from '../lib/hooks';
 import { api, errMsg } from '../lib/api';
 import { qc, useBadges, useMe, usePost, useReports } from '../lib/data';
 import { timeAgo } from '../lib/format';
+import { useGoBack } from '../lib/nav';
 import { toast } from '../lib/store';
 
 export function PostPage() {
@@ -85,15 +86,15 @@ function ReportQueue() {
             </span>
           </div>
           {c.author && (
-            <button type="button" onClick={() => nav(`/u/${c.author!.username}`)} className="tap flex items-center gap-2 border-0 bg-transparent p-0 text-left text-ink">
+            <button type="button" onClick={() => nav(`/u/${c.author!.username}`)} className="tap flex min-h-11 min-w-0 items-center gap-2 self-start border-0 bg-transparent p-0 text-left text-ink">
               <Avatar user={c.author} size={30} />
-              <span className="text-sm font-bold">{c.author.displayName}</span>
-              <span className="text-sm text-mute">@{c.author.username}</span>
+              <span className="truncate text-sm font-bold">{c.author.displayName}</span>
+              <span className="truncate text-sm text-mute">@{c.author.username}</span>
             </button>
           )}
           {c.media && (
             <div className="ph aspect-[4/3] max-w-[320px] overflow-hidden rounded-[20px]">
-              <MediaView media={c.media} controls={c.media.kind === 'video'} sizes="320px" />
+              <MediaView media={c.media} controls={c.media.kind === 'video'} sizes="320px" fit="contain" />
             </div>
           )}
           {c.text && <p className="m-0 rounded-[18px] bg-soft p-3 text-[0.9375rem] whitespace-pre-line">{c.text}</p>}
@@ -132,14 +133,17 @@ function ReportQueue() {
 }
 
 export function Moderation() {
-  const nav = useNavigate();
+  const back = useGoBack();
   const { data: me } = useMe();
-  const { data, isLoading } = useReports(!!me?.isAdmin);
+  const { data, isLoading, isError, refetch } = useReports(!!me?.isAdmin);
   const cases = useQuery({ queryKey: ['moderation'], queryFn: () => api<ModerationCase[]>('/api/admin/moderation'), enabled: !!me?.isAdmin });
   if (!me?.isAdmin) return <div className="card p-8 text-center text-mute">Réservé aux administrateurs.</div>;
   if (isLoading || cases.isLoading) return <ScreenLoader />;
+  // Une erreur ne doit pas passer pour « Rien à vérifier ».
+  if ((isError && !data) || (cases.isError && !cases.data)) return <ErrorCard onRetry={() => void Promise.all([refetch(), cases.refetch()])} />;
 
   const act = async (id: string, action: 'restore' | 'remove') => {
+    if (action === 'remove' && !(await confirmAction({ title: 'Retirer définitivement cette image du pool ?', confirmLabel: 'Retirer', destructive: true }))) return;
     try {
       await api(action === 'restore' ? `/api/admin/pool/${id}/restore` : `/api/admin/pool/${id}`, { method: action === 'restore' ? 'POST' : 'DELETE' });
       qc.invalidateQueries({ queryKey: ['reports'] });
@@ -152,7 +156,7 @@ export function Moderation() {
   if (!data?.length && !cases.data?.length)
     return (
       <EmptyCard icon={<ShieldCheck size={30} weight="fill" />} title="Rien à vérifier" text="Les contenus et comptes signalés, ainsi que les images signalées dans Make It Friends, apparaîtront ici.">
-        <PrimaryBtn tone="soft" onClick={() => nav('/profil')}>
+        <PrimaryBtn tone="soft" onClick={() => back('/profil')}>
           Retour au profil
         </PrimaryBtn>
       </EmptyCard>
@@ -166,7 +170,7 @@ export function Moderation() {
       {data?.map((r) => (
         <div key={r.id} className="card flex flex-col gap-2.5 p-3">
           <div className="ph aspect-[4/3] overflow-hidden rounded-[20px]">
-            <MediaView media={r.media} controls={r.media.kind === 'video'} />
+            <MediaView media={r.media} controls={r.media.kind === 'video'} fit="contain" />
           </div>
           <div className="flex items-center gap-2 px-1">
             <Avatar user={r.owner} size={30} />

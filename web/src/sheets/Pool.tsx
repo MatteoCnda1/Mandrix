@@ -24,8 +24,9 @@ export function PoolSheet({ target }: { target: PoolTarget }) {
             key={o.value}
             type="button"
             onClick={() => setScope(o.value)}
+            aria-pressed={scope === o.value}
             className="tap flex items-center gap-3 rounded-[26px] border-0 bg-soft p-3 text-left text-ink transition-shadow duration-300"
-            style={{ boxShadow: `inset 0 0 0 2px ${scope === o.value ? '#0E76C6' : 'transparent'}` }}
+            style={{ boxShadow: `inset 0 0 0 2px ${scope === o.value ? 'var(--acc)' : 'transparent'}` }}
           >
             <span className="grid h-[46px] w-[46px] flex-none place-items-center rounded-full bg-card">
               <Icon size={22} />

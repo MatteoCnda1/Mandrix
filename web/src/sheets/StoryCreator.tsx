@@ -145,14 +145,14 @@ const mid = (a: Pt, b: Pt) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 function MusicChip({ music, onEdit, onRemove }: { music: PickedMusic; onEdit?: () => void; onRemove?: () => void }) {
   return (
     <div className="absolute top-14 left-1/2 z-10 flex max-w-[85%] -translate-x-1/2 items-center gap-2 rounded-full bg-black/55 py-1 pr-1 pl-1 text-white backdrop-blur">
-      <button type="button" onClick={onEdit} disabled={!onEdit} className="tap flex min-w-0 items-center gap-2 border-0 bg-transparent p-0 text-left text-white" aria-label={`Musique : ${music.track.title}, ${music.track.artist}. Modifier`}>
+      <button type="button" onClick={onEdit} disabled={!onEdit} className="tap relative flex min-w-0 items-center gap-2 border-0 bg-transparent p-0 text-left text-white after:absolute after:-inset-y-1.5 after:-left-1 after:right-0 after:content-['']" aria-label={`Musique : ${music.track.title}, ${music.track.artist}. Modifier`}>
         {music.track.cover ? <img src={music.track.cover} alt="" className="h-8 w-8 flex-none rounded-full object-cover" /> : <MusicNotes size={18} className="ml-1.5 flex-none" />}
         <span className="min-w-0 truncate text-[0.8125rem] font-bold">
           {music.track.title} <span className="font-semibold text-white/70">· {music.track.artist}</span>
         </span>
       </button>
       {onRemove && (
-        <button type="button" aria-label="Retirer la musique" onClick={onRemove} className="tap grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
+        <button type="button" aria-label="Retirer la musique" onClick={onRemove} className="tap relative grid h-8 w-8 flex-none place-items-center rounded-full border-0 bg-white/15 text-white after:absolute after:-inset-1.5 after:content-['']">
           <X size={14} weight="bold" />
         </button>
       )}
@@ -340,7 +340,8 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
           }}
         />
       )}
-      <div className="flex flex-none items-center justify-center gap-2.5 px-4 pt-1" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
+      {/* `flex-wrap` : sur un écran étroit, « Publier » passe à la ligne au lieu de sortir de l'écran. */}
+      <div className="flex flex-none flex-wrap items-center justify-center gap-2.5 px-4 pt-1" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
         {preview ? (
           <button type="button" onClick={() => setPreview(null)} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white/15 px-4 text-sm font-bold text-white">
             <PencilSimple size={18} /> Modifier
@@ -358,9 +359,9 @@ function PhotoStep({ blob, onBack }: { blob: Blob; onBack: () => void }) {
                 <MusicNotes size={20} weight={music ? 'fill' : 'regular'} />
               </RoundBtn>
             )}
-            <button type="button" onClick={showPreview} disabled={!img} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white/15 px-4 text-sm font-bold text-white disabled:opacity-40">
-              <Eye size={18} /> Aperçu
-            </button>
+            <RoundBtn label="Aperçu" onClick={showPreview} disabled={!img}>
+              <Eye size={20} weight="bold" />
+            </RoundBtn>
           </>
         )}
         <button type="button" onClick={publish} disabled={!img || progress !== null} className="tap flex h-12 items-center gap-2 rounded-full border-0 bg-white px-5 text-sm font-extrabold text-black disabled:opacity-50">
@@ -451,7 +452,8 @@ export function StoryCreator() {
   const [picked, setPicked] = useState<Picked | null>(null);
   useScrollLock();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    // Le choix de musique (ou une confirmation) par-dessus gère Échap lui-même : la photo n'est pas perdue.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('[data-music-picker], [role="alertdialog"]') && close();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);

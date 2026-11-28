@@ -3,7 +3,7 @@ import { CheckCircle, MagnifyingGlass } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { ConvAvatar } from '../components/ConvAvatar';
 import { SharedPostCard } from '../components/SharedPost';
-import { PrimaryBtn, Sheet, cx } from '../components/ui';
+import { PrimaryBtn, Sheet, SheetFooter, cx } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useConversations, useFriends, useMe } from '../lib/data';
 import { toast, useUI } from '../lib/store';
@@ -16,8 +16,8 @@ const close = () => useUI.setState({ shareFor: null });
 /** Envoyer un post en message (#73) : conversations récentes, groupes compris, puis les autres amis. */
 export function ShareSheet({ post }: { post: Post }) {
   const { data: me } = useMe();
-  const { data: convs } = useConversations();
-  const { data: friends } = useFriends();
+  const { data: convs, isLoading: convsLoading } = useConversations();
+  const { data: friends, isLoading: friendsLoading } = useFriends();
   const [q, setQ] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [text, setText] = useState('');
@@ -86,7 +86,9 @@ export function ShareSheet({ post }: { post: Post }) {
       <div className="flex justify-center [&>button]:shadow-pill">
         <SharedPostCard post={{ id: post.id, kind: post.kind, author: post.author, text: post.text, media: post.media, anonymous: post.anonymous }} mine={false} />
       </div>
-      {targets.length === 0 ? (
+      {targets.length === 0 && (convsLoading || friendsLoading) ? (
+        <p className="m-0 px-1 text-sm text-mute">Chargement…</p>
+      ) : targets.length === 0 ? (
         <p className="m-0 px-1 text-sm text-mute">Ajoute des amis pour leur envoyer des posts.</p>
       ) : (
         <>
@@ -118,10 +120,13 @@ export function ShareSheet({ post }: { post: Post }) {
             })}
             {shown.length === 0 && <p className="m-0 px-2 py-3 text-sm text-mute">Personne ne correspond.</p>}
           </div>
-          <input className="field" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Ajouter un message (facultatif)" aria-label="Message" />
-          <PrimaryBtn disabled={!picked.size || busy} onClick={send}>
-            {busy ? 'Envoi…' : picked.size > 1 ? `Envoyer (${picked.size})` : 'Envoyer'}
-          </PrimaryBtn>
+          {/* Collé en bas : le message et « Envoyer » restent à portée quand la liste est longue. */}
+          <SheetFooter>
+            <input className="field" value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Ajouter un message (facultatif)" aria-label="Message" />
+            <PrimaryBtn disabled={!picked.size || busy} onClick={send}>
+              {busy ? 'Envoi…' : picked.size > 1 ? `Envoyer (${picked.size})` : 'Envoyer'}
+            </PrimaryBtn>
+          </SheetFooter>
         </>
       )}
     </Sheet>

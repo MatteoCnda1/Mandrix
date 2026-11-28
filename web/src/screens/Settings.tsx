@@ -13,7 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import { Avatar, confirmAction, cx, PrimaryBtn, ScreenLoader, Seg, Switch } from '../components/ui';
+import { Avatar, confirmAction, cx, ErrorLine, PrimaryBtn, ScreenLoader, Seg, Switch } from '../components/ui';
 import { api, errMsg } from '../lib/api';
 import { qc, useConfig, useMe } from '../lib/data';
 import { timeAgo } from '../lib/format';
@@ -127,7 +127,7 @@ function NotificationSettings({ me }: { me: Me }) {
               aria-checked={on('push', c.key)}
               aria-label={`${c.label} : push`}
               onClick={() => save({ push: { [c.key]: !on('push', c.key) } })}
-              className="tap w-[52px] border-0 bg-transparent p-0"
+              className="tap grid h-12 w-[52px] place-items-center border-0 bg-transparent p-0"
             >
               <Switch on={on('push', c.key)} />
             </button>
@@ -140,7 +140,7 @@ function NotificationSettings({ me }: { me: Me }) {
                 aria-checked={on('bell', c.key)}
                 aria-label={`${c.label} : cloche`}
                 onClick={() => save({ bell: { [c.key]: !on('bell', c.key) } })}
-                className="tap w-[52px] border-0 bg-transparent p-0"
+                className="tap grid h-12 w-[52px] place-items-center border-0 bg-transparent p-0"
               >
                 <Switch on={on('bell', c.key)} />
               </button>
@@ -194,7 +194,7 @@ function AmbianceSettings() {
           options={[
             { value: 'light' as const, label: 'Clair' },
             { value: 'dark' as const, label: 'Sombre' },
-            { value: 'auto' as const, label: 'Automatique' },
+            { value: 'auto' as const, label: 'Auto' },
           ]}
         />
       </div>
@@ -336,6 +336,7 @@ function AccountSettings({ me }: { me: Me }) {
 
       <Section title="Appareils connectés">
         {sessions.isLoading && <div className="p-3 text-sm text-mute">Chargement…</div>}
+        {sessions.isError && <ErrorLine onRetry={() => void sessions.refetch()} />}
         {sessions.data?.map((s) => (
           <div key={s.id} className="flex min-h-14 items-center gap-3 px-2">
             <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-soft">
@@ -344,14 +345,14 @@ function AccountSettings({ me }: { me: Me }) {
             <span className="min-w-0 flex-1">
               <span className="block text-[0.9375rem] font-bold">
                 {s.device}
-                {s.current && <span className="ml-1.5 rounded-full bg-tint px-2 py-0.5 text-xs font-bold text-acc">Cet appareil</span>}
+                {s.current && <span className="ml-1.5 rounded-full bg-tint px-2 py-0.5 text-xs font-bold text-ink">Cet appareil</span>}
               </span>
               <span className="block text-[0.8125rem] text-mute">Actif {timeAgo(s.lastSeenAt ?? s.createdAt)}</span>
             </span>
             {!s.current && (
               <button
                 type="button"
-                className="tap h-10 rounded-[20px] border-0 bg-soft px-3.5 text-[0.8125rem] font-bold text-heart"
+                className="tap h-11 flex-none rounded-[22px] border-0 bg-soft px-3.5 text-[0.8125rem] font-bold text-heart"
                 onClick={() =>
                   void run(async () => {
                     await api(`/api/me/sessions/${s.id}`, { method: 'DELETE' });
@@ -382,6 +383,8 @@ function AccountSettings({ me }: { me: Me }) {
       </Section>
 
       <Section title="Comptes bloqués" footer="Une personne bloquée ne voit plus tes contenus et ne peut plus t’écrire.">
+        {blocks.isLoading && <div className="p-3 text-sm text-mute">Chargement…</div>}
+        {blocks.isError && <ErrorLine onRetry={() => void blocks.refetch()} />}
         {blocks.data?.length === 0 && <div className="px-3 py-3 text-sm text-mute">Personne.</div>}
         {blocks.data?.map((u) => (
           <div key={u.id} className="flex min-h-14 items-center gap-3 px-2">
@@ -392,7 +395,7 @@ function AccountSettings({ me }: { me: Me }) {
             </span>
             <button
               type="button"
-              className="tap h-10 rounded-[20px] border-0 bg-soft px-3.5 text-[0.8125rem] font-bold text-ink"
+              className="tap h-11 flex-none rounded-[22px] border-0 bg-soft px-3.5 text-[0.8125rem] font-bold text-ink"
               onClick={() =>
                 void run(async () => {
                   await api(`/api/users/${u.id}/block`, { method: 'DELETE' });

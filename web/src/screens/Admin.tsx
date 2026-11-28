@@ -38,7 +38,7 @@ export function Admin() {
     return (
       <div className="card flex flex-col items-center gap-3 p-8 text-center text-mute">
         <span>Impossible de charger le tableau de bord : {errMsg(error)}</span>
-        <button type="button" className="tap rounded-full border-0 bg-soft px-4 py-2 font-bold text-ink" onClick={() => void refetch()}>
+        <button type="button" className="tap h-11 rounded-full border-0 bg-soft px-5 font-bold text-ink" onClick={() => void refetch()}>
           Réessayer
         </button>
       </div>

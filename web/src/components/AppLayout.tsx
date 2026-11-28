@@ -24,11 +24,12 @@ const NAV: { to: string; icon: IconC; label: string; long: string; match: string
 ];
 
 /** Titre de l'écran et destination du bouton « retour » (navigation hiérarchique, HIG). */
-const ROUTES: { prefix: string; title: string; back?: string | -1; backLabel?: string }[] = [
+/** `short` : titre affiché sur les écrans très étroits (moins de 360 px), là où le titre entier serait coupé. */
+const ROUTES: { prefix: string; title: string; short?: string; back?: string | -1; backLabel?: string }[] = [
   { prefix: '/reels', title: 'Reels' },
   { prefix: '/pellicule', title: 'La Pellicule' },
   { prefix: '/deballage', title: 'Déballage', back: '/pellicule', backLabel: 'Pellicule' },
-  { prefix: '/jeu/galerie', title: 'Galerie des mèmes', back: '/jeu', backLabel: 'Jeu' },
+  { prefix: '/jeu/galerie', title: 'Galerie des mèmes', short: 'Galerie', back: '/jeu', backLabel: 'Jeu' },
   { prefix: '/jeu', title: 'Make It Friends' },
   { prefix: '/profil', title: 'Profil' },
   { prefix: '/u/', title: 'Profil', back: -1, backLabel: 'Retour' },
@@ -42,7 +43,18 @@ const ROUTES: { prefix: string; title: string; back?: string | -1; backLabel?: s
   { prefix: '/admin', title: 'Administration', back: '/profil', backLabel: 'Profil' },
 ];
 
-const routeInfo = (path: string) => (path === '/' ? { prefix: '/', title: 'Pour toi' } : (ROUTES.find((r) => path.startsWith(r.prefix)) ?? { prefix: path, title: '' }));
+const routeInfo = (path: string): (typeof ROUTES)[number] => (path === '/' ? { prefix: '/', title: 'Pour toi' } : (ROUTES.find((r) => path.startsWith(r.prefix)) ?? { prefix: path, title: '' }));
+
+/** Titre de l'écran, raccourci sur les écrans très étroits quand il a une version courte. */
+const Title = ({ info }: { info: (typeof ROUTES)[number] }) =>
+  info.short ? (
+    <>
+      <span className="max-[359px]:hidden">{info.title}</span>
+      <span className="hidden max-[359px]:inline">{info.short}</span>
+    </>
+  ) : (
+    info.title
+  );
 
 const isActive = (path: string, match: string[]) => match.some((m) => (m === '/' ? path === '/' : path.startsWith(m)));
 
@@ -62,6 +74,7 @@ function SideNav({ desktop }: { desktop: boolean }) {
             key={n.to}
             to={n.to}
             aria-label={n.long}
+            aria-current={active ? 'page' : undefined}
             className={cx(
               'tap flex h-[54px] items-center gap-3 rounded-[27px] px-4 text-[0.9375rem] font-bold no-underline shadow-pill transition-[background,color,transform] duration-300 hover:translate-x-[3px] active:scale-[.96]',
               active ? 'bg-ink text-inv hover:text-inv' : 'bg-glass text-ink hover:text-ink',
@@ -95,7 +108,8 @@ function BottomNav() {
             aria-current={active ? 'page' : undefined}
             className={cx(
               'tap relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-[3px] rounded-[28px] no-underline transition-colors duration-300 active:scale-95',
-              active ? 'text-acc hover:text-acc' : n.to === '/pellicule' ? 'text-azure hover:text-azure' : 'text-ink hover:text-ink',
+              // Pellicule mise en avant en bleu : --acc reste lisible sur la barre en verre (l'azur faisait 3,4:1).
+              active || n.to === '/pellicule' ? 'text-acc hover:text-acc' : 'text-ink hover:text-ink',
             )}
           >
             <span
@@ -123,6 +137,13 @@ function Header({ isPhone }: { isPhone: boolean }) {
   const round = 'tap grid h-[46px] w-[46px] place-items-center rounded-full border-0 transition-transform duration-200 active:scale-[.94]';
 
   useEffect(() => setOpen(false), [pathname]);
+  // Échap referme le menu des notifications.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const toggleNotifs = () => {
     const next = !open;
@@ -143,20 +164,25 @@ function Header({ isPhone }: { isPhone: boolean }) {
             type="button"
             onClick={goBack}
             aria-label={`Retour : ${info.backLabel}`}
-            className="tap flex h-11 flex-none items-center gap-0.5 rounded-[22px] border-0 bg-card/70 pr-3.5 pl-2 text-[0.9375rem] font-bold text-acc shadow-pill backdrop-blur active:scale-95"
+            className="tap flex h-11 min-w-11 flex-none items-center justify-center gap-0.5 rounded-[22px] border-0 bg-card/70 pr-3 pl-2 text-[0.9375rem] font-bold text-acc shadow-pill backdrop-blur active:scale-95"
           >
             <CaretLeft size={20} weight="bold" />
             {!isPhone && <span>{info.backLabel}</span>}
           </button>
-          <h1 className="m-0 truncate text-[1.375rem] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">{info.title}</h1>
+          <h1 className="m-0 truncate text-[clamp(1.125rem,5.4vw,1.375rem)] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">
+            <Title info={info} />
+          </h1>
         </div>
       ) : isPhone && pathname === '/' ? (
-        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="tap flex items-center gap-1 border-0 bg-transparent p-0 text-ink" aria-label="Mandrix, revenir en haut">
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="tap flex h-11 min-w-11 items-center gap-1 border-0 bg-transparent p-0 text-ink" aria-label="Mandrix, revenir en haut">
           <Logo size={40} />
-          <div className="ml-1 font-script text-4xl leading-none">Mandrix</div>
+          {/* Sous 360 px de large, le logo seul : le nom ferait déborder les boutons hors de l'écran. */}
+          <div className="ml-1 font-script text-4xl leading-none max-[359px]:hidden">Mandrix</div>
         </button>
       ) : (
-        <h1 className="m-0 min-w-0 truncate text-[1.625rem] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">{info.title}</h1>
+        <h1 className="m-0 min-w-0 truncate text-[clamp(1.125rem,6vw,1.625rem)] font-extrabold tracking-[-.03em] sm:text-[1.75rem]">
+          <Title info={info} />
+        </h1>
       )}
       <div className="ml-auto flex gap-2">
         {!(isPhone && info.back) && (
@@ -184,7 +210,7 @@ function Header({ isPhone }: { isPhone: boolean }) {
           {!!badges?.notifications && <span>{badges.notifications > 99 ? '99+' : badges.notifications}</span>}
         </button>
         {!isPhone && (
-          <button type="button" aria-label="Mode sombre" onClick={toggleDark} className={cx(round, 'bg-card text-ink shadow-pill')}>
+          <button type="button" aria-label="Mode sombre" aria-pressed={dark} onClick={toggleDark} className={cx(round, 'bg-card text-ink shadow-pill')}>
             {dark ? <Sun size={20} /> : <Moon size={20} />}
           </button>
         )}
@@ -192,17 +218,21 @@ function Header({ isPhone }: { isPhone: boolean }) {
       {open && (
         <>
           <div className="fixed inset-0" onClick={() => setOpen(false)} />
-          <div className="absolute top-[62px] right-0 flex max-h-[70vh] w-[min(390px,100%)] origin-top-right animate-drop flex-col gap-0.5 overflow-auto rounded-[28px] bg-card p-2.5 shadow-menu">
-            <div className="flex items-center px-2.5 py-2">
-              <div className="text-[1.0625rem] font-extrabold">Notifications</div>
+          <div
+            role="dialog"
+            aria-label="Notifications"
+            className="no-scrollbar absolute top-[62px] right-0 flex max-h-[min(70vh,calc(var(--vvh,100dvh)-170px))] w-[min(390px,100%)] origin-top-right animate-drop flex-col gap-0.5 overflow-auto overscroll-contain rounded-[28px] bg-card p-2.5 shadow-menu"
+          >
+            <div className="flex min-h-11 items-center gap-1 pl-2.5">
+              <div className="mr-auto text-[1.0625rem] font-extrabold">Notifications</div>
               {!!badges?.notifications && (
-                <button type="button" className="tap ml-auto border-0 bg-transparent text-[0.8125rem] font-bold text-mute" onClick={() => void markAllRead()}>
+                <button type="button" className="tap h-11 rounded-[22px] border-0 bg-transparent px-2.5 text-[0.8125rem] font-bold text-mute active:bg-soft" onClick={() => void markAllRead()}>
                   Tout marquer comme lu
                 </button>
               )}
               <button
                 type="button"
-                className={cx('tap border-0 bg-transparent pl-3 text-[0.8125rem] font-bold text-acc', !badges?.notifications && 'ml-auto')}
+                className="tap h-11 rounded-[22px] border-0 bg-transparent px-2.5 text-[0.8125rem] font-bold text-acc active:bg-soft"
                 onClick={() => nav('/notifications')}
               >
                 Tout voir

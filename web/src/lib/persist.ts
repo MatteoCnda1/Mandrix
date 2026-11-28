@@ -37,12 +37,12 @@ export async function restoreCache() {
 
 type Q = DehydratedState['queries'][number];
 
-/** Allège ce qui est gardé : première page du fil, 60 derniers messages par conversation. */
+/** Allège ce qui est gardé : première page du fil et des profils, 60 derniers messages par conversation. */
 function trim(q: Q): Q {
   const key = String(q.queryKey[0]);
   const data = q.state.data as unknown;
   if (key === 'messages' && Array.isArray(data)) return { ...q, state: { ...q.state, data: data.slice(-60) } };
-  if (key === 'feed' && data && typeof data === 'object' && 'pages' in data) {
+  if ((key === 'feed' || key === 'user-posts') && data && typeof data === 'object' && 'pages' in data) {
     const d = data as { pages: unknown[]; pageParams: unknown[] };
     return { ...q, state: { ...q.state, data: { pages: d.pages.slice(0, 1), pageParams: d.pageParams.slice(0, 1) } } };
   }

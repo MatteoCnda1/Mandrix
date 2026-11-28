@@ -2,7 +2,7 @@ import type { Post, RetroState } from '@mandrix/shared';
 import { ArrowCounterClockwise, CaretLeft, CaretRight, X } from '@phosphor-icons/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
-import { Avatar, MediaView, Portal, cx } from '../components/ui';
+import { Avatar, MediaView, Portal, WholeMedia, cx } from '../components/ui';
 import { useMe, useRetro } from '../lib/data';
 import { useSwipeX } from '../lib/gestures';
 import { useGoBack } from '../lib/nav';
@@ -68,7 +68,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
     const parts = [r.posts.photos && s(r.posts.photos, 'photo', 'photos'), r.posts.videos && s(r.posts.videos, 'vidéo', 'vidéos'), r.posts.polls && s(r.posts.polls, 'sondage', 'sondages')].filter(Boolean);
     push(
       'posts',
-      'from-[#e5484d] to-[#f59e0b]',
+      'from-[#d1373c] to-[#b45309]',
       <>
         <Line>Tu as publié</Line>
         <Big>{s(r.posts.total, 'post', 'posts')}</Big>
@@ -83,13 +83,17 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
   if (r.topPost?.media) {
     push(
       'top',
-      'from-[#7b2ff7] to-[#e5484d]',
+      'from-[#7b2ff7] to-[#d1373c]',
       <>
         <Line>Ton post le plus aimé</Line>
         <div className="ph mx-auto aspect-square w-[min(72vw,340px)] animate-pop overflow-hidden rounded-[28px] shadow-hero">
           <MediaView media={r.topPost.media} sizes="340px" autoPlay />
         </div>
-        {r.topPost.text && <Line delay={0.2}>« {r.topPost.text} »</Line>}
+        {r.topPost.text && (
+          <Line delay={0.2}>
+            <span className="line-clamp-4 break-words">« {r.topPost.text} »</span>
+          </Line>
+        )}
         {postScore(r.topPost) && <Line delay={0.35}>{postScore(r.topPost)}</Line>}
       </>,
     );
@@ -99,7 +103,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
     const p = r.pellicule;
     push(
       'pellicule',
-      'from-[#0e76c6] to-[#06b6d4]',
+      'from-[#0e76c6] to-[#0e7490]',
       <>
         <Line>Dans la Pellicule</Line>
         <Big>{s(p.shots, 'photo', 'photos')}</Big>
@@ -130,9 +134,8 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
         {m.best && (
           <div className="mx-auto mt-2 flex w-[min(72vw,320px)] animate-in flex-col overflow-hidden rounded-[24px] bg-white text-black shadow-hero" style={{ animationDelay: '.4s', animationFillMode: 'both' }}>
             <div className="px-3 py-2.5 text-center text-lg leading-tight font-extrabold">{m.best.caption}</div>
-            <div className="ph aspect-[4/3]">
-              <MediaView media={m.best.media} sizes="320px" />
-            </div>
+            {/* Le mème en entier, comme partout ailleurs. */}
+            <WholeMedia media={m.best.media} sizes="320px" maxH="34svh" className="rounded-none" />
           </div>
         )}
       </>,
@@ -142,7 +145,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
   if (r.guesses.played) {
     push(
       'guess',
-      'from-[#f59e0b] to-[#e5484d]',
+      'from-[#b45309] to-[#d1373c]',
       <>
         <Line>Qui a pris ça ?</Line>
         <Big>{s(r.guesses.hits, 'bonne réponse', 'bonnes réponses')}</Big>
@@ -155,7 +158,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
     const t = r.messages.topFriend;
     push(
       'messages',
-      'from-[#0e76c6] to-[#22c55e]',
+      'from-[#0e76c6] to-[#15803d]',
       <>
         <Line>Tu as envoyé</Line>
         <Big>{s(r.messages.sent, 'message', 'messages')}</Big>
@@ -163,9 +166,9 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
           <div className="mt-2 flex animate-in items-center justify-center gap-3" style={{ animationDelay: '.25s', animationFillMode: 'both' }}>
             <Avatar user={t.user} size={56} className="shadow-[0_0_0_3px_rgba(255,255,255,.6)]" />
             <div className="text-left">
-              <div className="text-sm font-bold text-white/80">Ton acolyte de l’année</div>
+              <div className="text-sm font-bold text-white">Ton acolyte de l’année</div>
               <div className="text-2xl font-extrabold">{t.user.displayName}</div>
-              <div className="text-sm font-semibold text-white/80">{s(t.count, 'message échangé', 'messages échangés')}</div>
+              <div className="text-sm font-semibold text-white">{s(t.count, 'message échangé', 'messages échangés')}</div>
             </div>
           </div>
         )}
@@ -176,7 +179,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
 
   push(
     'friends',
-    'from-[#22c55e] to-[#0e76c6]',
+    'from-[#15803d] to-[#0e76c6]',
     <>
       <Big>{s(r.friends.total, 'ami', 'amis')}</Big>
       {r.friends.added > 0 && <Line delay={0.2}>dont {n(r.friends.added)} cette année 🤝</Line>}
@@ -202,7 +205,7 @@ function slidesFor(r: RetroState, meName: string): Slide[] {
 
   push(
     'outro',
-    'from-[#e5484d] to-[#7b2ff7]',
+    'from-[#d1373c] to-[#7b2ff7]',
     <>
       <Big>Merci pour {r.year} 💙</Big>
       <Line delay={0.2}>Rendez-vous en {r.year + 1} pour de nouveaux souvenirs.</Line>
@@ -251,7 +254,7 @@ export function Retro() {
               <span key={sl.key} className={cx('h-1 flex-1 rounded-full transition-colors', k <= i ? 'bg-white' : 'bg-white/30')} />
             ))}
           </div>
-          <button type="button" aria-label="Fermer la rétro" onClick={goBack} className="tap grid h-10 w-10 place-items-center rounded-full border-0 bg-white/15 text-white">
+          <button type="button" aria-label="Fermer la rétro" onClick={goBack} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
             <X size={20} weight="bold" />
           </button>
         </div>
@@ -259,7 +262,8 @@ export function Retro() {
           {isLoading && <div className="grid h-full place-items-center text-lg font-bold text-white/80">Préparation de ta rétro…</div>}
           {error && <div className="grid h-full place-items-center px-8 text-center text-lg font-bold">Impossible de charger la rétro pour l’instant.</div>}
           {slide && (
-            <div key={slide.key} className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto px-7 py-6 text-center" aria-live="polite">
+            // `justify-center-safe` : un contenu trop haut commence en haut au lieu d'être coupé.
+            <div key={slide.key} className="flex h-full flex-col items-center justify-center-safe gap-4 overflow-y-auto px-7 py-6 text-center" aria-live="polite">
               {slide.body}
             </div>
           )}
@@ -280,7 +284,7 @@ export function Retro() {
               <ArrowCounterClockwise size={18} weight="bold" /> Revoir
             </button>
           ) : (
-            <span className="min-w-16 text-center text-sm font-bold text-white/80 tabular-nums">{slides.length ? `${i + 1}/${slides.length}` : ''}</span>
+            <span className="min-w-16 text-center text-sm font-bold text-white tabular-nums">{slides.length ? `${i + 1}/${slides.length}` : ''}</span>
           )}
           <button type="button" aria-label="Suivante" disabled={i >= last} onClick={() => go(1)} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white disabled:opacity-30">
             <CaretRight size={20} weight="bold" />
