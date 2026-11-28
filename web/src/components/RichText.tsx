@@ -79,7 +79,7 @@ export function MentionSuggestions({ value, onChange, inputRef, className }: { v
           aria-selected={false}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => pick(f.username)}
-          className="tap flex h-10 flex-none items-center gap-1.5 rounded-full border-0 bg-soft py-1 pr-3 pl-1 text-sm font-semibold text-ink"
+          className="tap flex h-11 flex-none items-center gap-1.5 rounded-full border-0 bg-soft py-1 pr-3 pl-1.5 text-sm font-semibold text-ink"
         >
           <Avatar user={f} size={30} />
           <span>{f.displayName.split(' ')[0]}</span>

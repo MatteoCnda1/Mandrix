@@ -14,9 +14,9 @@ const first = (name: string) => name.split(' ')[0];
 
 function Hero({ code }: { code?: string }) {
   return (
-    <div className="flex flex-col gap-3.5 rounded-[32px] bg-gradient-to-br from-[#7b2ff7] to-[#e5484d] p-6 text-white shadow-hero">
-      <div className="text-[clamp(34px,8vw,52px)] leading-none font-extrabold tracking-[-.05em]">Qui de nous… ?</div>
-      <p className="m-0 max-w-[420px] text-base leading-[1.45] text-white/85">Une question, chacun désigne quelqu’un de la bande. Les votes restent anonymes, le résultat non.</p>
+    <div className="flex flex-col gap-3.5 rounded-[32px] bg-gradient-to-br from-[#7b2ff7] to-[#d1373c] p-6 text-white shadow-hero">
+      <div className="text-[clamp(34px,8vw,52px)] leading-none font-extrabold tracking-[-.05em]">Qui de nous… ?</div>
+      <p className="m-0 max-w-[420px] text-base leading-[1.45] text-white">Une question, chacun désigne quelqu’un de la bande. Les votes restent anonymes, le résultat non.</p>
       {code && <span className="flex h-10 w-fit items-center rounded-[20px] bg-white/15 px-3.5 font-mono text-sm font-semibold">{code}</span>}
     </div>
   );
@@ -79,7 +79,7 @@ function QuestionBank() {
           value={text}
           maxLength={WHOIS.questionMax}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Qui de nous… finirait chanteur d’opéra ?"
+          placeholder="Qui de nous… ?"
           aria-label="Nouvelle question"
         />
         <button type="submit" disabled={busy || text.trim().length < 8} aria-label="Ajouter la question" className="tap grid h-12 w-12 flex-none place-items-center rounded-full border-0 bg-ink text-inv disabled:bg-line disabled:text-mute">
@@ -93,7 +93,7 @@ function QuestionBank() {
               <Avatar user={q.author} size={26} />
               <span className="min-w-0 flex-1 text-sm leading-snug">{q.text}</span>
               {q.mine && (
-                <button type="button" aria-label="Supprimer la question" onClick={() => remove(q)} className="tap grid h-9 w-9 flex-none place-items-center rounded-full border-0 bg-transparent text-mute hover:text-heart">
+                <button type="button" aria-label="Supprimer la question" onClick={() => remove(q)} className="tap -my-1 grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-transparent text-mute hover:text-heart">
                   <Trash size={16} />
                 </button>
               )}
@@ -102,7 +102,7 @@ function QuestionBank() {
         </ul>
       )}
       {list.length > 5 && (
-        <button type="button" onClick={() => setAll(!all)} className="tap self-start border-0 bg-transparent p-0 text-sm font-bold text-acc">
+        <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="tap min-h-11 self-start border-0 bg-transparent px-1 text-sm font-bold text-acc">
           {all ? 'Réduire' : `Voir les ${list.length} questions`}
         </button>
       )}
@@ -138,7 +138,7 @@ export function WhoisHome() {
             if (code.trim()) void run('whois:join', code.trim());
           }}
         >
-          <input className="field min-w-0 flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Code du salon (QDN-482)" maxLength={8} autoCapitalize="characters" />
+          <input className="field min-w-0 flex-1 font-mono uppercase" value={code} onChange={(e) => setCode(e.target.value)} placeholder="QDN-482" aria-label="Code du salon" maxLength={8} autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
           <button type="submit" disabled={busy || !connected || !code.trim()} className="tap h-12 rounded-3xl border-0 bg-ink px-5 text-[0.9375rem] font-bold text-inv active:scale-95 disabled:bg-line disabled:text-mute">
             Rejoindre
           </button>
@@ -154,7 +154,7 @@ function LeaveLink() {
     <button
       type="button"
       onClick={() => gameEmit('whois:leave')}
-      className="tap flex items-center gap-1.5 self-center border-0 bg-transparent px-2 py-2 text-sm font-semibold text-mute underline underline-offset-4"
+      className="tap flex min-h-11 items-center gap-1.5 self-center border-0 bg-transparent px-2 py-2 text-sm font-semibold text-mute underline underline-offset-4"
     >
       <SignOut size={16} /> Quitter le salon
     </button>
@@ -184,7 +184,7 @@ function Lobby({ room, meId }: { room: WhoisRoom; meId: string }) {
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(room.code).then(() => toast('Code copié'))}
-            className="tap ml-auto flex items-center gap-1.5 rounded-[14px] border-0 bg-soft px-3 py-2 font-mono text-[0.8125rem] font-semibold text-ink"
+            className="tap ml-auto flex min-h-11 items-center gap-1.5 rounded-[16px] border-0 bg-soft px-3 py-2 font-mono text-[0.8125rem] font-semibold text-ink"
             aria-label="Copier le code du salon"
           >
             {room.code} <Copy size={14} />
@@ -245,7 +245,7 @@ function Lobby({ room, meId }: { room: WhoisRoom; meId: string }) {
 
 function QuestionHead({ room, children }: { room: WhoisRoom; children?: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[32px] bg-gradient-to-br from-[#7b2ff7] to-[#e5484d] p-6 text-white shadow-hero">
+    <div className="flex flex-col gap-3 rounded-[32px] bg-gradient-to-br from-[#7b2ff7] to-[#d1373c] p-6 text-white shadow-hero">
       <div className="flex items-center gap-2">
         <span className="rounded-[16px] bg-white/15 px-3 py-1.5 text-xs font-bold">
           Question {room.round}/{room.rounds}
@@ -254,7 +254,7 @@ function QuestionHead({ room, children }: { room: WhoisRoom; children?: React.Re
       </div>
       <div className="text-[clamp(22px,5.4vw,32px)] leading-[1.15] font-extrabold tracking-[-.02em] text-balance">{room.question?.text}</div>
       {room.question?.by && (
-        <div className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-white/85">
+        <div className="flex items-center gap-1.5 text-[0.8125rem] font-semibold text-white">
           <Avatar user={room.question.by} size={20} /> Proposée par {first(room.question.by.displayName)}
         </div>
       )}
@@ -269,7 +269,7 @@ function Question({ room, meId }: { room: WhoisRoom; meId: string }) {
   return (
     <div className="flex animate-in flex-col gap-3.5">
       <QuestionHead room={room}>
-        <span className={cx('ml-auto flex items-center gap-1 rounded-[16px] px-3 py-1.5 text-xs font-bold tabular-nums', left <= 5 ? 'bg-white text-heart' : 'bg-white/15')}>
+        <span className={cx('ml-auto flex items-center gap-1 rounded-[16px] px-3 py-1.5 text-xs font-bold tabular-nums', left <= 5 ? 'bg-white text-[#d1373c]' : 'bg-white/15')}>
           <Timer size={14} weight="bold" /> {left} s
         </span>
       </QuestionHead>

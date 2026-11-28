@@ -60,23 +60,31 @@ export function Landing() {
     <div className="min-h-dvh font-sans text-ink">
       <div
         className="mx-auto flex min-h-dvh max-w-[1120px] animate-in flex-wrap items-center gap-[clamp(32px,6vw,72px)]"
-        style={{ padding: 'clamp(24px,5vw,56px)', paddingTop: 'calc(clamp(24px,5vw,56px) + env(safe-area-inset-top))', animationDuration: '.6s' }}
+        style={{
+          padding: 'clamp(24px,5vw,56px)',
+          paddingTop: 'calc(clamp(24px,5vw,56px) + env(safe-area-inset-top))',
+          paddingBottom: 'calc(clamp(24px,5vw,56px) + env(safe-area-inset-bottom))',
+          animationDuration: '.6s',
+        }}
       >
         <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-[22px]">
           <Logo size={72} />
           <h1 className="m-0 font-script text-[clamp(76px,13vw,140px)] leading-[.95] font-normal">Mandrix</h1>
           <p className="m-0 max-w-[440px] text-lg leading-normal text-pretty text-body">
-            Poste, vote et joue avec tes amis. Chaque dimanche à 20h, tout le monde déballe les photos de la semaine.
+            Poste, vote et joue avec tes amis. Chaque dimanche à 20 h, tout le monde déballe les photos de la semaine.
           </p>
           <form onSubmit={submit} className="card flex max-w-[440px] flex-col gap-2.5 p-3.5">
             {mode === 'signup' && (
               <input
                 className={field}
                 placeholder="Pseudo"
+                aria-label="Pseudo"
                 value={username}
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
                 autoComplete="username"
                 autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 required
                 minLength={3}
                 maxLength={20}
@@ -86,10 +94,14 @@ export function Landing() {
               className={field}
               type={mode === 'login' ? 'text' : 'email'}
               placeholder={mode === 'login' ? 'E-mail ou pseudo' : 'Adresse e-mail'}
+              aria-label={mode === 'login' ? 'E-mail ou pseudo' : 'Adresse e-mail'}
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete={mode === 'login' ? 'username' : 'email'}
               autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
             />
             {mode !== 'forgot' && (
@@ -97,6 +109,7 @@ export function Landing() {
                 className={field}
                 type="password"
                 placeholder="Mot de passe"
+                aria-label="Mot de passe"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -107,18 +120,21 @@ export function Landing() {
             {mode === 'signup' && config?.inviteRequired && (
               <input
                 className={field}
-                placeholder="Code de parrainage (ex. LEA-7K2F)"
+                placeholder="Code de parrainage"
+                aria-label="Code de parrainage"
                 value={invite}
                 onChange={(e) => setInvite(e.target.value.toUpperCase())}
                 autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
                 required
               />
             )}
             {mode === 'signup' && config?.inviteRequired && !invite && (
-              <div className="px-3 text-[0.8125rem] leading-snug text-mute">Mandrix se rejoint sur invitation : demande son code de parrainage à un ami déjà inscrit.</div>
+              <div className="px-3 text-[0.8125rem] leading-snug text-mute">Mandrix se rejoint sur invitation : demande son code de parrainage (par exemple LEA-7K2F) à un ami déjà inscrit.</div>
             )}
             {error && <div className="px-3 text-sm font-semibold text-heart" role="alert">{error}</div>}
-            {info && <div className="px-3 text-sm font-semibold text-acc">{info}</div>}
+            {info && <div className="px-3 text-sm font-semibold text-acc" role="status">{info}</div>}
             <button
               type="submit"
               disabled={busy}
@@ -134,13 +150,13 @@ export function Landing() {
           <div className="flex flex-wrap gap-x-4">
             <button
               type="button"
-              onClick={() => switchTo(mode === 'signup' ? 'login' : 'signup')}
-              className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-ink underline underline-offset-4"
+              onClick={() => switchTo(mode === 'login' ? 'signup' : 'login')}
+              className="tap min-h-11 self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-ink underline underline-offset-4"
             >
-              {mode === 'signup' ? 'J’ai déjà un compte' : 'Créer un compte'}
+              {mode === 'signup' ? 'J’ai déjà un compte' : mode === 'forgot' ? 'Retour à la connexion' : 'Créer un compte'}
             </button>
             {mode === 'login' && config?.mailEnabled && (
-              <button type="button" onClick={() => switchTo('forgot')} className="tap self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-mute underline underline-offset-4">
+              <button type="button" onClick={() => switchTo('forgot')} className="tap min-h-11 self-start border-0 bg-transparent px-1 py-2.5 text-[0.9375rem] font-semibold text-mute underline underline-offset-4">
                 Mot de passe oublié ?
               </button>
             )}

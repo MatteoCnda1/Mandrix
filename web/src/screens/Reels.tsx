@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type TouchEvent, type WheelEvent } from 'r
 import { useNavigate, useSearchParams } from 'react-router';
 import { useHeartBurst } from '../components/HeartBurst';
 import { useDoubleTap } from '../lib/gestures';
-import { Avatar, EmptyCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
+import { Avatar, EmptyCard, ErrorCard, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, toggleLike, toggleRepost, useMe, useReels, usePost } from '../lib/data';
 import { fmtCount } from '../lib/format';
 import { openPool, useUI } from '../lib/store';
@@ -38,7 +38,8 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
       burst.show(box.current, p);
     },
   );
-  const side = 'tap grid h-[50px] w-[50px] place-items-center rounded-full border-0 bg-white/15 text-white transition-transform duration-200 active:scale-[.88]';
+  // Fond sombre translucide : les boutons restent visibles sur une vidéo claire.
+  const side = 'tap grid h-[50px] w-[50px] place-items-center rounded-full border-0 bg-black/30 text-white backdrop-blur transition-transform duration-200 active:scale-[.88]';
   return (
     <div ref={box} className="phdark relative grid h-full place-items-center">
       {post.media && (
@@ -55,6 +56,9 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
           onClick={onTap}
         />
       )}
+      {/* Voiles haut et bas : progression, son, légende et compteurs lisibles sur une vidéo claire. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/45 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/55 to-transparent" />
       {burst.node}
       {paused && active && (
         <span className="pointer-events-none relative grid h-[68px] w-[68px] place-items-center rounded-full bg-white/90 text-night">
@@ -64,7 +68,7 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
       <div className="absolute top-3.5 right-[18px] left-[18px] h-1 overflow-hidden rounded-sm bg-white/20">
         <div className="h-full rounded-sm bg-white" style={{ width: `${progress * 100}%` }} />
       </div>
-      <button type="button" aria-label={muted ? 'Activer le son' : 'Couper le son'} onClick={onToggleMute} className="tap absolute top-7 right-3.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur">
+      <button type="button" aria-label={muted ? 'Activer le son' : 'Couper le son'} onClick={onToggleMute} className="tap absolute top-7 right-3.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-black/30 text-white backdrop-blur">
         {muted ? <SpeakerSlash size={20} /> : <SpeakerHigh size={20} />}
       </button>
       <div className="absolute right-[84px] bottom-5 left-[18px] flex flex-col gap-2 text-white [text-shadow:0_1px_10px_rgba(0,0,0,.45)]">
@@ -72,35 +76,41 @@ function Reel({ post, active, muted, onToggleMute }: { post: Post; active: boole
           type="button"
           disabled={post.anonymous}
           onClick={() => !post.anonymous && nav(`/u/${post.author.username}`)}
-          className="tap flex items-center gap-2.5 border-0 bg-transparent p-0 text-left text-white"
+          className="tap flex min-h-11 min-w-0 items-center gap-2.5 self-start border-0 bg-transparent p-0 text-left text-white"
         >
           <Avatar user={post.author} size={40} className="[text-shadow:none]" anonymous={post.anonymous} />
-          <span className="text-[0.9375rem] font-bold">{post.author.displayName}</span>
+          <span className="min-w-0 truncate text-[0.9375rem] font-bold">{post.author.displayName}</span>
         </button>
-        {post.text && <div className="text-base leading-[1.4]">{post.text}</div>}
+        {post.text && <div className="line-clamp-4 text-base leading-[1.4] break-words">{post.text}</div>}
       </div>
-      <div className="absolute right-3.5 bottom-5 flex flex-col items-center gap-2.5 text-xs font-bold text-white">
-        <button type="button" aria-label="Aimer" className={side} onClick={() => toggleLike(post)}>
+      <div className="absolute right-3.5 bottom-5 flex flex-col items-center gap-2.5 text-xs font-bold text-white [text-shadow:0_1px_8px_rgba(0,0,0,.55)]">
+        <button type="button" aria-label={`J’aime (${post.likes})`} aria-pressed={post.liked} className={side} onClick={() => toggleLike(post)}>
           <Heart size={24} weight={post.liked ? 'fill' : 'regular'} className={cx(post.liked && 'animate-pop text-heartlite')} />
         </button>
         <span>{fmtCount(post.likes)}</span>
-        <button type="button" aria-label="Commenter" className={side} onClick={() => useUI.setState({ commentsFor: post.id })}>
+        <button type="button" aria-label={`Commentaires (${post.comments})`} className={side} onClick={() => useUI.setState({ commentsFor: post.id })}>
           <ChatCircle size={24} />
         </button>
         <span>{fmtCount(post.comments)}</span>
-        <button type="button" aria-label="Republier" className={cx(side, post.reposted && 'text-ice')} onClick={() => me && toggleRepost(post, me.id)}>
+        <button type="button" aria-label={`Republier (${post.reposts})`} aria-pressed={post.reposted} className={cx(side, post.reposted && 'text-ice')} onClick={() => me && toggleRepost(post, me.id)}>
           <Repeat size={24} />
         </button>
         <span>{fmtCount(post.reposts)}</span>
-        <button
-          type="button"
-          aria-label="Envoyer dans le pool"
-          onClick={() => (post.pool ? removeFromPool({ postId: post.id }) : openPool({ postId: post.id }))}
-          className={cx(side, post.pool ? 'bg-brand text-white' : 'bg-white text-night')}
-        >
-          {post.pool ? <CheckCircle size={24} weight="fill" /> : <Sticker size={24} />}
-        </button>
-        <span>Pool</span>
+        {/* Pas de pool pour un post anonyme : le pool affiche à qui est l'image (comme sur le fil). */}
+        {!post.anonymous && (
+          <>
+            <button
+              type="button"
+              aria-label={post.pool ? 'Retirer du pool' : 'Envoyer dans le pool'}
+              aria-pressed={!!post.pool}
+              onClick={() => (post.pool ? removeFromPool({ postId: post.id }) : openPool({ postId: post.id }))}
+              className={cx(side, post.pool ? 'bg-brand text-white' : 'bg-white text-night')}
+            >
+              {post.pool ? <CheckCircle size={24} weight="fill" /> : <Sticker size={24} />}
+            </button>
+            <span>Pool</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -150,6 +160,7 @@ export function Reels() {
   });
 
   if (reels.isLoading) return <ScreenLoader />;
+  if (reels.isError && items.length === 0) return <ErrorCard onRetry={() => void reels.refetch()} />;
   if (items.length === 0)
     return (
       <EmptyCard icon={<Play size={30} weight="fill" />} title="Pas encore de Reels" text="Les vidéos publiées par tes amis apparaîtront ici. Lance-toi avec la première !">
@@ -176,7 +187,8 @@ export function Reels() {
         onTouchStart={(e) => (touchY.current = e.touches[0].clientY)}
         onTouchEnd={onTouchEnd}
         className="relative w-full max-w-[440px] touch-none overflow-hidden rounded-[36px] bg-night shadow-deep"
-        style={{ height: isPhone ? 'calc(100dvh - 210px)' : 'min(74vh, 760px)' }}
+        // Téléphone : entre l'en-tête et la barre d'onglets, encoche et indicateur d'accueil compris.
+        style={{ height: isPhone ? 'calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom))' : 'min(74vh, 760px)' }}
       >
         <div className="h-full transition-transform duration-[600ms] ease-[cubic-bezier(.3,.9,.2,1)]" style={{ transform: `translateY(-${idx * 100}%)` }}>
           {items.map((p, i) => (

@@ -4,7 +4,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { PostCard } from '../components/PostCard';
-import { Avatar, cx, EmptyCard } from '../components/ui';
+import { Avatar, cx, EmptyCard, ErrorCard } from '../components/ui';
 import { api } from '../lib/api';
 import { friendAction } from '../lib/data';
 import { useDebounced, useSentinel } from '../lib/hooks';
@@ -53,7 +53,7 @@ export function Suggestions({ limit = 12, onOpen }: { limit?: number; onOpen?: (
               }
             }}
             className={cx(
-              'tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 px-3.5 text-[0.8125rem] font-bold transition-transform active:scale-95',
+              'tap flex h-11 flex-none items-center gap-1.5 rounded-[22px] border-0 px-3.5 text-[0.8125rem] font-bold transition-transform active:scale-95',
               sent.has(s.user.id) ? 'bg-soft text-mute' : 'bg-brand text-white',
             )}
           >
@@ -114,7 +114,7 @@ export function Search() {
           aria-label="Rechercher"
         />
         {q && (
-          <button type="button" aria-label="Effacer" onClick={() => setQ('')} className="tap absolute right-1.5 grid h-10 w-10 place-items-center rounded-full border-0 bg-transparent text-mute">
+          <button type="button" aria-label="Effacer" onClick={() => setQ('')} className="tap absolute right-0.5 grid h-11 w-11 place-items-center rounded-full border-0 bg-transparent text-mute">
             <X size={18} />
           </button>
         )}
@@ -144,7 +144,8 @@ export function Search() {
             </div>
           )}
           {res.isLoading && <div className="py-8 text-center text-sm text-mute">Recherche…</div>}
-          {!res.isLoading && posts.length === 0 && users.length === 0 && (
+          {res.isError && !res.data && <ErrorCard onRetry={() => void res.refetch()} />}
+          {!res.isLoading && !res.isError && posts.length === 0 && users.length === 0 && (
             <EmptyCard
               icon={hashtag ? <Hash size={30} weight="bold" /> : <MagnifyingGlass size={30} weight="bold" />}
               title="Rien trouvé"

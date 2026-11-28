@@ -89,10 +89,14 @@ export const useWhoisQuestions = () => useQuery({ queryKey: ['whois-questions'],
 export const usePoolStats = () => useQuery({ queryKey: ['pool-stats'], queryFn: () => api<PoolStats>('/api/pool/stats') });
 export const useProfile = (username: string) =>
   useQuery({ queryKey: ['profile', username], queryFn: () => api<UserProfile>(`/api/users/${encodeURIComponent(username)}`), enabled: !!username });
+/** Grille d'un profil, 30 posts par page (la page suivante se charge en bas de la grille). */
 export const useUserPosts = (username: string, tab: 'posts' | 'reels' | 'memes') =>
-  useQuery({
-    queryKey: ['user-posts', username, tab],
-    queryFn: () => api<ProfilePosts>(`/api/users/${encodeURIComponent(username)}/posts?tab=${tab}`),
+  useInfiniteQuery({
+    // « pages » : nouvelle forme des données (pages successives) ; un ancien cache sous l'autre clé est ignoré.
+    queryKey: ['user-posts', username, tab, 'pages'],
+    queryFn: ({ pageParam }) => api<ProfilePosts>(`/api/users/${encodeURIComponent(username)}/posts?tab=${tab}&page=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next ?? undefined,
   });
 export const useFriends = () => useQuery({ queryKey: ['friends'], queryFn: () => api<FriendsList>('/api/friends') });
 export const useUserSearch = (q: string) =>

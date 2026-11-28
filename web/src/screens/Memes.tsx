@@ -2,14 +2,17 @@ import { Heart, Trophy } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router';
 import { SeasonBoard } from '../components/Daily';
 import { TapMedia } from '../components/PostCard';
-import { Avatar, EmptyCard, MediaView, Podium, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
+import { Avatar, EmptyCard, ErrorCard, Podium, PrimaryBtn, ScreenLoader, cx } from '../components/ui';
 import { toggleLike, useMemes } from '../lib/data';
 import { fmtCount } from '../lib/format';
+import { useGoBack } from '../lib/nav';
 
 export function Memes() {
   const nav = useNavigate();
-  const { data, isLoading } = useMemes();
+  const back = useGoBack();
+  const { data, isLoading, isError, refetch } = useMemes();
   if (isLoading) return <ScreenLoader />;
+  if (isError && !data) return <ErrorCard onRetry={() => void refetch()} />;
   const items = data?.items ?? [];
   const podium = data?.podium ?? [];
 
@@ -40,7 +43,7 @@ export function Memes() {
       </div>
       {items.length === 0 ? (
         <EmptyCard icon={<Trophy size={30} weight="fill" />} title="Aucun mème pour l’instant" text="Lance une partie de Make It Friends et publie ta meilleure légende.">
-          <PrimaryBtn tone="brand" onClick={() => nav('/jeu')}>
+          <PrimaryBtn tone="brand" onClick={() => back('/jeu')}>
             Jouer
           </PrimaryBtn>
         </EmptyCard>
@@ -51,13 +54,15 @@ export function Memes() {
               <div className="grid min-h-11 place-items-center px-1.5 py-0.5 text-center text-[1.0625rem] leading-tight font-extrabold tracking-[-.02em] text-balance">{m.text}</div>
               <TapMedia post={m} ratio="4 / 3" whole className="rounded-[20px]" sizes="(max-width: 600px) 100vw, 340px" />
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap truncate border-0 bg-transparent pl-1 text-[0.8125rem] text-mute">
+                <button type="button" onClick={() => nav(`/u/${m.author.username}`)} className="tap min-h-11 min-w-0 truncate border-0 bg-transparent pl-1 text-left text-[0.8125rem] text-mute">
                   Légende de {m.author.displayName}
                 </button>
                 <button
                   type="button"
                   onClick={() => toggleLike(m)}
-                  className="tap ml-auto flex h-11 items-center gap-1.5 rounded-[22px] border-0 bg-soft px-3.5 text-sm font-semibold text-ink transition-transform active:scale-[.92]"
+                  aria-label={`J’aime (${m.likes})`}
+                  aria-pressed={m.liked}
+                  className="tap ml-auto flex h-11 flex-none items-center gap-1.5 rounded-[22px] border-0 bg-soft px-3.5 text-sm font-semibold text-ink transition-transform active:scale-[.92]"
                 >
                   <Heart size={20} weight={m.liked ? 'fill' : 'regular'} className={cx(m.liked && 'animate-pop text-heart')} />
                   <span>{fmtCount(m.likes)}</span>

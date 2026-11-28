@@ -16,7 +16,7 @@ import {
 } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { GuessQuiz, GuessSummary } from '../components/GuessQuiz';
-import { Avatar, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
+import { Avatar, ErrorCard, MediaView, Portal, ScreenLoader, cx } from '../components/ui';
 import { removeFromPool, sendToPool, toggleShotLike, useMe, useUnpack } from '../lib/data';
 import { countdown, fmtCount, plural } from '../lib/format';
 import { ZoomableImage } from '../components/Zoomable';
@@ -49,7 +49,8 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
     onSwipeX: (dir) => setI((x) => Math.max(0, Math.min(photos.length - 1, x - dir))),
   });
   if (!shot) return null;
-  const nav = 'tap absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur';
+  // Voile sombre : les flèches restent visibles sur une photo claire.
+  const nav = 'tap absolute top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-full border-0 bg-black/35 text-white backdrop-blur';
   return (
     <div className="fixed inset-0 z-[45] grid animate-fade place-items-center bg-[rgba(8,12,17,.94)] p-3" role="dialog" aria-modal="true" aria-label={`Photo de ${shot.author.displayName}`}>
       <div className="relative flex h-[min(88vh,820px)] w-full max-w-[520px] animate-drop flex-col overflow-hidden rounded-[36px] bg-night" style={gestures.style}>
@@ -89,6 +90,8 @@ function ShotViewer({ photos, index, onClose }: { photos: Shot[]; index: number;
           <button
             type="button"
             onClick={() => toggleShotLike(shot)}
+            aria-label={`J’aime (${shot.likes})`}
+            aria-pressed={shot.liked}
             className="tap flex h-12 items-center gap-2 rounded-3xl border-0 bg-white/15 px-4 text-[0.9375rem] font-bold text-white active:scale-95"
           >
             <Heart size={22} weight={shot.liked ? 'fill' : 'regular'} className={cx(shot.liked && 'animate-pop text-heartlite')} />
@@ -158,6 +161,8 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
               <img src={shot.media.url} alt="" className="h-full w-full animate-ken object-cover" />
             </div>
             {next && <link rel="prefetch" href={next.media.url} />}
+            {/* Voiles haut et bas : barre de progression, compteur et boutons lisibles sur une photo claire. */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent" />
             <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/75 to-transparent" />
             <div className="absolute right-5 bottom-6 left-5 flex items-center gap-3 text-white">
               <Avatar user={shot.author} size={44} />
@@ -208,7 +213,7 @@ function Retro({ photos, top, label, onClose }: { photos: Shot[]; top: Shot[]; l
             {Math.min(i + 1, last)}/{last}
           </span>
           {paused && shot && <span className="rounded-full bg-black/40 px-2.5 py-1 text-xs font-bold">En pause</span>}
-          <button type="button" aria-label="Fermer la rétrospective" onClick={onClose} className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white backdrop-blur">
+          <button type="button" aria-label="Fermer la rétrospective" onClick={onClose} className="tap ml-auto grid h-11 w-11 place-items-center rounded-full border-0 bg-black/35 text-white backdrop-blur">
             <X size={20} />
           </button>
         </div>
@@ -243,7 +248,7 @@ export function Unpack() {
       setFetching(null);
     }
   };
-  const { data, isLoading } = useUnpack();
+  const { data, isLoading, isError, refetch } = useUnpack();
   const { data: me } = useMe();
   const [retro, setRetro] = useState(false);
   const now = useNow(1000);
@@ -261,6 +266,8 @@ export function Unpack() {
     }
   }, [r?.revealAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hors ligne sans cache : une erreur avec « Réessayer », pas un squelette sans fin.
+  if (isError && !data) return <ErrorCard onRetry={() => void refetch()} />;
   if (isLoading || !data) return <ScreenLoader />;
   const cd = countdown(data.nextRevealAt, now);
 
@@ -310,7 +317,7 @@ export function Unpack() {
           )}
         >
           {locked || quizTodo ? <LockSimple size={18} weight="fill" /> : revealed ? <ArrowCounterClockwise size={18} /> : <Package size={18} weight="fill" />}
-          <span>{locked ? 'Ouverture dimanche à 20h' : quizTodo ? 'Devine d’abord' : revealed ? 'Refermer' : 'Déballer la semaine'}</span>
+          <span>{locked ? 'Ouverture dimanche à 20 h' : quizTodo ? 'Devine d’abord' : revealed ? 'Refermer' : 'Déballer la semaine'}</span>
         </button>
       </div>
 
@@ -405,29 +412,36 @@ export function Unpack() {
                   <LockSimple size={28} weight="fill" />
                 </div>
                 {r && (
-                  <div
-                    className="ph tap absolute inset-0 flex flex-col justify-end overflow-hidden rounded-3xl p-2.5 shadow-[0_10px_26px_rgba(20,90,160,.12)] [backface-visibility:hidden]"
-                    onClick={() => open && setViewer(i)}
-                  >
+                  <div className="ph absolute inset-0 flex flex-col justify-end overflow-hidden rounded-3xl p-2.5 shadow-[0_10px_26px_rgba(20,90,160,.12)] [backface-visibility:hidden]">
                     {open && <MediaView media={ph.media} className="absolute inset-0" sizes="(max-width: 700px) 34vw, 220px" />}
+                    {/* Vrai bouton (clavier, VoiceOver) sur toute la tuile ; le bouton pool reste à part. */}
+                    {open && (
+                      <button
+                        type="button"
+                        aria-label={`Photo de ${ph.author.displayName}, ${ph.day}`}
+                        onClick={() => setViewer(i)}
+                        className="tap absolute inset-0 rounded-3xl border-0 bg-transparent p-0"
+                      />
+                    )}
                     {open && ph.onTime && (
                       <span className="absolute top-2 left-2 flex h-7 items-center gap-1 rounded-full bg-gradient-to-r from-ember to-heart px-2.5 text-[0.6875rem] font-extrabold text-white shadow-[0_4px_12px_rgba(229,72,77,.35)]">
                         <Lightning size={12} weight="fill" /> Pile à l’heure
                       </span>
                     )}
-                    <div className="relative flex items-center gap-1.5">
+                    <div className="pointer-events-none relative flex items-center gap-1.5">
                       <span className="flex h-9 min-w-0 flex-1 items-center truncate rounded-[18px] bg-card px-3 text-xs font-bold">
                         @{ph.author.username} · {ph.day}
                       </span>
                       <button
                         type="button"
-                        aria-label="Envoyer dans le pool"
+                        aria-label={ph.pool ? 'Retirer du pool' : 'Envoyer dans le pool'}
+                        aria-pressed={!!ph.pool}
                         onClick={(e) => {
                           e.stopPropagation();
                           if (ph.pool) removeFromPool({ shotId: ph.id });
                           else openPool({ shotId: ph.id });
                         }}
-                        className={cx('tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 transition-[background,transform] duration-300 active:scale-[.88]', ph.pool ? 'bg-brand text-white' : 'bg-ink text-inv')}
+                        className={cx('tap pointer-events-auto grid h-11 w-11 flex-none place-items-center rounded-full border-0 transition-[background,transform] duration-300 active:scale-[.88]', ph.pool ? 'bg-brand text-white' : 'bg-ink text-inv')}
                       >
                         {ph.pool ? <CheckCircle size={20} weight="fill" /> : <Sticker size={20} />}
                       </button>

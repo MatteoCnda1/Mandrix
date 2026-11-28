@@ -30,19 +30,30 @@ export function ResetPassword() {
   };
 
   return (
-    <div className="grid min-h-dvh place-items-center p-6 font-sans text-ink">
+    <div
+      className="grid min-h-dvh place-items-center p-6 font-sans text-ink"
+      style={{ paddingTop: 'calc(24px + env(safe-area-inset-top))', paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}
+    >
       <form onSubmit={submit} className="card flex w-full max-w-[420px] animate-in flex-col gap-3 p-5">
         <div className="flex items-center gap-3">
           <Logo size={40} />
           <div className="font-script text-4xl leading-none">Mandrix</div>
         </div>
         <div className="text-xl font-extrabold tracking-[-.02em]">Nouveau mot de passe</div>
-        <input className="field" type="password" placeholder="Nouveau mot de passe" minLength={8} required value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
-        <input className="field" type="password" placeholder="Confirme le mot de passe" minLength={8} required value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
-        {error && <div className="px-2 text-sm font-semibold text-heart">{error}</div>}
+        <input className="field" type="password" placeholder="Nouveau mot de passe" aria-label="Nouveau mot de passe" minLength={8} required value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+        <input className="field" type="password" placeholder="Confirme le mot de passe" aria-label="Confirme le mot de passe" minLength={8} required value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+        {error && (
+          <div className="px-2 text-sm font-semibold text-heart" role="alert">
+            {error}
+          </div>
+        )}
         <PrimaryBtn type="submit" disabled={busy}>
           Enregistrer
         </PrimaryBtn>
+        {/* Lien expiré ou déjà utilisé : une sortie vers la connexion (et « Mot de passe oublié ? »). */}
+        <button type="button" onClick={() => nav('/', { replace: true })} className="tap min-h-11 self-center border-0 bg-transparent px-2 text-[0.9375rem] font-semibold text-acc">
+          Retour à la connexion
+        </button>
       </form>
     </div>
   );

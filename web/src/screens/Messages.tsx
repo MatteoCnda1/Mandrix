@@ -33,7 +33,7 @@ import { SharedPostCard } from '../components/SharedPost';
 import { ReactionPicker, type MenuAction } from '../components/Reactions';
 import { RichText } from '../components/RichText';
 import { openReport } from '../components/Report';
-import { Avatar, EmptyCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
+import { Avatar, EmptyCard, ErrorCard, MediaView, PrimaryBtn, PullIndicator, ScreenLoader, Sheet, Switch, confirmAction, cx, fmtDuration, useFilePicker } from '../components/ui';
 import { api, ApiError, errMsg, upload } from '../lib/api';
 import { useSwipeX } from '../lib/gestures';
 import { useDebounced, useLongPress, useObjectUrl, type Point } from '../lib/hooks';
@@ -54,7 +54,7 @@ import { useViewport } from '../lib/theme';
 export function Messages() {
   const nav = useNavigate();
   const { data: me } = useMe();
-  const { data, isLoading, dataUpdatedAt } = useConversations();
+  const { data, isLoading, isError, refetch, dataUpdatedAt } = useConversations();
   const now = useNow(60_000);
   const typing = useTyping();
   const presences = usePresence();
@@ -70,6 +70,7 @@ export function Messages() {
   }, [data, dataUpdatedAt]);
   const { pull, refreshing } = usePullToRefresh(() => qc.invalidateQueries({ queryKey: ['conversations'] }));
   if (isLoading) return <ScreenLoader />;
+  if (isError && !data) return <ErrorCard onRetry={() => void refetch()} />;
   return (
     <div data-screen-label="Messages" className="flex animate-in flex-col gap-3">
       <PullIndicator pull={pull} refreshing={refreshing} />
@@ -94,7 +95,7 @@ export function Messages() {
         </EmptyCard>
       ) : (
         <div className="card flex flex-col gap-0.5 p-2">
-          {shown.length === 0 && <div className="p-4 text-center text-sm text-mute">Aucune conversation pour « {search} ».</div>}
+          {shown.length === 0 && search.trim() && <div className="p-4 text-center text-sm text-mute">Aucune conversation pour « {search} ».</div>}
           {shown.map((c) => {
             const muteActions: MenuAction[] = [
               {
@@ -307,13 +308,13 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
           </span>
         </button>
         {conv.photo && (
-          <button type="button" disabled={busy} onClick={removePhoto} className="tap border-0 bg-transparent text-[0.8125rem] font-bold text-mute">
+          <button type="button" disabled={busy} onClick={removePhoto} className="tap h-11 rounded-[22px] border-0 bg-transparent px-3 text-[0.8125rem] font-bold text-mute">
             Retirer la photo
           </button>
         )}
       </div>
       <div className="flex gap-2">
-        <input className="field flex-1" value={title} maxLength={40} onChange={(e) => setTitle(e.target.value)} placeholder="Nom du groupe" />
+        <input className="field flex-1" value={title} maxLength={40} onChange={(e) => setTitle(e.target.value)} placeholder="Nom du groupe" aria-label="Nom du groupe" />
         <button
           type="button"
           disabled={busy || title.trim() === (conv.title ?? '')}
@@ -328,37 +329,33 @@ function GroupSheet({ conv, onClose }: { conv: ConversationDetail; onClose: () =
       </div>
       <div className="flex flex-col gap-0.5">
         {conv.members.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => {
-              onClose();
-              nav(m.id === me?.id ? '/profil' : `/u/${m.username}`);
-            }}
-            className="tap flex items-center gap-3 rounded-3xl border-0 bg-transparent p-2 text-left text-ink hover:bg-soft"
-          >
-            <Avatar user={m} size={42} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[0.9375rem] font-bold">{m.id === me?.id ? 'Toi' : m.displayName}</span>
-              <span className="block truncate text-[0.8125rem] text-mute">@{m.username}</span>
-            </span>
-            {conv.createdBy === m.id && <span className="rounded-full bg-soft px-2.5 py-1 text-xs font-bold text-mute">Créateur</span>}
+          <div key={m.id} className="flex items-center gap-2 rounded-3xl hover:bg-soft">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                nav(m.id === me?.id ? '/profil' : `/u/${m.username}`);
+              }}
+              className="tap flex min-w-0 flex-1 items-center gap-3 border-0 bg-transparent p-2 text-left text-ink"
+            >
+              <Avatar user={m} size={42} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[0.9375rem] font-bold">{m.id === me?.id ? 'Toi' : m.displayName}</span>
+                <span className="block truncate text-[0.8125rem] text-mute">@{m.username}</span>
+              </span>
+              {conv.createdBy === m.id && <span className="flex-none rounded-full bg-soft px-2.5 py-1 text-xs font-bold text-mute">Créateur</span>}
+            </button>
             {conv.createdBy === me?.id && m.id !== me?.id && (
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 aria-label={`Retirer ${m.displayName} du groupe`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void removeMember(m);
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && void removeMember(m)}
-                className="tap rounded-full bg-soft px-3 py-1.5 text-xs font-bold text-heart"
+                onClick={() => void removeMember(m)}
+                className="tap mr-1 h-11 flex-none rounded-[22px] border-0 bg-soft px-3.5 text-xs font-bold text-heart"
               >
                 Retirer
-              </span>
+              </button>
             )}
-          </button>
+          </div>
         ))}
       </div>
       {adding ? (
@@ -431,7 +428,7 @@ function Pressable({
     <div className="relative">
       <span
         aria-hidden
-        className="absolute top-1/2 -left-9 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-soft text-mute"
+        className="absolute top-1/2 left-1 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-soft text-mute"
         style={{ opacity: Math.min(1, dx / 56), transform: `translateY(-50%) scale(${0.6 + Math.min(1, dx / 56) * 0.4})` }}
       >
         <ArrowBendUpLeft size={16} weight="bold" />
@@ -521,7 +518,7 @@ function ChatView({ id }: { id: string }) {
   const goBack = useGoBack();
   const { isPhone } = useViewport();
   const { data: me } = useMe();
-  const { data: conv } = useConversation(id);
+  const { data: conv, error: convError } = useConversation(id);
   const { data: msgs, isLoading } = useMessages(id);
   const [draft, setDraft] = useState('');
   const [info, setInfo] = useState(false);
@@ -795,7 +792,34 @@ function ChatView({ id }: { id: string }) {
     }
   };
 
-  if (isLoading || !me) return <ScreenLoader />;
+  // Conversation quittée, supprimée ou lien mort : un message clair plutôt qu'un fil vide qui refuse les envois.
+  const gone = convError instanceof ApiError && convError.status === 404;
+  if (gone || isLoading || !me) {
+    const body = gone ? (
+      <EmptyCard icon={<ChatCircleDots size={30} weight="fill" />} title="Conversation introuvable" text="Elle a été supprimée, ou tu n’en fais plus partie.">
+        <PrimaryBtn onClick={() => goBack('/messages')}>Retour aux messages</PrimaryBtn>
+      </EmptyCard>
+    ) : (
+      <ScreenLoader />
+    );
+    if (!isPhone) return body;
+    // Téléphone : l'en-tête de l'app est masqué ici, on garde un bouton retour pendant l'attente.
+    return (
+      <div className="fixed inset-x-0 z-30 flex flex-col" style={{ top: 'var(--vv-top, 0px)', height: 'var(--vvh, 100dvh)' }}>
+        <header className="glass-bar flex flex-none items-center gap-2 rounded-b-[28px] px-3 pb-2.5" style={{ paddingTop: 'calc(10px + env(safe-area-inset-top))' }}>
+          <button
+            type="button"
+            aria-label="Retour : Messages"
+            onClick={() => goBack('/messages')}
+            className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-acc active:scale-95"
+          >
+            <CaretLeft size={20} weight="bold" />
+          </button>
+        </header>
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto p-3">{body}</div>
+      </div>
+    );
+  }
 
   const byId = new Map((conv?.members ?? []).map((m) => [m.id, m]));
   const group = !!conv?.isGroup;
@@ -857,7 +881,7 @@ function ChatView({ id }: { id: string }) {
     <button
       type="button"
       onClick={() => (group ? setInfo(true) : conv.user && nav(`/u/${conv.user.username}`))}
-      className="tap flex min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink"
+      className="tap flex min-h-11 min-w-0 flex-1 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink"
     >
       <ConvAvatar isGroup={group} user={conv.user} members={conv.members.filter((m) => m.id !== me.id)} photo={conv.photo} size={40} />
       <span className="min-w-0">
@@ -1007,14 +1031,15 @@ function ChatView({ id }: { id: string }) {
                   onClick={() => showOriginal((m.meta as { replyTo: { id: string } }).replyTo.id)}
                   className={cx(
                     'tap mb-1.5 block w-full rounded-[14px] border-0 border-l-[3px] border-solid px-2.5 py-1.5 text-left text-[0.8125rem] leading-snug',
-                    mine ? 'border-white/70 bg-white/15 text-white' : 'border-brand bg-card/70 text-ink',
+                    // Citation dans ma bulle bleue : voile sombre pour garder le texte blanc lisible.
+                    mine ? 'border-white/70 bg-black/15 text-white' : 'border-brand bg-card/70 text-ink',
                     m.media && m.media.kind !== 'audio' && 'mx-1 mt-1 w-auto',
                   )}
                 >
                   <span className="block font-bold">
                     {m.meta.replyTo.senderId === me.id ? 'Toi' : (byId.get(m.meta.replyTo.senderId)?.displayName.split(' ')[0] ?? 'Message')}
                   </span>
-                  <span className="line-clamp-2 opacity-85">{m.meta.replyTo.text}</span>
+                  <span className={cx('line-clamp-2', !mine && 'text-mute')}>{m.meta.replyTo.text}</span>
                 </button>
               )}
               {shared && <SharedPostCard post={shared.post} mine={mine} />}
@@ -1048,7 +1073,7 @@ function ChatView({ id }: { id: string }) {
                       aria-label={`${r.emoji} : ${names}${minePick ? ' (toucher pour retirer)' : ''}`}
                       title={names}
                       className={cx(
-                        'tap flex h-7 items-center gap-0.5 rounded-full border-2 border-solid border-card px-1.5 text-[0.9375rem] leading-none shadow-pill',
+                        "tap relative flex h-7 items-center gap-0.5 rounded-full border-2 border-solid border-card px-1.5 text-[0.9375rem] leading-none shadow-pill after:absolute after:-inset-x-1 after:-inset-y-2 after:content-['']",
                         minePick ? 'bg-tint' : 'bg-card',
                       )}
                     >
@@ -1077,10 +1102,10 @@ function ChatView({ id }: { id: string }) {
           ) : (
             <span className="flex items-center gap-2 px-1 text-[0.75rem] font-semibold text-heart">
               Non envoyé
-              <button type="button" onClick={() => retryPending(p.tempId)} className="tap border-0 bg-transparent p-0 font-bold text-acc">
+              <button type="button" onClick={() => retryPending(p.tempId)} className="tap -my-3 min-h-11 border-0 bg-transparent px-2 font-bold text-acc">
                 Réessayer
               </button>
-              <button type="button" onClick={() => discardPending(p.tempId)} className="tap border-0 bg-transparent p-0 font-bold text-mute">
+              <button type="button" onClick={() => discardPending(p.tempId)} className="tap -my-3 min-h-11 border-0 bg-transparent px-2 font-bold text-mute">
                 Supprimer
               </button>
             </span>
@@ -1158,7 +1183,7 @@ function ChatView({ id }: { id: string }) {
             </span>
             <span className="block truncate text-[0.8125rem] text-mute">{replyTo.text || attachmentLabel(replyTo.media?.kind, replyTo.media?.duration)}</span>
           </span>
-          <button type="button" aria-label="Annuler la réponse" onClick={() => setReplyTo(null)} className="tap grid h-9 w-9 flex-none place-items-center rounded-full border-0 bg-card text-ink">
+          <button type="button" aria-label="Annuler la réponse" onClick={() => setReplyTo(null)} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-card text-ink">
             <X size={16} />
           </button>
         </div>
@@ -1176,7 +1201,7 @@ function ChatView({ id }: { id: string }) {
             {busy ? `Envoi… ${Math.round((progress ?? 0) * 100)} %` : file.type.startsWith('video/') ? 'Vidéo prête à envoyer' : 'Photo prête à envoyer'}
           </span>
           {!busy && (
-            <button type="button" aria-label="Retirer la pièce jointe" onClick={() => setFile(null)} className="tap grid h-10 w-10 place-items-center rounded-full border-0 bg-card text-ink">
+            <button type="button" aria-label="Retirer la pièce jointe" onClick={() => setFile(null)} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-card text-ink">
               <X size={18} />
             </button>
           )}

@@ -67,7 +67,11 @@ function describe(n: AppNotification, nav: (to: string) => void): Row {
     case 'unpack':
       return {
         icon: <Package size={18} weight="fill" className="text-acc" />,
-        text: <>Le déballage est ouvert · {String(d.count ?? '')} photos</>,
+        text: (
+          <>
+            Le déballage est ouvert · {Number(d.count ?? 0)} photo{Number(d.count ?? 0) > 1 ? 's' : ''}
+          </>
+        ),
         action: { label: 'Voir', run: () => nav('/deballage') },
       };
     case 'pool_added':
@@ -234,6 +238,8 @@ export function NotificationList({ onNavigate }: { onNavigate?: () => void }) {
             className={cx(rowCls, r.to && 'tap')}
             onClick={r.to ? () => go(r.to!) : undefined}
             role={r.to ? 'link' : undefined}
+            tabIndex={r.to ? 0 : undefined}
+            onKeyDown={r.to ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), go(r.to!)) : undefined}
           >
             <div className="relative grid h-10 w-10 flex-none place-items-center rounded-full bg-soft text-ink">
               {r.icon}

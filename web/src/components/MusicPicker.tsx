@@ -57,7 +57,7 @@ function Passage({ track, initial, onBack, onPick }: { track: MusicTrack; initia
   const left = max ? (start / track.duration) * 100 : 0;
   const width = (len / Math.max(1, track.duration)) * 100;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 px-5 pb-6">
+    <div className="flex min-h-0 flex-1 flex-col gap-5 px-5" style={{ paddingBottom: 'calc(24px + env(safe-area-inset-bottom))' }}>
       <audio
         ref={audio}
         onPlaying={() => setLoading(false)}
@@ -69,7 +69,7 @@ function Passage({ track, initial, onBack, onPick }: { track: MusicTrack; initia
         }}
       />
       <div className="flex items-center gap-3">
-        <button type="button" aria-label="Retour à la recherche" onClick={onBack} className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
+        <button type="button" aria-label="Retour à la recherche" onClick={onBack} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-white/15 text-white">
           <ArrowLeft size={18} weight="bold" />
         </button>
         <div className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ function Passage({ track, initial, onBack, onPick }: { track: MusicTrack; initia
               setDuration(n);
               setStart((s) => Math.min(s, Math.max(0, track.duration - n)));
             }}
-            className={cx('tap h-9 rounded-full border-0 px-4 text-sm font-bold disabled:opacity-40', duration === n ? 'bg-white text-black' : 'bg-white/15 text-white')}
+            className={cx('tap h-11 rounded-full border-0 px-5 text-sm font-bold disabled:opacity-40', duration === n ? 'bg-white text-black' : 'bg-white/15 text-white')}
           >
             {n} s
           </button>
@@ -160,8 +160,14 @@ export function MusicPicker({ initial, onClose, onPick }: { initial?: PickedMusi
     enabled: dq.length >= 2,
     staleTime: 60_000,
   });
+  // Échap ferme ce choix seulement (le créateur de story, lui, ignore la touche tant qu'il est ouvert).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-[#0b0f14] text-white" role="dialog" aria-label="Ajouter une musique">
+    <div data-music-picker className="absolute inset-0 z-20 flex flex-col bg-[#0b0f14] text-white" role="dialog" aria-label="Ajouter une musique">
       <div className="flex flex-none items-center gap-2 px-4 pb-3" style={{ paddingTop: 'calc(10px + env(safe-area-inset-top))' }}>
         <div className="flex-1 text-[0.9375rem] font-bold">{track ? 'Choisir le passage' : 'Ajouter une musique'}</div>
         <button type="button" aria-label="Fermer" onClick={onClose} className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-white/15 text-white">

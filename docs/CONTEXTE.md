@@ -3,7 +3,7 @@
 Ce document résume tout ce qui a été construit, comment c'est déployé et les décisions prises en route.
 À lire avant de reprendre le projet (humain ou agent). Le README couvre l'installation ; ici, c'est le « pourquoi » et le « où ».
 
-> Dernière mise à jour : 26 novembre 2026 (posts anonymes).
+> Dernière mise à jour : 28 novembre 2026 (audit de l'interface).
 
 ## 1. L'idée
 
@@ -234,6 +234,9 @@ Le **premier compte créé est administrateur** (et `ADMIN_EMAILS`, `npm run cli
   restent fixes (`saveUpload(…, { still: true })`). Côté téléphone, une image animée n'est ni réduite ni recadrée (`isAnimated`).
   Les GIF postés avant ce correctif ont été enregistrés figés (première image seulement) : il faut les reposter.
 - Accessibilité (#16) : tailles de texte en `rem`, texte secondaire et liens ≥ 4,5:1, focus gardé dans les feuilles.
+- **Audit de l'interface** (28/11/2026) : tous les écrans et feuilles vérifiés à 320, 375 px et en bureau, en clair et en sombre
+  (cibles ≥ 44 px, libellés, contrastes ≥ 4,5:1, débordements, zones sûres, états de chargement et d'erreur, clavier).
+  États d'erreur communs : `ErrorCard` (écran) et `ErrorLine` (liste, réglages) dans `ui.tsx`, avec « Réessayer ».
 - Mise à jour sur demande : bannière « Mettre à jour » (`registerType: 'prompt'`, message `SKIP_WAITING`).
 - **Photos réduites avant l'envoi** (#78, `web/src/lib/image.ts`) : 2048 px max, JPEG 0,85 (PNG gardé en PNG), EXIF retiré, dans `upload()`.
 - **Ouverture instantanée** (#79, `web/src/lib/persist.ts`) : cache TanStack Query gardé dans IndexedDB (`mandrix-cache`) — première page
@@ -328,7 +331,19 @@ déploiement automatique facultatif (dépôt public : aucune clé à créer), al
 - **Zod 4** : `z.record(z.enum(...), …)` exige toutes les clés, utiliser `z.partialRecord` ; `errorMap` devient `error`.
 - **Stories** : le visionneur fige la liste à l'ouverture ; le minuteur cumule le temps écoulé par story.
 - Heure de Paris : `Intl` en `en-GB` + `formatToParts` (le format français écrit « 15 h », `Number()` donne NaN).
-- Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block`.
+- Un `<span>` interrupteur dans un bouton non flex reste en ligne : `Switch` est `inline-block` ; il ne fait que 30 px de haut,
+  le bouton qui le porte doit faire 44 px (`h-12` ou la ligne entière).
+- **Feuilles** : les enfants directs ne rétrécissent pas (`*:shrink-0`), la feuille défile. Un bouton principal sous une longue
+  liste va dans `SheetFooter` (collé en bas). Échap et Tab ne concernent que la feuille du dessus (pile `sheetStack`), jamais
+  sous une confirmation (`role="alertdialog"`) ou un menu (`role="menu"`).
+- **Texte blanc sur photo ou vidéo** : voile sombre (`bg-black/35`…) ou dégradé `from-black/50`, jamais `bg-white/15` seul
+  (illisible sur une photo claire). Dans une bulle bleue, `bg-black/15` plutôt que `bg-white/15`.
+- **Rouge** : `--color-heart` vaut `#d1373c` (texte blanc dessus et texte rouge sur blanc ≥ 4,5:1) ; en sombre, `text-heart`
+  s'éclaircit (`#ff6b70`, règle dans `index.css`). Sur un fond blanc fixe en mode sombre, écrire `text-[#d1373c]`.
+- **Menus « ··· »** : dans un `Portal`, en `fixed`, ouverts vers le haut quand la barre d'onglets manque de place (`PostMenu`).
+- **Cache gardé sur l'appareil** : changer la forme des données d'une requête persistée (ex. `useQuery` → `useInfiniteQuery`)
+  impose de changer sa clé, sinon l'ancien cache fait planter l'écran (vu pour `user-posts`).
+- Écrans très étroits (< 360 px) : titres courts (`short` dans `ROUTES`), logo seul sur le fil.
 - `toLite(u, withBirthday)` : ne jamais écrire `.map(toLite)` (l'index passerait pour `withBirthday`).
 - **Posts anonymes** : pour savoir si un post est le sien, `post.mine` (et `comment.mine`), jamais `post.author.id === me.id`.
   Toute nouvelle route, notification ou évènement qui parle d'un post doit tester `anonymous` avant de citer son auteur.

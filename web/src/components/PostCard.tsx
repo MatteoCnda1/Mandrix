@@ -15,7 +15,7 @@ import {
   Trash,
   User,
 } from '@phosphor-icons/react';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
 import { api, errMsg } from '../lib/api';
 import { deletePost, patchPost, pinPost, reactToPost, removeFromPool, toggleLike, toggleRepost, useMe, votePoll } from '../lib/data';
@@ -28,7 +28,7 @@ import { ReactionPicker, ReactionSummary } from './Reactions';
 import { openReport } from './Report';
 import { MentionSuggestions, RichText } from './RichText';
 import { openPool, openShare, toast, useUI } from '../lib/store';
-import { Avatar, confirmAction, cx, fmtDuration, mediaFrame, MediaView, POST_MEDIA_MAX_H, PrimaryBtn, ratioOf, Sheet, VideoProcessing, wholeRatio } from './ui';
+import { Avatar, confirmAction, cx, fmtDuration, mediaFrame, MediaView, Portal, POST_MEDIA_MAX_H, PrimaryBtn, ratioOf, Sheet, VideoProcessing, wholeRatio } from './ui';
 
 const KIND_BADGE: Record<string, string> = { poll: 'Sondage', video: 'Vidéo', meme: 'Mème' };
 
@@ -62,10 +62,10 @@ function Reactions({ post, className }: { post: Post; className?: string }) {
       <ReactionSummary
         reactions={post.reactions}
         className={cx(post.myReaction && 'bg-tint', className)}
-        onClick={() => {
-          const el = document.activeElement as HTMLElement | null;
-          const r = el?.getBoundingClientRect();
-          setAt(r ? { x: r.left + r.width / 2, y: r.top } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+        onClick={(e) => {
+          // Le bouton touché lui-même : sur iPhone, un bouton touché ne prend pas le focus (activeElement = body).
+          const r = e.currentTarget.getBoundingClientRect();
+          setAt({ x: r.left + r.width / 2, y: r.top });
         }}
       />
       {at && <ReactionPicker at={at} emojis={REACTIONS} current={post.myReaction} onPick={(e) => void reactToPost(post, e)} onClose={() => setAt(null)} />}
@@ -82,7 +82,7 @@ export function ActionBar({ post }: { post: Post }) {
     <div className="flex flex-wrap items-center gap-2">
       <LikeButton post={post} className={pill} />
       <Reactions post={post} className="h-11 px-3" />
-      <button type="button" className={pill} onClick={() => useUI.setState({ commentsFor: post.id })} aria-label="Commentaires">
+      <button type="button" className={pill} onClick={() => useUI.setState({ commentsFor: post.id })} aria-label={`Commentaires (${post.comments})`}>
         <ChatCircle size={20} />
         <span>{fmtCount(post.comments)}</span>
       </button>
@@ -311,7 +311,8 @@ function VideoTeaser({ post }: { post: Post }) {
       <span className="relative grid h-[68px] w-[68px] place-items-center rounded-full bg-white text-night transition-transform duration-[250ms] ease-spring hover:scale-110">
         <Play size={26} weight="fill" />
       </span>
-      {dur && <span className="absolute right-3.5 bottom-3.5 rounded-[14px] bg-white/15 px-3 py-1.5 text-[0.8125rem] font-bold text-white backdrop-blur">{dur}</span>}
+      {/* Voile sombre : la durée reste lisible sur une miniature claire. */}
+      {dur && <span className="absolute right-3.5 bottom-3.5 rounded-[14px] bg-black/45 px-3 py-1.5 text-[0.8125rem] font-bold text-white backdrop-blur">{dur}</span>}
     </button>
   );
 }
@@ -353,18 +354,51 @@ function EditCaption({ post, onClose }: { post: Post; onClose: () => void }) {
   );
 }
 
-function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; onEdit: () => void }) {
+/**
+ * Menu « ··· » d'un post : dans un portail (au-dessus de la barre d'onglets et des autres cartes),
+ * sous le bouton, ou au-dessus quand la place manque en bas de l'écran.
+ */
+function PostMenu({ post, anchor, onClose, onEdit }: { post: Post; anchor: React.RefObject<HTMLElement | null>; onClose: () => void; onEdit: () => void }) {
   const nav = useNavigate();
   const { data: me } = useMe();
+  const box = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ style: CSSProperties; up: boolean }>({ style: { visibility: 'hidden' }, up: false });
+  useLayoutEffect(() => {
+    const a = anchor.current?.getBoundingClientRect();
+    if (!a || !box.current) return;
+    const h = box.current.offsetHeight;
+    const right = Math.max(8, window.innerWidth - a.right);
+    // Limite basse : le haut de la barre d'onglets (téléphone), sinon le bas de l'écran.
+    const floor = document.querySelector<HTMLElement>('nav.glass-bar')?.getBoundingClientRect().top ?? window.innerHeight;
+    const up = a.bottom + 6 + h > floor - 8 && a.top - 6 - h > 8;
+    setPos({ style: up ? { top: a.top - 6 - h, right } : { top: a.bottom + 6, right }, up });
+  }, [anchor]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onClose, { passive: true });
+    window.addEventListener('resize', onClose);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onClose);
+      window.removeEventListener('resize', onClose);
+    };
+  }, [onClose]);
   // `mine` : seul moyen de reconnaître son post anonyme (l'auteur affiché est factice).
   const own = !!me && (post.mine || post.author.id === me.id);
   const mine = me && (own || me.isAdmin);
   const profile = post.anonymous ? post.realAuthor : post.author;
   const item = 'tap flex h-12 w-full items-center gap-2.5 rounded-[20px] border-0 bg-transparent px-3 text-left text-[0.9375rem] font-semibold text-ink hover:bg-soft';
   return (
-    <>
-      <div className="fixed inset-0 z-20" onClick={onClose} />
-      <div className="absolute top-12 right-0 z-30 flex w-56 origin-top-right animate-drop flex-col gap-0.5 rounded-[24px] bg-card p-1.5 shadow-menu">
+    <Portal>
+      <div className="fixed inset-0 z-[70]" onClick={onClose} />
+      <div
+        ref={box}
+        role="menu"
+        aria-label="Options du post"
+        className={cx('fixed z-[70] flex w-56 animate-drop flex-col gap-0.5 rounded-[24px] bg-card p-1.5 text-ink shadow-menu', pos.up ? 'origin-bottom-right' : 'origin-top-right')}
+        style={pos.style}
+      >
         {profile && (
           <button type="button" className={item} onClick={() => nav(`/u/${profile.username}`)}>
             <User size={20} /> {post.anonymous ? 'Profil de l’auteur (admin)' : 'Voir le profil'}
@@ -421,7 +455,7 @@ function PostMenu({ post, onClose, onEdit }: { post: Post; onClose: () => void; 
           </button>
         )}
       </div>
-    </>
+    </Portal>
   );
 }
 
@@ -513,15 +547,19 @@ function Carousel({ post, gallery }: { post: Post; gallery: MediaRef[] }) {
       <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-black/50 px-2.5 py-1 text-xs font-bold text-white tabular-nums">
         {i + 1}/{gallery.length}
       </span>
-      <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+      {/* Points : petits à l'œil, mais chaque cible fait 44 px de haut. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
         {gallery.map((m, k) => (
           <button
             key={m.id}
             type="button"
             aria-label={`Aller à la photo ${k + 1}`}
+            aria-current={k === i ? 'true' : undefined}
             onClick={() => goTo(k)}
-            className={cx('h-2 rounded-full border-0 p-0 transition-all', k === i ? 'w-5 bg-white' : 'w-2 bg-white/55')}
-          />
+            className="tap pointer-events-auto grid h-11 min-w-7 place-items-center border-0 bg-transparent px-[3px]"
+          >
+            <span className={cx('block h-2 rounded-full shadow-[0_0_4px_rgba(0,0,0,.35)] transition-all', k === i ? 'w-5 bg-white' : 'w-2 bg-white/60')} />
+          </button>
         ))}
       </div>
       {open && <MediaLightbox media={open} gallery={gallery} onClose={() => setOpen(null)} />}
@@ -539,6 +577,8 @@ function AnonymousTag({ post }: { post: Post }) {
 export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
+  const closeMenu = useCallback(() => setMenu(false), []);
+  const optionsBtn = useRef<HTMLButtonElement | null>(null);
   const [editing, setEditing] = useState(false);
   const isPoll = post.kind === 'poll';
   const small = isPoll;
@@ -552,7 +592,7 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
       <div className="relative flex items-center gap-2.5">
         <button
           type="button"
-          className="tap flex min-w-0 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink disabled:cursor-default"
+          className="tap flex min-h-11 min-w-0 items-center gap-2.5 border-0 bg-transparent p-0 text-left text-ink disabled:cursor-default"
           disabled={post.anonymous}
           onClick={() => !post.anonymous && nav(`/u/${post.author.username}`)}
         >
@@ -574,15 +614,18 @@ export function PostCard({ post, delay = 0 }: { post: Post; delay?: number }) {
         <div className="ml-auto flex items-center gap-2">
           {KIND_BADGE[post.kind] && <span className="rounded-[14px] bg-soft px-3 py-1.5 text-xs font-bold">{KIND_BADGE[post.kind]}</span>}
           <button
+            ref={optionsBtn}
             type="button"
             aria-label="Options"
+            aria-haspopup="menu"
+            aria-expanded={menu}
             onClick={() => setMenu(true)}
             className="tap grid h-11 w-11 place-items-center rounded-full border-0 bg-soft text-ink"
           >
             <DotsThree size={22} />
           </button>
         </div>
-        {menu && <PostMenu post={post} onClose={() => setMenu(false)} onEdit={() => setEditing(true)} />}
+        {menu && <PostMenu post={post} anchor={optionsBtn} onClose={closeMenu} onEdit={() => setEditing(true)} />}
         {editing && <EditCaption post={post} onClose={() => setEditing(false)} />}
       </div>
 
@@ -622,9 +665,15 @@ function PollFooter({ post }: { post: Post }) {
   return (
     <div className="flex items-center gap-3 text-[0.8125rem] text-mute">
       <span>{timeAgo(post.createdAt)}</span>
-      <Reactions post={post} className="ml-auto h-9" />
-      <LikeButton post={post} size={18} className={cx('tap flex h-9 items-center gap-1.5 border-0 bg-transparent p-0 font-semibold text-mute', !post.reactions.length && 'ml-auto')} />
-      <button type="button" className="tap flex items-center gap-1.5 border-0 bg-transparent p-0 font-semibold text-mute" onClick={() => useUI.setState({ commentsFor: post.id })}>
+      <Reactions post={post} className="ml-auto h-11" />
+      {/* Zones de 44 px (HIG) : le texte reste discret, seule la cible grandit. */}
+      <LikeButton post={post} size={18} className={cx('tap -mx-1 flex h-11 min-w-11 items-center justify-center gap-1.5 border-0 bg-transparent px-1 font-semibold text-mute', !post.reactions.length && 'ml-auto')} />
+      <button
+        type="button"
+        aria-label={`Commentaires (${post.comments})`}
+        className="tap -mx-1 flex h-11 min-w-11 items-center justify-center gap-1.5 border-0 bg-transparent px-1 font-semibold text-mute"
+        onClick={() => useUI.setState({ commentsFor: post.id })}
+      >
         <ChatCircle size={18} /> {fmtCount(post.comments)}
       </button>
     </div>

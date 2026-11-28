@@ -2,13 +2,13 @@ import type { Friendship, MemberCard, UserLite } from '@mandrix/shared';
 import { ChatCircleDots, MagnifyingGlass, MapPin } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Avatar, Seg, Sheet, confirmAction, cx } from '../components/ui';
+import { Avatar, ErrorLine, Seg, Sheet, confirmAction, cx } from '../components/ui';
 import { friendAction, openConversation, useDirectory, useFriends, useUserSearch } from '../lib/data';
 import { useDebounced } from '../lib/hooks';
 import { closeSheet, toast } from '../lib/store';
 import { Suggestions } from '../screens/Search';
 
-const small = 'tap h-10 flex-none rounded-[20px] border-0 px-3.5 text-[0.8125rem] font-bold transition-transform active:scale-95';
+const small = 'tap h-11 flex-none rounded-[22px] border-0 px-3.5 text-[0.8125rem] font-bold transition-transform active:scale-95';
 
 export function FriendButton({ user, status, className, onSoft = false }: { user: UserLite; status: Friendship; className?: string; onSoft?: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -119,7 +119,7 @@ function MemberTile({ m }: { m: MemberCard }) {
 function Members() {
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
-  const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } = useDirectory(dq);
+  const { data, isLoading, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useDirectory(dq);
   const items = data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <>
@@ -128,7 +128,8 @@ function Members() {
         <input className="field w-full pl-12" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher parmi les membres…" aria-label="Rechercher parmi les membres" />
       </label>
       {isLoading && <div className="py-6 text-center text-sm text-mute">Chargement des membres…</div>}
-      {!isLoading && items.length === 0 && <div className="py-6 text-center text-sm text-mute">{dq ? `Personne trouvé pour « ${dq} ».` : 'Tu es le premier membre !'}</div>}
+      {isError && !data && <ErrorLine onRetry={() => void refetch()} />}
+      {!isLoading && !isError && items.length === 0 && <div className="py-6 text-center text-sm text-mute">{dq ? `Aucun membre trouvé pour « ${dq} ».` : 'Tu es le premier membre !'}</div>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {items.map((m) => (
           <MemberTile key={m.id} m={m} />
@@ -149,7 +150,7 @@ export function FriendsSheet() {
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const dq = useDebounced(q.trim(), 300);
-  const { data: friends } = useFriends();
+  const { data: friends, isLoading: friendsLoading, isError: friendsError, refetch: refetchFriends } = useFriends();
   const { data: results, isFetching } = useUserSearch(dq);
   const [tab, setTab] = useState<'amis' | 'membres'>('amis');
 
@@ -169,13 +170,13 @@ export function FriendsSheet() {
         <>
           <label className="relative flex items-center">
             <MagnifyingGlass size={20} className="pointer-events-none absolute left-4 text-mute" />
-            <input className="field w-full pl-12" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un pseudo ou un nom…" autoFocus />
+            <input className="field w-full pl-12" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un pseudo ou un nom…" aria-label="Rechercher un pseudo ou un nom" autoFocus />
           </label>
 
           {dq.length >= 2 ? (
             <div className="flex flex-col gap-0.5">
               {isFetching && !results && <div className="py-4 text-center text-sm text-mute">Recherche…</div>}
-              {results?.length === 0 && <div className="py-4 text-center text-sm text-mute">Personne trouvé pour « {dq} ».</div>}
+              {results?.length === 0 && <div className="py-4 text-center text-sm text-mute">Aucun membre trouvé pour « {dq} ».</div>}
               {results?.map((u) => (
                 <Row key={u.id} user={u}>
                   <FriendButton user={u} status={u.friendship} />
@@ -208,13 +209,15 @@ export function FriendsSheet() {
                 </>
               )}
               <Suggestions limit={5} onOpen={closeSheet} />
-              <Title>Tes amis · {friends?.friends.length ?? 0}</Title>
+              <Title>Tes amis{friends ? ` · ${friends.friends.length}` : ''}</Title>
+              {friendsLoading && <div className="px-2 py-3 text-sm text-mute">Chargement…</div>}
+              {friendsError && !friends && <ErrorLine onRetry={() => void refetchFriends()} />}
               {friends?.friends.length === 0 && (
                 <div className="px-2 py-3 text-sm text-mute">Cherche tes amis par leur pseudo pour leur envoyer une demande.</div>
               )}
               {friends?.friends.map((u) => (
                 <Row key={u.id} user={u}>
-                  <button type="button" aria-label={`Écrire à ${u.displayName}`} className="tap grid h-10 w-10 place-items-center rounded-full border-0 bg-soft text-ink" onClick={() => openConversation(u.id, nav)}>
+                  <button type="button" aria-label={`Écrire à ${u.displayName}`} className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-soft text-ink" onClick={() => openConversation(u.id, nav)}>
                     <ChatCircleDots size={20} />
                   </button>
                 </Row>

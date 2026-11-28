@@ -25,7 +25,7 @@ export function UpdateBanner() {
             setBusy(true);
             apply?.();
           }}
-          className="tap flex h-10 flex-none items-center gap-1.5 rounded-[20px] border-0 bg-brand px-3.5 text-[0.8125rem] font-bold text-white transition-transform active:scale-95 sm:px-4 sm:text-sm"
+          className="tap flex h-11 flex-none items-center gap-1.5 rounded-[22px] border-0 bg-brand px-3.5 text-[0.8125rem] font-bold text-white transition-transform active:scale-95 sm:px-4 sm:text-sm"
         >
           <ArrowClockwise size={16} weight="bold" className={busy ? 'animate-spin' : undefined} />
           {busy ? 'Mise à jour…' : 'Mettre à jour'}
@@ -34,7 +34,7 @@ export function UpdateBanner() {
           type="button"
           aria-label="Plus tard"
           onClick={() => useUI.setState({ updateReady: false })}
-          className="tap grid h-10 w-10 flex-none place-items-center rounded-full border-0 bg-white/15 text-white"
+          className="tap grid h-11 w-11 flex-none place-items-center rounded-full border-0 bg-white/15 text-white"
         >
           <X size={16} />
         </button>

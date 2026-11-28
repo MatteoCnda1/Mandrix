@@ -57,7 +57,7 @@ export function startJobs() {
       [...users].map((u) => u.id),
       'unpack',
       { count: c.count },
-      { title: 'Le déballage est ouvert 📦', body: `${c.count} photos de la semaine t'attendent. Devine d'abord qui les a prises !`, url: '/deballage', tag: 'unpack' },
+      { title: 'Le déballage est ouvert 📦', body: `${c.count} photo${c.count > 1 ? 's' : ''} de la semaine t'attend${c.count > 1 ? 'ent' : ''}. Devine d'abord qui ${c.count > 1 ? 'les a prises' : 'l’a prise'} !`, url: '/deballage', tag: 'unpack' },
       `unpack:${revealAt.toISOString()}`,
     );
   });

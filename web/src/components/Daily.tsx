@@ -8,7 +8,7 @@ import { qc } from '../lib/data';
 import { countdown, fmtCount } from '../lib/format';
 import { useNow } from '../lib/hooks';
 import { toast } from '../lib/store';
-import { Avatar, cx, MediaView, Podium, PrimaryBtn, WholeMedia } from './ui';
+import { Avatar, cx, ErrorCard, Podium, PrimaryBtn, WholeMedia } from './ui';
 
 export const useDaily = () => useQuery({ queryKey: ['daily'], queryFn: () => api<DailyState>('/api/daily'), refetchInterval: 60_000 });
 export const useSeason = () => useQuery({ queryKey: ['season'], queryFn: () => api<SeasonState>('/api/season') });
@@ -22,7 +22,7 @@ function PhaseChip({ meme }: { meme: DailyMeme }) {
   const hours = Number(cd.d) * 24 + Number(cd.h);
   const left = cd.done ? 'bientôt' : `${hours > 0 ? `${hours} h ` : ''}${cd.m} min`;
   return (
-    <span className="flex h-9 items-center gap-1.5 rounded-full bg-tint px-3 text-[0.8125rem] font-bold text-acc tabular-nums">
+    <span className="flex h-9 items-center gap-1.5 rounded-full bg-tint px-3 text-[0.8125rem] font-bold text-ink tabular-nums">
       <HourglassMedium size={16} weight="fill" />
       {meme.phase === 'caption' ? `Légendes · votes dans ${left}` : `Votes · fin dans ${left}`}
     </span>
@@ -140,7 +140,7 @@ function Results({ meme }: { meme: DailyMeme }) {
           <span className="w-6 flex-none text-center text-sm font-extrabold text-mute">{c.winner ? <Crown size={20} weight="fill" className="text-ember" /> : i + 1}</span>
           {c.user && <Avatar user={c.user} size={32} />}
           <span className="min-w-0 flex-1">
-            <span className="block text-[0.9375rem] leading-tight font-bold">{c.text}</span>
+            <span className="block text-[0.9375rem] leading-tight font-bold break-words">{c.text}</span>
             <span className="block text-xs text-mute">{c.mine ? 'Toi' : c.user?.displayName}</span>
           </span>
           <span className="flex-none text-sm font-extrabold tabular-nums">
@@ -154,8 +154,9 @@ function Results({ meme }: { meme: DailyMeme }) {
 
 /** Mème du jour : la légende d'aujourd'hui (ou le vote) et les résultats d'hier. */
 export function DailyMemeView({ emptyPool }: { emptyPool?: React.ReactNode }) {
-  const { data, isLoading } = useDaily();
+  const { data, isLoading, isError, refetch } = useDaily();
   if (isLoading) return <div className="skel h-80 rounded-[32px]" />;
+  if (isError && !data) return <ErrorCard onRetry={() => void refetch()} />;
   const today = data?.today;
   const yesterday = data?.yesterday;
   return (
@@ -182,10 +183,9 @@ export function DailyMemeView({ emptyPool }: { emptyPool?: React.ReactNode }) {
       {yesterday && (
         <section className="card flex flex-col gap-3 p-4" aria-label="Résultats d’hier">
           <h3 className="m-0 text-[1.0625rem] font-extrabold">Résultats d’hier</h3>
-          <div className="flex gap-3">
-            <div className="ph h-24 w-24 flex-none overflow-hidden rounded-[18px]">
-              <MediaView media={yesterday.media} sizes="96px" />
-            </div>
+          {/* Image en entier au-dessus, classement dessous : sur téléphone, la vignette de côté écrasait les légendes. */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <WholeMedia media={yesterday.media} sizes="(max-width: 640px) 100vw, 200px" maxH="min(36svh, 320px)" className="rounded-[18px] sm:w-[200px] sm:flex-none" />
             <div className="min-w-0 flex-1">
               <Results meme={yesterday} />
             </div>
