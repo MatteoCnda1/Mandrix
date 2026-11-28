@@ -1,6 +1,7 @@
 #!/bin/sh
 # Supervision Mandrix, lancée toutes les 5 minutes sur le Proxmox (mandrix-watchdog.timer).
-# - NAS injoignable deux fois de suite : Wake-on-LAN (wake-nas) et alerte ;
+# - NAS injoignable deux fois de suite : Wake-on-LAN (wake-nas) et alerte, sauf s'il a été éteint
+#   exprès (marqueur « veille voulue » de nas-power) ;
 # - partage NFS figé ou disque presque plein (Proxmox, NAS, LXC) : alerte ;
 # - pool LVM « thin » des VM et conteneurs presque plein : alerte (plein, toutes les écritures échouent) ;
 # - disque du LXC passé en lecture seule (erreur d'écriture) : alerte ;
@@ -12,6 +13,8 @@ CONF=/etc/mandrix-watchdog.env
 [ -r "$CONF" ] && . "$CONF"
 NAS_IP=${NAS_IP:-192.168.1.78}
 NAS_MOUNT=${NAS_MOUNT:-/mnt/nas/mandrix}
+# Marqueur « veille voulue » posé par nas-power (homelab) quand le NAS est éteint exprès : ni réveil ni alerte.
+NAS_SLEEP_FLAG=${NAS_SLEEP_FLAG:-/var/lib/nas-power/veille}
 CT=${CT:-107}
 APP_LAN=${APP_LAN:-http://192.168.1.116:3000}
 PUBLIC_URL=${PUBLIC_URL:-https://mandrix.rudylink.eu}
@@ -36,7 +39,16 @@ fail() { n=$(( $(cat "$STATE/$1" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$ST
 ok() { n=$(cat "$STATE/$1" 2>/dev/null || echo 0); echo 0 > "$STATE/$1"; [ "$n" -gt 0 ] && echo "$n" || echo 0; }
 
 # ——— NAS ———
+NAS_UP=0
 if ping -c 2 -W 2 "$NAS_IP" >/dev/null 2>&1; then
+  NAS_UP=1
+  rm -f "$STATE/veille-vue"
+  # Rallumé au bouton sans « nas-power wake » : le marqueur ne sert plus. 15 min de marge, car pendant
+  # l'extinction le NAS répond encore un peu alors que le marqueur est déjà posé.
+  if [ -n "$(find "$NAS_SLEEP_FLAG" -mmin +15 2>/dev/null)" ]; then
+    rm -f "$NAS_SLEEP_FLAG"
+    log "NAS rallumé : marqueur de veille retiré"
+  fi
   if [ "$(ok nas)" -ge 2 ]; then
     log "NAS revenu"
     alert nas "NAS revenu ✅" "Le NAS répond de nouveau. Photos et sauvegardes sont accessibles."
@@ -46,6 +58,10 @@ if ping -c 2 -W 2 "$NAS_IP" >/dev/null 2>&1; then
   else
     ok mount >/dev/null
   fi
+elif [ -e "$NAS_SLEEP_FLAG" ]; then
+  # Éteint exprès (bouton, appli UGREEN, Homelab Hub) : réveil par « nas-power wake » seulement
+  ok nas >/dev/null
+  [ -e "$STATE/veille-vue" ] || { log "NAS en veille voulue : pas de réveil"; touch "$STATE/veille-vue"; }
 else
   n=$(fail nas)
   if [ "$n" -eq 2 ] || [ $(( n % 12 )) -eq 0 ]; then
@@ -56,7 +72,10 @@ else
 fi
 
 # ——— Espace disque (une alerte par jour au plus) ———
-for target in / "$NAS_MOUNT"; do
+# NAS éteint : pas de df sur son montage « hard », il resterait bloqué et les df s'empileraient
+targets=/
+[ "$NAS_UP" -eq 1 ] && targets="/ $NAS_MOUNT"
+for target in $targets; do
   used=$(timeout 15 df -P "$target" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')
   [ -n "$used" ] || continue
   key=disk$(echo "$target" | tr '/' '_')

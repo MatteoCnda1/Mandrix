@@ -18,6 +18,10 @@ Le même jeton doit figurer dans `/etc/mandrix-watchdog.env` sur le Proxmox (ét
 `mandrix-watchdog.sh` :
 
 - NAS injoignable deux fois de suite : `wake-nas` (Wake-on-LAN) et alerte, puis rappel toutes les heures ; alerte au retour ;
+  sauf s'il a été éteint exprès : le marqueur « veille voulue » `/var/lib/nas-power/veille` (posé par `nas-power` du
+  homelab, ou par le NAS lui-même à chaque arrêt voulu) coupe le réveil et les alertes jusqu'à `nas-power wake` ;
+  rallumé au bouton, le marqueur est retiré au bout de 15 min ;
+- NAS éteint : pas de `df` sur son montage NFS « hard » (il resterait bloqué et les `df` s'empileraient) ;
 - montage NFS figé (`stat` qui ne répond pas) : alerte ;
 - disque du Proxmox, du NAS ou du LXC Mandrix rempli au-delà de 90 % : une alerte par jour ;
 - pool LVM « thin » `pve/data` (disques de toutes les VM et conteneurs) rempli au-delà de 85 % (données ou métadonnées) :
@@ -33,7 +37,7 @@ printf 'ALERT_TOKEN=%s\n' "<jeton de l'étape 1>" > /etc/mandrix-watchdog.env &&
 systemctl daemon-reload && systemctl enable --now mandrix-watchdog.timer
 ```
 
-Réglages facultatifs dans `/etc/mandrix-watchdog.env` : `NAS_IP`, `NAS_MOUNT`, `CT`, `APP_LAN`, `PUBLIC_URL`, `DISK_LIMIT`,
+Réglages facultatifs dans `/etc/mandrix-watchdog.env` : `NAS_IP`, `NAS_MOUNT`, `NAS_SLEEP_FLAG`, `CT`, `APP_LAN`, `PUBLIC_URL`, `DISK_LIMIT`,
 `THIN_POOL` (défaut `pve/data`, vide pour ne pas le surveiller), `THIN_LIMIT` (défaut 85).
 
 **Pool LVM presque plein** : `pct exec 107 -- sh -c 'docker builder prune -f && docker image prune -f'`, `pct fstrim <id>`
